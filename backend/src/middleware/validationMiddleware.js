@@ -8,7 +8,7 @@ const handleValidationErrors = (req, res, next) => {
       success: false,
       message: 'Dữ liệu không hợp lệ',
       errors: errors.array().map(err => ({
-        field: err.param,
+        field: err.path || err.param,
         message: err.msg
       }))
     });
@@ -110,7 +110,7 @@ const validateServiceId = [
   handleValidationErrors
 ];
 
-// Appointment Validations
+// Appointment Validations 
 const validateCreateAppointment = [
   body('service_id')
     .isInt({ min: 1 }).withMessage('ID dịch vụ không hợp lệ'),
@@ -127,16 +127,17 @@ const validateCreateAppointment = [
       }
       return true;
     }),
-  body('appointment_time')
-    .matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).withMessage('Giờ hẹn phải định dạng HH:MM:SS')
+  body('appointment_time') //giờ hẹn phải định dạng HH:MM hoặc HH:MM:SS và trong khoảng 08:00 - 18:00
+    .matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/).withMessage('Giờ hẹn phải định dạng HH:MM hoặc HH:MM:SS')
+    .customSanitizer((value) => (value.length === 5 ? `${value}:00` : value))
     .custom(value => {
-      const [hour, minute] = value.split(':');
+      const hour = Number(value.split(':')[0]);
       if (hour < 8 || hour > 18) {
         throw new Error('Giờ hẹn phải từ 08:00 đến 18:00');
       }
       return true;
     }),
-  body('notes')
+  body('notes') // Ghi chú không bắt buộc, nhưng nếu có thì phải tối đa 500 ký tự
     .optional()
     .trim()
     .isLength({ max: 500 }).withMessage('Ghi chú không vượt quá 500 ký tự'),
@@ -154,9 +155,9 @@ const validateUpdateAppointmentStatus = [
 const validateAddReview = [
   param('id')
     .isInt({ min: 1 }).withMessage('ID lịch hẹn không hợp lệ'),
-  body('staff_rating')
+  body('rating')
     .isInt({ min: 1, max: 5 }).withMessage('Đánh giá phải từ 1 - 5 sao'),
-  body('staff_review')
+  body('review')
     .optional()
     .trim()
     .isLength({ max: 500 }).withMessage('Bình luận không vượt quá 500 ký tự'),

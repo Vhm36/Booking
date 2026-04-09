@@ -8,12 +8,26 @@ const normalizeCustomers = (list = []) =>
     is_active: Number(item.is_active) === 1 || item.is_active === true
   }));
 
+const emptyEditData = {
+  name: '',
+  email: '',
+  phone: '',
+  password: '',
+  is_active: true
+};
+
+const emptyFeedback = {
+  type: '',
+  text: ''
+};
+
 function ManageCustomers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [keyword, setKeyword] = useState('');
+  const [pageFeedback, setPageFeedback] = useState(emptyFeedback);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,13 +35,13 @@ function ManageCustomers() {
     phone: '',
     is_active: true
   });
-  const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    is_active: true
-  });
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [editData, setEditData] = useState(emptyEditData);
+  const [editFeedback, setEditFeedback] = useState(emptyFeedback);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -64,6 +78,12 @@ function ManageCustomers() {
     });
   }, [customers, keyword]);
 
+  const updateEditField = (field, value) => {
+    setEditFeedback(emptyFeedback);
+    setDeleteError('');
+    setEditData((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleCreate = async (event) => {
     event.preventDefault();
 
@@ -84,6 +104,7 @@ function ManageCustomers() {
         is_active: true
       });
       setShowForm(false);
+      setPageFeedback({ type: 'success', text: 'Bạn đã thêm khách hàng mới.' });
       fetchCustomers();
     } catch (err) {
       alert(err.response?.data?.message || 'Thêm khách hàng thất bại.');
@@ -91,42 +112,119 @@ function ManageCustomers() {
   };
 
   const startEdit = (customer) => {
-    setEditingId(customer.id);
+    setPageFeedback(emptyFeedback);
+    setEditingCustomer(customer);
     setEditData({
       name: customer.name || '',
       email: customer.email || '',
       phone: customer.phone || '',
+      password: '',
       is_active: !!customer.is_active
     });
+    setEditFeedback(emptyFeedback);
+    setShowDeleteConfirm(false);
+    setDeleteError('');
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditData({
-      name: '',
-      email: '',
-      phone: '',
-      is_active: true
-    });
+  const closeDeleteConfirm = () => {
+    if (deletingCustomer) {
+      return;
+    }
+
+    setShowDeleteConfirm(false);
+    setDeleteError('');
+  };  const closeEditModal = () => {
+    if (savingEdit || deletingCustomer) {
+      return;
+    }
+
+    setEditingCustomer(null);
+    setEditData(emptyEditData);
+    setEditFeedback(emptyFeedback);
+    setShowDeleteConfirm(false);
+    setDeleteError('');
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (event) => {
+    event.preventDefault();
+
     if (!editData.name.trim() || !editData.email.trim()) {
-      alert('Vui lòng nhập đầy đủ họ tên và email.');
+      setEditFeedback({
+        type: 'error',
+        text: 'Vui lòng nhập đầy đủ họ tên và email.'
+      });
       return;
     }
 
     try {
-      await customerService.updateCustomer(editingId, {
+      setSavingEdit(true);
+      setEditFeedback(emptyFeedback);
+      const payload = {
         name: editData.name.trim(),
         email: editData.email.trim(),
         phone: editData.phone.trim(),
         is_active: editData.is_active
+      };
+
+      if (editData.password) {
+        payload.password = editData.password;
+      }
+
+      await customerService.updateCustomer(editingCustomer.id, payload);
+
+      const nextCustomer = {
+        ...editingCustomer,
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone,
+        is_active: payload.is_active
+      };
+
+      setCustomers((prev) =>
+        prev.map((customer) =>
+          customer.id === editingCustomer.id ? { ...customer, ...nextCustomer } : customer
+        )
+      );
+      setEditingCustomer(nextCustomer);
+      setEditData((prev) => ({ ...prev, password: '' }));
+      setEditFeedback({
+        type: 'success',
+        text:
+          typeof payload.password !== 'undefined'
+            ? 'Bạn đã lưu mật khẩu mới.'
+            : 'Bạn đã lưu thông tin khách hàng.'
       });
-      cancelEdit();
-      fetchCustomers();
     } catch (err) {
-      alert(err.response?.data?.message || 'Cập nhật khách hàng thất bại.');
+      setEditFeedback({
+        type: 'error',
+        text: err.response?.data?.message || 'Cập nhật khách hàng thất bại.'
+      });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!editingCustomer) {
+      return;
+    }
+
+    try {
+      setDeletingCustomer(true);
+      setDeleteError('');
+      await customerService.deleteCustomer(editingCustomer.id);
+      setCustomers((prev) => prev.filter((customer) => customer.id !== editingCustomer.id));
+      setPageFeedback({ type: 'success', text: 'Bạn đã xóa tài khoản khách hàng.' });
+      setEditingCustomer(null);
+      setEditData(emptyEditData);
+      setEditFeedback(emptyFeedback);
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      setDeleteError(
+        err.response?.data?.message || 'Không thể xóa tài khoản này lúc này. Vui lòng thử lại.'
+      );
+    } finally {
+      setDeletingCustomer(false);
     }
   };
 
@@ -137,6 +235,10 @@ function ManageCustomers() {
   return (
     <div className="manage-customers">
       <h1>Quản lý khách hàng</h1>
+
+      {pageFeedback.text && (
+        <div className={`page-feedback ${pageFeedback.type}`}>{pageFeedback.text}</div>
+      )}
 
       <div className="customers-toolbar">
         <button className="btn-primary" onClick={() => setShowForm((prev) => !prev)}>
@@ -229,6 +331,7 @@ function ManageCustomers() {
               <th>Họ tên</th>
               <th>Email</th>
               <th>Điện thoại</th>
+              <th>Mật khẩu</th>
               <th>Số lịch</th>
               <th>Trạng thái</th>
               <th>Hành động</th>
@@ -237,100 +340,185 @@ function ManageCustomers() {
           <tbody>
             {filteredCustomers.length === 0 && (
               <tr>
-                <td colSpan="7" className="empty-state">
+                <td colSpan="8" className="empty-state">
                   Chưa có khách hàng phù hợp.
                 </td>
               </tr>
             )}
 
-            {filteredCustomers.map((customer) => {
-              const isEditing = editingId === customer.id;
-
-              return (
-                <tr key={customer.id}>
-                  <td>{customer.id}</td>
-                  <td>
-                    {isEditing ? (
-                      <input
-                        value={editData.name}
-                        onChange={(event) =>
-                          setEditData((prev) => ({ ...prev, name: event.target.value }))
-                        }
-                      />
-                    ) : (
-                      customer.name
-                    )}
-                  </td>
-                  <td>
-                    {isEditing ? (
-                      <input
-                        type="email"
-                        value={editData.email}
-                        onChange={(event) =>
-                          setEditData((prev) => ({ ...prev, email: event.target.value }))
-                        }
-                      />
-                    ) : (
-                      customer.email
-                    )}
-                  </td>
-                  <td>
-                    {isEditing ? (
-                      <input
-                        value={editData.phone}
-                        onChange={(event) =>
-                          setEditData((prev) => ({ ...prev, phone: event.target.value }))
-                        }
-                      />
-                    ) : (
-                      customer.phone || '-'
-                    )}
-                  </td>
-                  <td>{customer.total_appointments || 0}</td>
-                  <td>
-                    {isEditing ? (
-                      <select
-                        value={editData.is_active ? '1' : '0'}
-                        onChange={(event) =>
-                          setEditData((prev) => ({
-                            ...prev,
-                            is_active: event.target.value === '1'
-                          }))
-                        }
-                      >
-                        <option value="1">Đang hoạt động</option>
-                        <option value="0">Tạm khóa</option>
-                      </select>
-                    ) : (
-                      <span className={`customer-status ${customer.is_active ? 'active' : 'inactive'}`}>
-                        {customer.is_active ? 'Đang hoạt động' : 'Tạm khóa'}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {isEditing ? (
-                      <div className="customer-actions">
-                        <button className="btn-success btn-small" onClick={handleSaveEdit}>
-                          Lưu
-                        </button>
-                        <button className="btn-secondary btn-small" onClick={cancelEdit}>
-                          Hủy
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="customer-actions">
-                        <button className="btn-secondary btn-small" onClick={() => startEdit(customer)}>
-                          Sửa
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {filteredCustomers.map((customer) => (
+              <tr key={customer.id}>
+                <td>{customer.id}</td>
+                <td>{customer.name}</td>
+                <td>{customer.email}</td>
+                <td>{customer.phone || '-'}</td>
+                <td>
+                  <span className="password-placeholder">Không hiển thị</span>
+                </td>
+                <td>{customer.total_appointments || 0}</td>
+                <td>
+                  <span className={`customer-status ${customer.is_active ? 'active' : 'inactive'}`}>
+                    {customer.is_active ? 'Đang hoạt động' : 'Tạm khóa'}
+                  </span>
+                </td>
+                <td>
+                  <div className="customer-actions">
+                    <button className="btn-secondary btn-small" onClick={() => startEdit(customer)}>
+                      Sửa
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+      {editingCustomer && (
+        <div className="customer-edit-overlay" onClick={closeEditModal}>
+          <div
+            className="customer-edit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customer-edit-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="customer-edit-header">
+              <div>
+                <p className="customer-edit-kicker">Sửa khách hàng</p>
+                <h3 id="customer-edit-title">{editingCustomer.name || 'Khách hàng'}</h3>
+              </div>
+              <button
+                type="button"
+                className="customer-edit-close"
+                onClick={closeEditModal}
+                aria-label="Thoát tab sửa khách hàng"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="customer-edit-form" onSubmit={handleSaveEdit}>
+              <div className="customer-edit-grid">
+                <div className="form-group">
+                  <label>Họ tên</label>
+                  <input
+                    type="text"
+                    value={editData.name}
+                    onChange={(event) => updateEditField('name', event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={editData.email}
+                    onChange={(event) => updateEditField('email', event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Số điện thoại</label>
+                  <input
+                    type="text"
+                    value={editData.phone}
+                    onChange={(event) => updateEditField('phone', event.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Mật khẩu mới</label>
+                  <input
+                    type="password"
+                    value={editData.password}
+                    onChange={(event) => updateEditField('password', event.target.value)}
+                    placeholder="Để trống nếu không đổi"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group customer-edit-status">
+                <label>Trạng thái</label>
+                <select
+                  value={editData.is_active ? '1' : '0'}
+                  onChange={(event) => updateEditField('is_active', event.target.value === '1')}
+                >
+                  <option value="1">Đang hoạt động</option>
+                  <option value="0">Tạm khóa</option>
+                </select>
+              </div>
+
+              {editFeedback.text && (
+                <div className={`customer-edit-feedback ${editFeedback.type}`}>
+                  {editFeedback.text}
+                </div>
+              )}
+
+              <div className="customer-edit-actions">
+                <button
+                  type="button"
+                  className="btn-danger"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={savingEdit || deletingCustomer}
+                >
+                  Xóa tài khoản
+                </button>
+
+                <div className="customer-edit-action-group">
+                  <button type="submit" className="btn-success" disabled={savingEdit || deletingCustomer}>
+                    {savingEdit ? 'Đang lưu...' : 'Lưu'}
+                  </button>
+                  <button
+                    type="button"
+                    className="customer-action-neutral"
+                    onClick={closeEditModal}
+                    disabled={savingEdit || deletingCustomer}
+                  >
+                    Thoát
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {showDeleteConfirm && (
+            <div className="customer-confirm-overlay" onClick={closeDeleteConfirm}>
+              <div className="customer-confirm-card" onClick={(event) => event.stopPropagation()}>
+                <p className="customer-confirm-title">Bạn có chắc muốn xóa tài khoản này?</p>
+                <p className="customer-confirm-text">
+                  Tài khoản của {editingCustomer.name || 'khách hàng'} sẽ bị xóa khỏi danh sách.
+                </p>
+                <p className="customer-confirm-note">
+                  Những khách hàng đã có lịch hẹn sẽ không thể xóa và nên dùng trạng thái tạm khóa.
+                </p>
+
+                {deleteError && <div className="customer-confirm-error">{deleteError}</div>}
+
+                <div className="customer-confirm-actions">
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    onClick={handleDeleteCustomer}
+                    disabled={deletingCustomer}
+                  >
+                    {deletingCustomer ? 'Đang xóa...' : 'Có'}
+                  </button>
+                  <button
+                    type="button"
+                    className="customer-confirm-cancel"
+                    onClick={closeDeleteConfirm}
+                    disabled={deletingCustomer}
+                  >
+                    Không
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

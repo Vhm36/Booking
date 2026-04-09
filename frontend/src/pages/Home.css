@@ -377,6 +377,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  align-items: stretch;
+  animation: reviewPageFade 0.35s ease;
 }
 
 .reviews-dots {
@@ -384,31 +386,61 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 }
 
 .reviews-dot {
-  width: 8px;
-  height: 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  flex: 0 0 auto;
+  width: 6px;
+  min-width: 6px;
+  max-width: 6px;
+  height: 6px;
+  min-height: 6px;
+  max-height: 6px;
   border: none;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: #d5deea;
   cursor: pointer;
   padding: 0;
+  margin: 0;
+  box-shadow: none;
+  opacity: 0.9;
+  overflow: hidden;
+  transition: background 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.reviews-dot:hover {
+  background: #b9c7d9;
+  transform: scale(1.08);
+}
+
+.reviews-dot:focus-visible {
+  outline: 2px solid #bfdbfe;
+  outline-offset: 2px;
 }
 
 .reviews-dot.active {
-  width: 20px;
+  width: 6px;
+  min-width: 6px;
+  max-width: 6px;
+  height: 6px;
+  min-height: 6px;
+  max-height: 6px;
   background: #1d67e0;
+  opacity: 1;
 }
 
 .review-card {
-  border-radius: 13px;
+  border-radius: 13px; 
   border: 1px solid #dce5f0;
   background: #f9fbff;
   padding: 13px;
   display: grid;
   gap: 8px;
+  height: 100%;
 }
 
 .review-top {
@@ -486,6 +518,18 @@
   font-size: 13px;
   line-height: 1.58;
   margin: 0;
+}
+
+@keyframes reviewPageFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 1080px) {

@@ -35,6 +35,8 @@ CREATE TABLE appointments (
   appointment_date DATE NOT NULL,
   appointment_time TIME NOT NULL,
   status ENUM('pending', 'confirmed', 'completed', 'cancelled') DEFAULT 'pending',
+  cancellation_requested TINYINT(1) NOT NULL DEFAULT 0,
+  cancellation_requested_at DATETIME NULL,
   notes TEXT,
   total_amount DECIMAL(10,2),
   staff_rating TINYINT UNSIGNED NULL,

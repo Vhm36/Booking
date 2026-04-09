@@ -11,7 +11,7 @@ const normalizeStaff = (list = []) =>
 function ManageStaff() {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState('');
+  const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -23,6 +23,7 @@ function ManageStaff() {
   const [editData, setEditData] = useState({
     name: '',
     phone: '',
+    password: '',
     is_active: true
   });
 
@@ -37,7 +38,12 @@ function ManageStaff() {
       setStaffList(normalizeStaff(response.data.data || []));
       setError('');
     } catch (err) {
-      setError('Không thể tải danh sách nhân viên.');
+      const apiMessage =
+        typeof err.response?.data === 'string'
+          ? err.response.data
+          : err.response?.data?.message;
+      setError(apiMessage || 'Không thể tải danh sách nhân viên.');
+      setStaffList([]);
     } finally {
       setLoading(false);
     }
@@ -66,22 +72,29 @@ function ManageStaff() {
     setEditData({
       name: staff.name || '',
       phone: staff.phone || '',
+      password: '',
       is_active: !!staff.is_active
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditData({ name: '', phone: '', is_active: true });
+    setEditData({ name: '', phone: '', password: '', is_active: true });
   };
 
   const handleSaveEdit = async () => {
     try {
-      await staffService.updateStaff(editingId, {
+      const payload = {
         name: editData.name.trim(),
         phone: editData.phone.trim(),
         is_active: editData.is_active
-      });
+      };
+
+      if (editData.password) {
+        payload.password = editData.password;
+      }
+
+      await staffService.updateStaff(editingId, payload);
       cancelEdit();
       fetchStaff();
     } catch (err) {
@@ -109,6 +122,11 @@ function ManageStaff() {
       <button className="btn-primary" onClick={() => setShowForm((prev) => !prev)}>
         {showForm ? 'Đóng form' : '+ Thêm nhân viên'}
       </button>
+
+      {error && <div className="alert alert-error">{error}</div>}
+      {!error && staffList.length === 0 && (
+        <div className="alert alert-info">Chưa có nhân viên nào để hiển thị.</div>
+      )}
 
       {showForm && (
         <div className="staff-form-card">
@@ -170,12 +188,21 @@ function ManageStaff() {
               <th>Họ tên</th>
               <th>Email</th>
               <th>Điện thoại</th>
+              <th>Mật khẩu mới</th>
               <th>Số lịch</th>
               <th>Trạng thái</th>
               <th>Hành động</th>
             </tr>
           </thead>
           <tbody>
+            {staffList.length === 0 && (
+              <tr>
+                <td colSpan="8" className="empty-cell">
+                  Chưa có dữ liệu nhân viên.
+                </td>
+              </tr>
+            )}
+
             {staffList.map((staff) => {
               const isEditing = editingId === staff.id;
 
@@ -205,6 +232,20 @@ function ManageStaff() {
                       />
                     ) : (
                       staff.phone || '-'
+                    )}
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <input
+                        type="password"
+                        value={editData.password}
+                        onChange={(event) =>
+                          setEditData((prev) => ({ ...prev, password: event.target.value }))
+                        }
+                        placeholder="Để trống nếu không đổi"
+                      />
+                    ) : (
+                      <span className="password-placeholder">Không hiển thị</span>
                     )}
                   </td>
                   <td>{staff.total_appointments || 0}</td>

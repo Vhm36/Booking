@@ -1,15 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import bookingService from '../services/bookingService';
 import './MyAppointments.css';
 
-const getStatusBadge = (status) => {
+const hasCancellationRequest = (appointment) =>
+  Number(appointment?.cancellation_requested) === 1 && appointment?.status !== 'cancelled';
+
+const isAwaitingStaffConfirmation = (appointment) =>
+  appointment?.status === 'pending' && !hasCancellationRequest(appointment);
+
+const getStatusBadge = (appointment) => {
+  if (hasCancellationRequest(appointment)) {
+    return { label: 'Chờ xác nhận hủy', class: 'badge-cancel-request' };
+  }
+
   const statusMap = {
-    pending: { label: 'Chờ xác nhận', class: 'badge-warning' },
-    confirmed: { label: 'Đã xác nhận', class: 'badge-success' },
+    pending: { label: 'Chờ nhân viên xác nhận', class: 'badge-warning' },
+    confirmed: { label: 'Đã xác nhận làm', class: 'badge-success' },
     completed: { label: 'Hoàn thành', class: 'badge-info' },
     cancelled: { label: 'Đã hủy', class: 'badge-danger' }
   };
-  return statusMap[status] || { label: status, class: 'badge-default' };
+
+  return statusMap[appointment?.status] || { label: appointment?.status || 'Không rõ', class: 'badge-default' };
 };
 
 const hasRated = (appointment) => Number(appointment?.staff_rating) >= 1;
@@ -17,9 +28,20 @@ const hasRated = (appointment) => Number(appointment?.staff_rating) >= 1;
 const canReview = (appointment) =>
   appointment?.status === 'completed' && !!appointment?.staff_name && !hasRated(appointment);
 
+const canRequestCancellation = (appointment) =>
+  ['pending', 'confirmed'].includes(appointment?.status) && Number(appointment?.cancellation_requested) !== 1;
+
 const renderRatingStars = (rating) => {
   const safeRating = Math.min(5, Math.max(1, Number(rating) || 0));
-  return '★★★★★'.slice(0, safeRating) + '☆☆☆☆☆'.slice(0, 5 - safeRating);
+  return `${'\u2605'.repeat(safeRating)}${'\u2606'.repeat(5 - safeRating)}`;
+};
+
+const getPendingStaffMessage = (appointment) => {
+  if (appointment?.staff_name) {
+    return `Lịch hẹn đang chờ nhân viên ${appointment.staff_name} xác nhận nhận lịch.`;
+  }
+
+  return 'Lịch hẹn đang chờ nhân viên phụ trách xác nhận nhận lịch.';
 };
 
 function MyAppointments() {
@@ -28,6 +50,7 @@ function MyAppointments() {
   const [filter, setFilter] = useState('all');
   const [reviewDrafts, setReviewDrafts] = useState({});
   const [submittingReviewId, setSubmittingReviewId] = useState(null);
+  const [processingCancelId, setProcessingCancelId] = useState(null);
 
   useEffect(() => {
     fetchAppointments();
@@ -49,7 +72,6 @@ function MyAppointments() {
         return next;
       });
     } catch (err) {
-      // Không hiển thị banner lỗi cho khách hàng, chỉ fallback về danh sách rỗng.
       setAppointments([]);
       console.error('Không thể tải lịch hẹn:', err);
     } finally {
@@ -57,14 +79,31 @@ function MyAppointments() {
     }
   };
 
-  const handleCancel = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy lịch này?')) return;
+  const stats = useMemo(
+    () => ({
+      total: appointments.length,
+      pending: appointments.filter((item) => isAwaitingStaffConfirmation(item)).length,
+      confirmed: appointments.filter((item) => item.status === 'confirmed').length,
+      completed: appointments.filter((item) => item.status === 'completed').length,
+      cancellationRequested: appointments.filter((item) => hasCancellationRequest(item)).length
+    }),
+    [appointments]
+  );
+
+  const handleCancelRequest = async (id) => {
+    if (!window.confirm('Bạn có chắc muốn gửi yêu cầu hủy lịch này không?')) {
+      return;
+    }
 
     try {
+      setProcessingCancelId(id);
       await bookingService.cancelBooking(id);
-      fetchAppointments();
+      await fetchAppointments();
+      window.alert('Đã gửi yêu cầu hủy. Nhân viên sẽ xác nhận sớm.');
     } catch (err) {
-      alert('Hủy lịch thất bại.');
+      window.alert(err.response?.data?.message || 'Gửi yêu cầu hủy thất bại.');
+    } finally {
+      setProcessingCancelId(null);
     }
   };
 
@@ -83,7 +122,7 @@ function MyAppointments() {
     const rating = Number(draft.rating);
 
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      alert('Điểm đánh giá phải từ 1 đến 5.');
+      window.alert('Điểm đánh giá phải từ 1 đến 5.');
       return;
     }
 
@@ -109,15 +148,21 @@ function MyAppointments() {
         [appointment.id]: { rating: '5', review: '' }
       }));
     } catch (err) {
-      alert(err.response?.data?.message || 'Gửi đánh giá thất bại.');
+      window.alert(err.response?.data?.message || 'Gửi đánh giá thất bại.');
     } finally {
       setSubmittingReviewId(null);
     }
   };
 
-  const filteredAppointments = appointments.filter((apt) => {
+  const filteredAppointments = appointments.filter((appointment) => {
     if (filter === 'all') return true;
-    return apt.status === filter;
+    if (filter === 'cancellation_requested') {
+      return hasCancellationRequest(appointment);
+    }
+    if (filter === 'pending') {
+      return isAwaitingStaffConfirmation(appointment);
+    }
+    return appointment.status === filter;
   });
 
   if (loading) {
@@ -130,36 +175,42 @@ function MyAppointments() {
 
       <div className="filter-buttons">
         <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
-          Tất cả ({appointments.length})
+          Tất cả ({stats.total})
         </button>
         <button
           className={`filter-btn ${filter === 'pending' ? 'active' : ''}`}
           onClick={() => setFilter('pending')}
         >
-          Chờ xác nhận
+          Chờ NV xác nhận ({stats.pending})
         </button>
         <button
           className={`filter-btn ${filter === 'confirmed' ? 'active' : ''}`}
           onClick={() => setFilter('confirmed')}
         >
-          Đã xác nhận
+          Đã xác nhận làm ({stats.confirmed})
+        </button>
+        <button
+          className={`filter-btn ${filter === 'cancellation_requested' ? 'active' : ''}`}
+          onClick={() => setFilter('cancellation_requested')}
+        >
+          Chờ hủy ({stats.cancellationRequested})
         </button>
         <button
           className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
           onClick={() => setFilter('completed')}
         >
-          Hoàn thành
+          Hoàn thành ({stats.completed})
         </button>
       </div>
 
       {filteredAppointments.length === 0 ? (
         <div className="no-appointments">
-          <p>Không có lịch hẹn nào.</p>
+          <p>Không có lịch hẹn nào phù hợp với bộ lọc hiện tại.</p>
         </div>
       ) : (
         <div className="appointments-list">
           {filteredAppointments.map((appointment) => {
-            const statusInfo = getStatusBadge(appointment.status);
+            const statusInfo = getStatusBadge(appointment);
             const draft = reviewDrafts[appointment.id] || { rating: '5', review: '' };
 
             return (
@@ -203,6 +254,16 @@ function MyAppointments() {
                     </div>
                   )}
 
+                  {isAwaitingStaffConfirmation(appointment) && (
+                    <div className="awaiting-staff-note">{getPendingStaffMessage(appointment)}</div>
+                  )}
+
+                  {hasCancellationRequest(appointment) && (
+                    <div className="cancellation-request-note">
+                      Yêu cầu hủy của bạn đang chờ nhân viên xác nhận.
+                    </div>
+                  )}
+
                   {hasRated(appointment) && (
                     <div className="review-result">
                       <div className="review-result-head">
@@ -221,9 +282,7 @@ function MyAppointments() {
                         <select
                           id={`rating-${appointment.id}`}
                           value={draft.rating}
-                          onChange={(event) =>
-                            handleReviewInput(appointment.id, 'rating', event.target.value)
-                          }
+                          onChange={(event) => handleReviewInput(appointment.id, 'rating', event.target.value)}
                         >
                           <option value="5">5 - Rất hài lòng</option>
                           <option value="4">4 - Hài lòng</option>
@@ -235,9 +294,7 @@ function MyAppointments() {
                       <textarea
                         rows="3"
                         value={draft.review}
-                        onChange={(event) =>
-                          handleReviewInput(appointment.id, 'review', event.target.value)
-                        }
+                        onChange={(event) => handleReviewInput(appointment.id, 'review', event.target.value)}
                         placeholder="Bạn có thể ghi nhận xét chi tiết (không bắt buộc)..."
                       />
                       <button
@@ -252,10 +309,14 @@ function MyAppointments() {
                   )}
                 </div>
 
-                {appointment.status === 'pending' && (
+                {canRequestCancellation(appointment) && (
                   <div className="appointment-footer">
-                    <button onClick={() => handleCancel(appointment.id)} className="btn-danger">
-                      Hủy lịch
+                    <button
+                      onClick={() => handleCancelRequest(appointment.id)}
+                      className="btn-danger"
+                      disabled={processingCancelId === appointment.id}
+                    >
+                      {processingCancelId === appointment.id ? 'Đang gửi yêu cầu...' : 'Yêu cầu hủy lịch'}
                     </button>
                   </div>
                 )}

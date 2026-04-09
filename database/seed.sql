@@ -15,7 +15,7 @@ INSERT INTO users (name, email, password, phone, role, created_at)
 VALUES
   ('Admin Demo', 'admin@example.com', '$2a$10$h8z47WDz93kpQiWT4WtmFu8ML40EhcWp6cqN2SNxcBOCaQPEJGYFu', '0900000000', 'admin', NOW()),
   ('Customer Demo', 'customer@example.com', '$2a$10$c.w5r4w2oUHeEFKlNHN10uBCLM/k0vP3jTqspYkNYvvfCMNkxN2HO', '0911111111', 'customer', NOW()),
-  ('Linh Tran', 'staff1@example.com', '$2a$10$h8z47WDz93kpQiWT4WtmFu8ML40EhcWp6cqN2SNxcBOCaQPEJGYFu', '0922222222', 'staff', NOW()),
+  ('Linh Tran', 'staff1@example.com', 'staff123456', '0922222222', 'staff', NOW()),
   ('Quynh Nguyen', 'staff2@example.com', '$2a$10$h8z47WDz93kpQiWT4WtmFu8ML40EhcWp6cqN2SNxcBOCaQPEJGYFu', '0933333333', 'staff', NOW()),
   ('Thao Le', 'staff3@example.com', '$2a$10$h8z47WDz93kpQiWT4WtmFu8ML40EhcWp6cqN2SNxcBOCaQPEJGYFu', '0944444444', 'staff', NOW());
 

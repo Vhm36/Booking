@@ -1,4 +1,4 @@
-.appointments-page {
+﻿.appointments-page {
   width: 100%;
 }
 
@@ -135,6 +135,18 @@
   font-size: 14px;
 }
 
+.awaiting-staff-note {
+  margin-top: 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563eb;
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .appointment-footer {
   padding: 20px;
   border-top: 1px solid #eee;
@@ -264,4 +276,26 @@
   .review-row {
     grid-template-columns: 1fr;
   }
+}
+
+.badge-cancel-request {
+  background-color: #fff4ce;
+  color: #9a6700;
+}
+
+.badge-default {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.cancellation-request-note {
+  margin-top: 14px;
+  background: #fff8e6;
+  border: 1px solid #f9d98c;
+  border-left: 4px solid #f59e0b;
+  color: #8a5a00;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
 }

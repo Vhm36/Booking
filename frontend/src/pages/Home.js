@@ -2,12 +2,20 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import serviceService from '../services/serviceService';
 import { formatVnd } from '../utils/formatters';
+import { resolveServiceImageUrl } from '../utils/serviceImage';
 import './Home.css';
 
 const COUNTER_STORAGE_KEY = 'home_fake_appointments_counter';
 const COUNTER_TICK_MS = 2500;
 const REVIEW_ROTATE_MS = 3200;
 const REVIEWS_VISIBLE_COUNT = 3;
+
+const getReviewsPerView = () => {
+  if (typeof window === 'undefined') return REVIEWS_VISIBLE_COUNT;
+  if (window.innerWidth <= 760) return 1;
+  if (window.innerWidth <= 1080) return 2;
+  return REVIEWS_VISIBLE_COUNT;
+};
 const FALLBACK_SERVICE_IMAGE =
   'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1200&q=80';
 
@@ -15,10 +23,10 @@ const customerReviews = [
   {
     id: 1,
     name: 'Minh Anh',
-    service: 'Nâng mi và nhuộm mi',
+    service: 'Nối mi và uốn mi',
     rating: 5,
     time: '2 ngày trước',
-    comment: 'Đặt lịch nhanh, nhân viên tư vấn rõ và làm rất cẩn thận.'
+    comment: 'Đặt lịch rất nhanh, nhân viên tư vấn kỹ và làm đúng kiểu mình mong muốn.'
   },
   {
     id: 2,
@@ -26,7 +34,7 @@ const customerReviews = [
     service: 'Chăm sóc da cấp ẩm',
     rating: 5,
     time: '3 ngày trước',
-    comment: 'Giá hiển thị đúng như lúc đặt, trải nghiệm dịch vụ sạch sẽ và chuyên nghiệp.'
+    comment: 'Không gian sạch, nhẹ nhàng và dịch vụ làm mình thấy thư giãn thật sự.'
   },
   {
     id: 3,
@@ -34,7 +42,7 @@ const customerReviews = [
     service: 'Sơn gel chăm sóc móng',
     rating: 4,
     time: '5 ngày trước',
-    comment: 'Dễ chọn giờ và theo dõi trạng thái lịch hẹn trong tài khoản.'
+    comment: 'Màu sơn đẹp, giữ được lâu và có thể theo dõi lịch hẹn rất tiện trong tài khoản.'
   },
   {
     id: 4,
@@ -42,7 +50,7 @@ const customerReviews = [
     service: 'Nhuộm tóc cao cấp',
     rating: 5,
     time: '1 tuần trước',
-    comment: 'Màu tóc lên chuẩn và giữ được lâu hơn mong đợi.'
+    comment: 'Màu tóc lên chuẩn, stylist hiểu ý và gợi ý thêm cách chăm tóc sau khi làm.'
   },
   {
     id: 5,
@@ -50,7 +58,7 @@ const customerReviews = [
     service: 'Định hình lông mày',
     rating: 5,
     time: '1 tuần trước',
-    comment: 'Làm mày rất tự nhiên, form hợp mặt và tư vấn nhiệt tình.'
+    comment: 'Form mày tự nhiên, hợp mặt và mình nhận được hướng dẫn chăm sóc rất rõ.'
   },
   {
     id: 6,
@@ -58,7 +66,7 @@ const customerReviews = [
     service: 'Gội sấy tạo kiểu nhanh',
     rating: 4,
     time: '8 ngày trước',
-    comment: 'Phù hợp đi sự kiện gấp, làm nhanh nhưng vẫn gọn đẹp.'
+    comment: 'Phù hợp đi sự kiện gấp, làm nhanh nhưng vẫn gọn gàng và chỉn chu.'
   },
   {
     id: 7,
@@ -66,7 +74,7 @@ const customerReviews = [
     service: 'Massage mô sâu',
     rating: 5,
     time: '9 ngày trước',
-    comment: 'Đỡ căng vai gáy rõ rệt sau buổi đầu tiên.'
+    comment: 'Đỡ căng vai gáy rõ rệt sau buổi đầu tiên, mình sẽ quay lại tiếp.'
   },
   {
     id: 8,
@@ -74,7 +82,7 @@ const customerReviews = [
     service: 'Thải độc da đầu',
     rating: 5,
     time: '10 ngày trước',
-    comment: 'Da đầu nhẹ và sạch hơn, cảm giác rất thư giãn.'
+    comment: 'Da đầu sạch và nhẹ hơn hẳn, cảm giác rất thư giãn.'
   },
   {
     id: 9,
@@ -82,17 +90,23 @@ const customerReviews = [
     service: 'Cắt tóc và tạo kiểu',
     rating: 4,
     time: '11 ngày trước',
-    comment: 'Cắt đúng kiểu đã trao đổi, chăm sóc khách rất chu đáo.'
+    comment: 'Cắt đúng kiểu đã trao đổi, chăm khách kỹ và rất đúng giờ.'
   },
   {
     id: 10,
     name: 'Tuyết Nhi',
-    service: 'Trang điểm thử cô dâu',
+    service: 'Trang điểm tiệc cưới',
     rating: 5,
     time: '12 ngày trước',
-    comment: 'Trang điểm lên ảnh đẹp, tone đúng concept cưới mình muốn.'
+    comment: 'Makeup lên ảnh đẹp, tone hợp concept và giữ được lâu suốt buổi.'
   }
 ];
+
+const normalizeText = (value = '') =>
+  String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
 const getLocalDateKey = () => {
   const now = new Date();
@@ -153,15 +167,8 @@ const getInitialCounter = () => {
   return freshCounter;
 };
 
-const getServiceImage = (service) => {
-  const imageUrl = service?.image_url;
-
-  if (typeof imageUrl === 'string' && imageUrl.trim() !== '') {
-    return imageUrl.trim();
-  }
-
-  return FALLBACK_SERVICE_IMAGE;
-};
+const getServiceImage = (service) =>
+  resolveServiceImageUrl(service?.image_url, FALLBACK_SERVICE_IMAGE);
 
 const toTimestamp = (value) => {
   const parsed = new Date(value).getTime();
@@ -169,13 +176,13 @@ const toTimestamp = (value) => {
 };
 
 const toVietnameseCategoryLabel = (category) => {
-  const key = (category || '').toLowerCase();
+  const key = normalizeText(category);
 
-  if (key.includes('hair') || key.includes('toc') || key.includes('tóc')) {
+  if (key.includes('hair') || key.includes('toc')) {
     return 'Tóc';
   }
 
-  if (key.includes('nail')) {
+  if (key.includes('nail') || key.includes('mong')) {
     return 'Nail';
   }
 
@@ -187,11 +194,11 @@ const toVietnameseCategoryLabel = (category) => {
     return 'Chăm sóc da';
   }
 
-  if (key.includes('brow') || key.includes('lash') || key.includes('mi')) {
-    return 'Mi & Mày';
+  if (key.includes('brow') || key.includes('lash') || key.includes('mi') || key.includes('may')) {
+    return 'Mi & mày';
   }
 
-  if (key.includes('makeup') || key.includes('trang diem') || key.includes('trang điểm')) {
+  if (key.includes('makeup') || key.includes('trang diem')) {
     return 'Trang điểm';
   }
 
@@ -206,9 +213,10 @@ function Home({ userLocation = null }) {
   const [loadingServices, setLoadingServices] = useState(true);
   const [serviceError, setServiceError] = useState('');
   const [liveCounter, setLiveCounter] = useState(() => getInitialCounter());
-  const [reviewStartIndex, setReviewStartIndex] = useState(0);
+  const [reviewsPerView, setReviewsPerView] = useState(() => getReviewsPerView());
+  const [reviewPage, setReviewPage] = useState(0);
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const today = useMemo(() => getLocalDateKey(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,7 +233,7 @@ function Home({ userLocation = null }) {
       } catch (error) {
         if (!cancelled) {
           setServices([]);
-          setServiceError('Không thể tải dữ liệu dịch vụ từ hệ thống.');
+          setServiceError('Không thể tải dữ liệu dịch vụ tại thời điểm này.');
         }
       } finally {
         if (!cancelled) {
@@ -271,18 +279,51 @@ function Home({ userLocation = null }) {
   }, []);
 
   useEffect(() => {
-    if (customerReviews.length <= REVIEWS_VISIBLE_COUNT) {
+    const handleResize = () => {
+      setReviewsPerView(getReviewsPerView());
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const reviewPages = useMemo(() => {
+    const totalPages = Math.ceil(customerReviews.length / reviewsPerView);
+
+    return Array.from({ length: totalPages }, (_, pageIndex) =>
+      Array.from({ length: reviewsPerView }, (_, offset) => {
+        const reviewIndex = (pageIndex * reviewsPerView + offset) % customerReviews.length;
+        return customerReviews[reviewIndex];
+      })
+    );
+  }, [reviewsPerView]);
+
+  useEffect(() => {
+    setReviewPage((current) => {
+      if (reviewPages.length === 0) {
+        return 0;
+      }
+
+      return current >= reviewPages.length ? 0 : current;
+    });
+  }, [reviewPages.length]);
+
+  useEffect(() => {
+    if (reviewPages.length <= 1) {
       return undefined;
     }
 
     const intervalId = window.setInterval(() => {
-      setReviewStartIndex((current) => (current + 1) % customerReviews.length);
+      setReviewPage((current) => (current + 1) % reviewPages.length);
     }, REVIEW_ROTATE_MS);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [reviewPages.length]);
 
   const normalizedServices = useMemo(
     () =>
@@ -296,7 +337,7 @@ function Home({ userLocation = null }) {
 
   const categorizedServices = useMemo(() => {
     const categoryCount = normalizedServices.reduce((acc, service) => {
-      const categoryKey = (service.category || 'other').toLowerCase();
+      const categoryKey = normalizeText(service.category || 'other');
       acc[categoryKey] = (acc[categoryKey] || 0) + 1;
       return acc;
     }, {});
@@ -308,8 +349,8 @@ function Home({ userLocation = null }) {
     });
 
     const sortedByTrending = [...normalizedServices].sort((a, b) => {
-      const categoryA = (a.category || 'other').toLowerCase();
-      const categoryB = (b.category || 'other').toLowerCase();
+      const categoryA = normalizeText(a.category || 'other');
+      const categoryB = normalizeText(b.category || 'other');
       const trendA = (categoryCount[categoryA] || 0) * 1000 + toTimestamp(a.created_at);
       const trendB = (categoryCount[categoryB] || 0) * 1000 + toTimestamp(b.created_at);
       return trendB - trendA;
@@ -362,11 +403,11 @@ function Home({ userLocation = null }) {
     }
 
     return [
-      { value: 'nối mi', label: 'Nối mi' },
-      { value: 'cắt tóc', label: 'Cắt tóc' },
+      { value: 'noi mi', label: 'Nối mi' },
+      { value: 'cat toc', label: 'Cắt tóc' },
       { value: 'nail', label: 'Nail' },
       { value: 'massage', label: 'Massage' },
-      { value: 'chăm sóc da', label: 'Chăm sóc da' }
+      { value: 'cham soc da', label: 'Chăm sóc da' }
     ];
   }, [normalizedServices]);
 
@@ -416,16 +457,13 @@ function Home({ userLocation = null }) {
     });
   }, [userLocation]);
 
-  const rotatingReviews = useMemo(() => {
-    if (customerReviews.length <= REVIEWS_VISIBLE_COUNT) {
-      return customerReviews;
+  const visibleReviews = useMemo(() => {
+    if (reviewPages.length === 0) {
+      return customerReviews.slice(0, reviewsPerView);
     }
 
-    return Array.from({ length: REVIEWS_VISIBLE_COUNT }, (_, offset) => {
-      const nextIndex = (reviewStartIndex + offset) % customerReviews.length;
-      return customerReviews[nextIndex];
-    });
-  }, [reviewStartIndex]);
+    return reviewPages[reviewPage] || reviewPages[0];
+  }, [reviewPage, reviewPages, reviewsPerView]);
 
   const buildServiceUrl = (searchKeyword, searchDate) => {
     const params = new URLSearchParams();
@@ -455,10 +493,10 @@ function Home({ userLocation = null }) {
     <div className="home-fresha">
       <section className="fresha-hero">
         <div className="fresha-hero-content">
-          <h1>Đặt dịch vụ chăm sóc bản thân tại khu vực của bạn</h1>
+          <h1>Đặt lịch làm đẹp nhanh, đúng dịch vụ và đúng thời gian bạn muốn</h1>
           <p>
-            Tra cứu dịch vụ theo giá thật từ cơ sở dữ liệu, chọn ngày phù hợp và chuyển sang màn đặt
-            lịch chỉ với vài thao tác.
+            Tra cứu dịch vụ theo giá, thời lượng và danh mục nổi bật. Bạn có thể chọn ngày phù hợp rồi
+            chuyển ngay sang trang dịch vụ để xem chi tiết và đặt lịch chỉ với vài thao tác.
           </p>
 
           <form className="fresha-search" onSubmit={handleSearchSubmit}>
@@ -468,12 +506,12 @@ function Home({ userLocation = null }) {
                 type="text"
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
-                placeholder="Nối mi, cắt tóc, gội đầu..."
+                placeholder="Nối mi, cắt tóc, massage, chăm sóc da..."
               />
             </div>
 
             <div className="search-field">
-              <label>Ngày (dd/mm/yyyy)</label>
+              <label>Ngày mong muốn</label>
               <input
                 type="date"
                 lang="vi"
@@ -504,7 +542,7 @@ function Home({ userLocation = null }) {
 
         <aside className="fresha-hero-side">
           <article className="live-counter-card">
-            <span>Số cuộc hẹn đã đặt hôm nay</span>
+            <span>Số lượt đặt lịch được ghi nhận hôm nay</span>
             <strong>{liveCounter.count.toLocaleString('vi-VN')}</strong>
             <small>
               <i className="live-dot" />
@@ -525,7 +563,9 @@ function Home({ userLocation = null }) {
             <strong>{locationLabel || 'Chưa cấp quyền'}</strong>
             {locationLabel && (
               <small className="location-note">
-                {userLocation?.accuracy ? `Sai số ~${Math.round(userLocation.accuracy)}m` : 'Vị trí hiện tại'}
+                {userLocation?.accuracy
+                  ? `Sai số khoảng ${Math.round(userLocation.accuracy)}m`
+                  : 'Vị trí hiện tại'}
                 {locationCapturedLabel ? ` - cập nhật ${locationCapturedLabel}` : ''}
               </small>
             )}
@@ -538,7 +578,7 @@ function Home({ userLocation = null }) {
 
       <section className="fresha-listing">
         <div className="listing-head">
-          <h2>Danh mục sản phẩm</h2>
+          <h2>Danh mục nổi bật</h2>
           <Link to="/services">Xem tất cả</Link>
         </div>
 
@@ -557,12 +597,12 @@ function Home({ userLocation = null }) {
             {[
               { title: 'Xu hướng', data: categorizedServices.trending },
               { title: 'Đề xuất', data: categorizedServices.recommended },
-              { title: 'Mới', data: categorizedServices.newest }
+              { title: 'Mới cập nhật', data: categorizedServices.newest }
             ].map((group) => (
               <div className="listing-group" key={group.title}>
                 <h3>{group.title}</h3>
                 {group.data.length === 0 ? (
-                  <p className="listing-empty">Chưa có dịch vụ phù hợp.</p>
+                  <p className="listing-empty">Chưa có dịch vụ phù hợp cho mục này.</p>
                 ) : (
                   <div className="service-market-grid">
                     {group.data.map((service) => (
@@ -583,11 +623,14 @@ function Home({ userLocation = null }) {
 
                         <div className="service-market-top">
                           <span>{toVietnameseCategoryLabel(service.category)}</span>
-                          <small>4.9 ★</small>
+                          <small>4.9/5</small>
                         </div>
 
                         <h3>{service.name}</h3>
-                        <p>{service.description || 'Mô tả đang được cập nhật cho dịch vụ này.'}</p>
+                        <p>
+                          {service.description ||
+                            'Mô tả đang được cập nhật cho dịch vụ này.'}
+                        </p>
 
                         <div className="service-market-meta">
                           <strong>{formatVnd(service.price)}</strong>
@@ -619,12 +662,15 @@ function Home({ userLocation = null }) {
       <section className="fresha-reviews">
         <div className="fresha-reviews-head">
           <h2>Đánh giá trải nghiệm khách hàng</h2>
-          <p>Phản hồi gần đây từ khách đã đặt lịch trên hệ thống.</p>
+          <p>
+            Phản hồi gần đây từ khách đã sử dụng dịch vụ tại salon. Bạn có thể xem nhanh để tham khảo
+            trước khi chọn lịch phù hợp.
+          </p>
         </div>
 
-        <div className="reviews-grid">
-          {rotatingReviews.map((review) => (
-            <article className="review-card" key={review.id}>
+        <div className="reviews-grid" key={`review-page-${reviewsPerView}-${reviewPage}`}>
+          {visibleReviews.map((review, index) => (
+            <article className="review-card" key={`${review.id}-${reviewPage}-${index}`}>
               <div className="review-top">
                 <strong>{review.name}</strong>
                 <span>{review.time}</span>
@@ -639,17 +685,19 @@ function Home({ userLocation = null }) {
           ))}
         </div>
 
-        <div className="reviews-dots">
-          {customerReviews.map((review, index) => (
-            <button
-              key={review.id}
-              type="button"
-              className={index === reviewStartIndex ? 'reviews-dot active' : 'reviews-dot'}
-              onClick={() => setReviewStartIndex(index)}
-              aria-label={`Xem đánh giá ${index + 1}`}
-            />
-          ))}
-        </div>
+        {reviewPages.length > 1 && (
+          <div className="reviews-dots">
+            {reviewPages.map((_, index) => (
+              <button
+                key={`review-page-dot-${index}`}
+                type="button"
+                className={index === reviewPage ? 'reviews-dot active' : 'reviews-dot'}
+                onClick={() => setReviewPage(index)}
+                aria-label={`Xem nhom danh gia ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

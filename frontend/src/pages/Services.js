@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
 import serviceService from '../services/serviceService';
 import { formatDurationLabel, formatVnd } from '../utils/formatters';
+import { resolveServiceImageUrl } from '../utils/serviceImage';
 import './Services.css';
 
 const FALLBACK_SERVICE_IMAGE =
@@ -27,7 +28,8 @@ const getCategoryKey = (category) => {
     key.includes('long may') ||
     key.includes('chan may') ||
     key.includes('mi & may') ||
-    key.includes('mi va may')
+    key.includes('mi va may') ||
+    key.includes('mi')
   ) {
     return 'mi-may';
   }
@@ -43,7 +45,7 @@ const getCategoryLabel = (category) => {
   if (key === 'mong') return 'Móng';
   if (key === 'massage') return 'Massage';
   if (key === 'da') return 'Chăm sóc da';
-  if (key === 'mi-may') return 'Mi & Mày';
+  if (key === 'mi-may') return 'Mi & mày';
   if (key === 'trang-diem') return 'Trang điểm';
 
   return category || 'Dịch vụ làm đẹp';
@@ -52,25 +54,18 @@ const getCategoryLabel = (category) => {
 const getCollectionLabel = (category) => {
   const key = getCategoryKey(category);
 
-  if (key === 'toc') return 'Gói nổi bật';
-  if (key === 'mi-may') return 'Mi & Mày';
+  if (key === 'toc') return 'Gợi ý nổi bật';
+  if (key === 'mi-may') return 'Mi & mày';
   if (key === 'mong') return 'Nail';
   if (key === 'da') return 'Chăm sóc da';
   if (key === 'massage') return 'Massage phục hồi';
   if (key === 'trang-diem') return 'Trang điểm chuyên nghiệp';
 
-  return 'Đề xuất';
+  return 'Đề xuất hôm nay';
 };
 
-const getServiceImage = (service) => {
-  const imageUrl = service?.image_url;
-
-  if (typeof imageUrl === 'string' && imageUrl.trim() !== '') {
-    return imageUrl.trim();
-  }
-
-  return FALLBACK_SERVICE_IMAGE;
-};
+const getServiceImage = (service) =>
+  resolveServiceImageUrl(service?.image_url, FALLBACK_SERVICE_IMAGE);
 
 function Services() {
   const [services, setServices] = useState([]);
@@ -140,12 +135,12 @@ function Services() {
   }, [activeCategory, categories]);
 
   const filteredServices = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = normalizeText(query.trim());
 
     const withFilters = services.filter((service) => {
-      const name = (service.name || '').toLowerCase();
-      const description = (service.description || '').toLowerCase();
-      const category = (service.category || '').toLowerCase();
+      const name = normalizeText(service.name || '');
+      const description = normalizeText(service.description || '');
+      const category = normalizeText(service.category || '');
       const duration = Number(service.duration) || 0;
       const price = Number(service.price) || 0;
 
@@ -246,7 +241,6 @@ function Services() {
       };
     }
 
-    // Admin/Staff không đặt lịch từ màn này.
     return null;
   };
 
@@ -258,11 +252,11 @@ function Services() {
     <div className="services-marketplace">
       <section className="marketplace-hero">
         <div>
-          <span className="hero-kicker">PHONG CÁCH ĐẶT LỊCH NHANH</span>
-          <h1>Khám phá dịch vụ.</h1>
+          <span className="hero-kicker">KHÁM PHÁ DỊCH VỤ LÀM ĐẸP</span>
+          <h1>Chọn dịch vụ phù hợp và lọc nhanh theo nhu cầu của bạn.</h1>
           <p>
-            Giao diện tìm kiếm gọn, so sánh giá minh bạch và đặt lịch ngay
-            khi thấy khung giờ phù hợp.
+            Tìm kiếm theo tên, danh mục, mức giá và thời lượng. Bạn có thể xem chi tiết từng dịch vụ
+            trước khi chuyển sang bước đặt lịch.
           </p>
         </div>
       </section>
@@ -273,7 +267,7 @@ function Services() {
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm theo tên dịch vụ, mô tả..."
+            placeholder="Tìm theo tên dịch vụ, mô tả hoặc danh mục..."
           />
           <input
             type="date"
@@ -281,7 +275,7 @@ function Services() {
             onChange={(event) => setPreferredDate(event.target.value)}
           />
           <button type="submit" className="btn-primary">
-            Tìm lịch
+            Tìm dịch vụ
           </button>
         </form>
 
@@ -333,7 +327,7 @@ function Services() {
       {filteredServices.length === 0 ? (
         <div className="empty-state">
           <h3>Chưa có dịch vụ phù hợp</h3>
-          <p>Thử thay đổi từ khóa hoặc bộ lọc để xem thêm kết quả.</p>
+          <p>Hãy thử đổi từ khóa hoặc điều chỉnh lại bộ lọc để xem thêm kết quả.</p>
         </div>
       ) : (
         <div className="services-grid">

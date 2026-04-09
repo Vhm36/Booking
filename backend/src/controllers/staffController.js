@@ -19,7 +19,7 @@ exports.getAllStaff = (req, res) => {
       return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
-    res.status(200).json({ success: true, data: staffList });
+    return res.status(200).json({ success: true, data: staffList });
   });
 };
 
@@ -29,7 +29,7 @@ exports.getBookableStaff = (req, res) => {
       return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
-    res.status(200).json({ success: true, data: staffList });
+    return res.status(200).json({ success: true, data: staffList });
   });
 };
 
@@ -45,7 +45,7 @@ exports.getAvailableStaff = (req, res) => {
       return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
-    res.status(200).json({ success: true, data: staffList });
+    return res.status(200).json({ success: true, data: staffList });
   });
 };
 
@@ -74,7 +74,7 @@ exports.createStaff = (req, res) => {
 
     const hashedPassword = bcrypt.hashSync(password, 10);
 
-    staffModel.createStaff(
+    return staffModel.createStaff(
       {
         name,
         email,
@@ -87,7 +87,7 @@ exports.createStaff = (req, res) => {
           return res.status(500).json({ message: 'Lỗi server', error: createErr });
         }
 
-        res.status(201).json({
+        return res.status(201).json({
           success: true,
           message: 'Tạo nhân viên thành công',
           staffId: result.insertId
@@ -99,12 +99,13 @@ exports.createStaff = (req, res) => {
 
 exports.updateStaff = (req, res) => {
   const { id } = req.params;
-  const { name, phone, is_active } = req.body;
+  const { name, phone, is_active, password } = req.body;
 
   if (
     typeof name === 'undefined' &&
     typeof phone === 'undefined' &&
-    typeof is_active === 'undefined'
+    typeof is_active === 'undefined' &&
+    typeof password === 'undefined'
   ) {
     return res.status(400).json({ message: 'Không có dữ liệu để cập nhật' });
   }
@@ -122,6 +123,18 @@ exports.updateStaff = (req, res) => {
     if (typeof name !== 'undefined') payload.name = name;
     if (typeof phone !== 'undefined') payload.phone = phone;
 
+    if (typeof password !== 'undefined') {
+      if (typeof password !== 'string' || password.trim().length === 0) {
+        return res.status(400).json({ message: 'Mật khẩu mới không được để trống' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'Mật khẩu mới phải ít nhất 6 ký tự' });
+      }
+
+      payload.password = bcrypt.hashSync(password, 10);
+    }
+
     if (typeof is_active !== 'undefined') {
       const activeValue = parseActiveValue(is_active);
       if (activeValue === null) {
@@ -130,14 +143,17 @@ exports.updateStaff = (req, res) => {
       payload.is_active = activeValue;
     }
 
-    staffModel.updateStaff(id, payload, (updateErr) => {
+    return staffModel.updateStaff(id, payload, (updateErr) => {
       if (updateErr) {
         return res.status(500).json({ message: 'Lỗi server', error: updateErr });
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        message: 'Cập nhật nhân viên thành công'
+        message:
+          typeof password !== 'undefined'
+            ? 'Cập nhật nhân viên và mật khẩu thành công'
+            : 'Cập nhật nhân viên thành công'
       });
     });
   });

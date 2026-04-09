@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const appointmentController = require('../controllers/appointmentController');
 const { verifyToken, verifyAdminOrStaff } = require('../middleware/authMiddleware');
 const {
@@ -9,19 +10,22 @@ const {
   validateAppointmentId
 } = require('../middleware/validationMiddleware');
 
-// FIX 1: Add input validation to all appointment endpoints
+const createBookingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => (req.user?.id ? `user:${req.user.id}` : ipKeyGenerator(req.ip)),
+  message: 'Bạn đặt lịch quá nhiều lần, vui lòng thử lại sau.'
+});
 
-// Customer
-router.post('/', verifyToken, validateCreateAppointment, appointmentController.createAppointment);
+router.post('/', verifyToken, createBookingLimiter, validateCreateAppointment, appointmentController.createAppointment);
 router.get('/my-bookings', verifyToken, appointmentController.getMyAppointments);
 router.put('/:id/cancel', verifyToken, validateAppointmentId, appointmentController.cancelAppointment);
 router.put('/:id/review', verifyToken, validateAppointmentId, validateAddReview, appointmentController.addStaffReview);
 
-// Admin + Staff
 router.get('/', verifyToken, verifyAdminOrStaff, appointmentController.getAllAppointments);
 router.get('/:id', verifyToken, verifyAdminOrStaff, validateAppointmentId, appointmentController.getAppointmentById);
-
-// FIX 3: Staff can only update their own appointments (authorization check in controller)
 router.put('/:id/status', verifyToken, verifyAdminOrStaff, validateAppointmentId, validateUpdateAppointmentStatus, appointmentController.updateAppointmentStatus);
+router.put('/:id/confirm-cancel', verifyToken, verifyAdminOrStaff, validateAppointmentId, appointmentController.confirmCancellationRequest);
+router.put('/:id/reject-cancel', verifyToken, verifyAdminOrStaff, validateAppointmentId, appointmentController.rejectCancellationRequest);
 
 module.exports = router;

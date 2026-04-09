@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import authService from '../services/authService';
 import bookingService from '../services/bookingService';
 import serviceService from '../services/serviceService';
 import staffService from '../services/staffService';
@@ -8,6 +9,17 @@ import './Booking.css';
 
 const quickSlots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '18:00'];
 
+const getStaffRequestError = (err, fallbackMessage) => {
+  if (err.response?.status === 401) {
+    return 'Phien dang nhap da het han. Vui long dang nhap lai de chon nhan vien.';
+  }
+
+  if (err.response?.status === 403) {
+    return 'Tai khoan hien tai khong co quyen xem danh sach nhan vien.';
+  }
+
+  return fallbackMessage;
+};
 function Booking() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
@@ -58,6 +70,16 @@ function Booking() {
     let cancelled = false;
 
     const fetchBookableStaff = async () => {
+      if (!authService.getToken()) {
+        if (!cancelled) {
+          setAllStaff([]);
+          setAvailableStaffIds(new Set());
+          setStaffError('Vui long dang nhap lai de chon nhan vien phu trach.');
+          setLoadingStaffList(false);
+        }
+        return;
+      }
+
       try {
         setLoadingStaffList(true);
         const response = await staffService.getBookableStaff();
@@ -72,7 +94,7 @@ function Booking() {
         if (!cancelled) {
           setAllStaff([]);
           setAvailableStaffIds(new Set());
-          setStaffError('Không thể tải danh sách nhân viên.');
+          setStaffError(getStaffRequestError(err, 'Khong the tai danh sach nhan vien.'));
         }
       } finally {
         if (!cancelled) {
@@ -125,7 +147,7 @@ function Booking() {
         if (!cancelled) {
           setAvailableStaffIds(new Set());
           setSelectedStaffId('');
-          setStaffError('Không thể kiểm tra lịch trống của nhân viên theo khung giờ này.');
+          setStaffError(getStaffRequestError(err, 'Khong the kiem tra lich trong cua nhan vien theo khung gio nay.'));
         }
       } finally {
         if (!cancelled) {
@@ -348,3 +370,8 @@ function Booking() {
 }
 
 export default Booking;
+
+
+
+
+

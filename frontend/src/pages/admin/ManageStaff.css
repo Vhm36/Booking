@@ -35,10 +35,12 @@
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .staff-table table {
   width: 100%;
+  min-width: 1040px;
   border-collapse: collapse;
 }
 
@@ -72,6 +74,12 @@
   font-size: 13px;
 }
 
+.password-placeholder {
+  color: #5f6b7a;
+  font-size: 12px;
+  font-style: italic;
+}
+
 .staff-status {
   display: inline-block;
   padding: 6px 10px;
@@ -94,11 +102,19 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .btn-small {
   padding: 6px 10px;
   font-size: 12px;
+}
+
+.empty-cell {
+  text-align: center;
+  color: #5f6b7a;
+  font-style: italic;
+  padding: 22px 12px;
 }
 
 @media (max-width: 900px) {
@@ -113,6 +129,7 @@
   }
 
   .staff-table table {
+    min-width: 920px;
     font-size: 12px;
   }
 

@@ -52,6 +52,85 @@
   box-shadow: 0 0 5px rgba(233, 30, 99, 0.3);
 }
 
+.auth-card .password-input-wrap {
+  position: relative;
+}
+
+.auth-card .password-input-wrap input {
+  padding-right: 46px;
+}
+
+.auth-card .password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+}
+
+.auth-card .password-toggle:hover {
+  color: #e91e63;
+}
+
+.auth-card .password-toggle:focus-visible {
+  outline: 2px solid #e91e63;
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.auth-card .password-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+.auth-card .password-requirements {
+  margin-top: 8px;
+  color: #666;
+  font-size: 13px;
+}
+
+.auth-card .password-requirements-title {
+  margin: 4px 0;
+  font-weight: 500;
+}
+
+.auth-card .password-check-list {
+  display: grid;
+  gap: 4px;
+  margin-left: 12px;
+}
+
+.auth-card .password-check-item {
+  color: #999;
+}
+
+.auth-card .password-check-item.is-valid {
+  color: #4caf50;
+}
+
+.auth-card .field-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.auth-card .field-hint.error {
+  color: #c62828;
+}
+
+.auth-card .field-hint.success {
+  color: #2e7d32;
+}
+
 .auth-card .btn-primary {
   width: 100%;
   padding: 12px;

@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import serviceService from '../../services/serviceService';
+import { resolveServiceImageUrl } from '../../utils/serviceImage';
 import './ManageServices.css';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?auto=format&fit=crop&w=500&q=80';
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 const EMPTY_FORM = {
   name: '',
@@ -12,8 +15,18 @@ const EMPTY_FORM = {
   duration: '',
   category: 'Tóc',
   status: 'active',
-  image_url: ''
+  image_url: '',
+  image_data: '',
+  image_name: ''
 };
+
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Không thể đọc file ảnh đã chọn.'));
+    reader.readAsDataURL(file);
+  });
 
 function ManageServices() {
   const [services, setServices] = useState([]);
@@ -24,6 +37,7 @@ function ManageServices() {
   const [editingServiceId, setEditingServiceId] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [imageInputKey, setImageInputKey] = useState(0);
 
   useEffect(() => {
     fetchServices();
@@ -44,6 +58,7 @@ function ManageServices() {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
+    setActionError('');
     setFormData((prev) => ({
       ...prev,
       [name]: value
@@ -55,6 +70,48 @@ function ManageServices() {
     setEditingServiceId(null);
     setShowForm(false);
     setActionError('');
+    setImageInputKey((prev) => prev + 1);
+  };
+
+  const handleImageChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      setActionError('Vui lòng chọn ảnh JPG, PNG, GIF hoặc WEBP.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setActionError('Ảnh dịch vụ phải nhỏ hơn 5MB.');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const imageData = await readFileAsDataUrl(file);
+      setFormData((prev) => ({
+        ...prev,
+        image_data: typeof imageData === 'string' ? imageData : '',
+        image_name: file.name
+      }));
+      setActionError('');
+    } catch (err) {
+      setActionError(err.message || 'Không thể đọc file ảnh đã chọn.');
+      event.target.value = '';
+    }
+  };
+
+  const clearSelectedImage = () => {
+    setFormData((prev) => ({
+      ...prev,
+      image_data: '',
+      image_name: ''
+    }));
+    setImageInputKey((prev) => prev + 1);
   };
 
   const handleSubmit = async (event) => {
@@ -66,7 +123,8 @@ function ManageServices() {
       duration: Number(formData.duration),
       category: formData.category.trim(),
       status: formData.status,
-      image_url: formData.image_url.trim()
+      image_url: formData.image_url.trim(),
+      image_data: formData.image_data
     };
 
     if (!payload.name || !Number.isFinite(payload.price) || !Number.isFinite(payload.duration)) {
@@ -85,6 +143,7 @@ function ManageServices() {
       } else {
         await serviceService.createService(payload);
       }
+
       resetForm();
       fetchServices();
     } catch (err) {
@@ -98,6 +157,7 @@ function ManageServices() {
   const startEditService = (service) => {
     setEditingServiceId(service.id);
     setShowForm(true);
+    setActionError('');
     setFormData({
       name: service.name || '',
       description: service.description || '',
@@ -105,8 +165,11 @@ function ManageServices() {
       duration: String(Number(service.duration) || ''),
       category: service.category || 'Tóc',
       status: service.status || 'active',
-      image_url: service.image_url || ''
+      image_url: service.image_url || '',
+      image_data: '',
+      image_name: ''
     });
+    setImageInputKey((prev) => prev + 1);
   };
 
   const handleDelete = async (id) => {
@@ -128,6 +191,11 @@ function ManageServices() {
       setActionLoadingId(null);
     }
   };
+
+  const previewImage = useMemo(
+    () => resolveServiceImageUrl(formData.image_data || formData.image_url, FALLBACK_IMAGE),
+    [formData.image_data, formData.image_url]
+  );
 
   if (loading) {
     return <div className="loading">Đang tải...</div>;
@@ -211,16 +279,48 @@ function ManageServices() {
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>Ảnh dịch vụ (URL)</label>
+              <div className="form-group image-upload-field">
+                <label>Ảnh dịch vụ</label>
                 <input
-                  type="url"
-                  name="image_url"
-                  value={formData.image_url}
-                  onChange={handleInputChange}
-                  placeholder="https://..."
+                  key={imageInputKey}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleImageChange}
                 />
+                <small className="field-hint">Chọn file từ máy tính, tối đa 5MB.</small>
+                {formData.image_name && (
+                  <div className="selected-file-row">
+                    <span className="selected-file-name">Đã chọn: {formData.image_name}</span>
+                    <button type="button" className="btn-neutral btn-small" onClick={clearSelectedImage}>
+                      Bỏ ảnh đã chọn
+                    </button>
+                  </div>
+                )}
               </div>
+            </div>
+
+            <div className="image-preview-card">
+              <div className="image-preview-text">
+                <strong>Xem trước ảnh dịch vụ</strong>
+                <span>
+                  {formData.image_name
+                    ? 'Đây là ảnh mới bạn vừa chọn từ máy tính.'
+                    : formData.image_url
+                      ? 'Đang dùng ảnh hiện tại của dịch vụ.'
+                      : 'Nếu chưa chọn ảnh, hệ thống sẽ hiển thị ảnh mặc định.'}
+                </span>
+              </div>
+              <img
+                src={previewImage}
+                alt={formData.name || 'Ảnh xem trước dịch vụ'}
+                className="service-preview-image"
+                loading="lazy"
+                onError={(event) => {
+                  if (event.currentTarget.src !== FALLBACK_IMAGE) {
+                    event.currentTarget.src = FALLBACK_IMAGE;
+                  }
+                }}
+              />
             </div>
 
             <div className="form-group">
@@ -276,10 +376,15 @@ function ManageServices() {
                   <td>{service.id}</td>
                   <td>
                     <img
-                      src={service.image_url || FALLBACK_IMAGE}
+                      src={resolveServiceImageUrl(service.image_url, FALLBACK_IMAGE)}
                       alt={service.name}
                       className="service-thumb"
                       loading="lazy"
+                      onError={(event) => {
+                        if (event.currentTarget.src !== FALLBACK_IMAGE) {
+                          event.currentTarget.src = FALLBACK_IMAGE;
+                        }
+                      }}
                     />
                   </td>
                   <td>{service.name}</td>

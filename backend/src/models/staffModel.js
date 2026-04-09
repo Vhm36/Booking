@@ -79,6 +79,11 @@ const updateStaff = (id, staffData, callback) => {
     values.push(staffData.phone);
   }
 
+  if (typeof staffData.password !== 'undefined') {
+    fields.push('password = ?');
+    values.push(staffData.password);
+  }
+
   if (typeof staffData.is_active !== 'undefined') {
     fields.push('is_active = ?');
     values.push(staffData.is_active ? 1 : 0);

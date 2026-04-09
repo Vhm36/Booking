@@ -14,6 +14,10 @@
   --shadow-soft: 0 10px 28px rgba(18, 34, 59, 0.08);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -25,10 +29,27 @@ body {
   color: var(--text-main);
   background: radial-gradient(circle at 10% 5%, #ffffff 0%, var(--bg-soft) 60%, #e8eef8 100%);
   min-height: 100vh;
+  line-height: 1.5;
+  overflow-x: hidden;
 }
 
 a {
   color: inherit;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 .app {
@@ -44,7 +65,7 @@ a {
   max-width: 1240px;
   margin: 0 auto;
   width: 100%;
-  padding: 24px;
+  padding: clamp(16px, 2.8vw, 24px);
 }
 
 .loading {
@@ -64,7 +85,9 @@ button {
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  min-height: 42px;
   transition: all 0.25s ease;
+  touch-action: manipulation;
 }
 
 .btn-primary {
@@ -188,12 +211,32 @@ button {
 
 @media (max-width: 768px) {
   .main-content {
-    padding: 14px;
+    padding: 16px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    font-size: 16px;
   }
 
   .grid,
   .grid-2,
   .grid-3 {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: 14px;
+  }
+
+  .alert {
+    padding: 11px 12px;
   }
 }

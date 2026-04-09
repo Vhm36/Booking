@@ -2,46 +2,67 @@ const userModel = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// FIX 1: Load JWT_SECRET from environment
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 
 if (!JWT_SECRET) {
   throw new Error('ERROR: JWT_SECRET must be set in environment variables');
 }
 
-// Đăng ký
+const isBcryptHash = (value) =>
+  typeof value === 'string' && BCRYPT_HASH_PATTERN.test(value);
+
+const respondWithLoginSuccess = (res, user) => {
+  const token = jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRE }
+  );
+
+  return res.status(200).json({
+    success: true,
+    message: 'Đăng nhập thành công',
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role
+    }
+  });
+};
+
 exports.register = (req, res) => {
   const { name, email, password, phone } = req.body;
   const normalizedName = (name || '').trim();
-  const normalizedEmail = (email || '').trim();
+  const normalizedEmail = (email || '').trim().toLowerCase();
   const normalizedPhone = (phone || '').trim();
 
   if (!normalizedName || !normalizedEmail || !password) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      message: 'Vui lòng cung cấp đầy đủ thông tin' 
+      message: 'Vui lòng cung cấp đầy đủ thông tin'
     });
   }
 
-  // Kiểm tra email đã tồn tại
   userModel.getUserByEmail(normalizedEmail, (err, user) => {
     if (err) {
       console.error('[REGISTER_ERROR]', err);
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        message: 'Lỗi server khi kiểm tra email' 
+        message: 'Lỗi server khi kiểm tra email'
       });
     }
 
     if (user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Email đã được đăng ký' 
+        message: 'Email đã được đăng ký'
       });
     }
 
-    // Hash password
     const hashedPassword = bcrypt.hashSync(password, 10);
 
     const userData = {
@@ -52,119 +73,131 @@ exports.register = (req, res) => {
       role: 'customer'
     };
 
-    userModel.createUser(userData, (err, result) => {
-      if (err) {
-        console.error('[REGISTER_CREATE_ERROR]', err);
-        return res.status(500).json({ 
+    return userModel.createUser(userData, (createErr, result) => {
+      if (createErr) {
+        console.error('[REGISTER_CREATE_ERROR]', createErr);
+        return res.status(500).json({
           success: false,
-          message: 'Lỗi server khi tạo người dùng' 
+          message: 'Lỗi server khi tạo người dùng'
         });
       }
 
-      res.status(201).json({ 
-        success: true, 
-        message: 'Đăng ký thành công' 
+      return res.status(201).json({
+        success: true,
+        message: 'Đăng ký thành công',
+        user: {
+          id: result.insertId,
+          name: normalizedName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          role: 'customer'
+        }
       });
     });
   });
 };
 
-// Đăng nhập
 exports.login = (req, res) => {
   const { email, password } = req.body;
-  const normalizedEmail = (email || '').trim();
+  const normalizedEmail = (email || '').trim().toLowerCase();
 
   if (!normalizedEmail || !password) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      message: 'Vui lòng cung cấp email và mật khẩu' 
+      message: 'Vui lòng cung cấp email và mật khẩu'
     });
   }
 
-  userModel.getUserByEmail(normalizedEmail, (err, user) => {
+  return userModel.getUserByEmail(normalizedEmail, (err, user) => {
     if (err) {
       console.error('[LOGIN_ERROR]', err);
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        message: 'Lỗi server khi xác thực' 
+        message: 'Lỗi server khi xác thực'
       });
     }
 
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'Email hoặc mật khẩu không đúng' 
+        message: 'Email hoặc mật khẩu không đúng'
       });
     }
 
-    // So sánh password
-    const isPasswordValid = bcrypt.compareSync(password, user.password);
+    const storedPassword = user.password || '';
+    const usingLegacyPlainTextPassword = !isBcryptHash(storedPassword);
+
+    let isPasswordValid = false;
+    if (usingLegacyPlainTextPassword) {
+      isPasswordValid = password === storedPassword;
+    } else {
+      isPasswordValid = bcrypt.compareSync(password, storedPassword);
+    }
 
     if (!isPasswordValid) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'Email hoặc mật khẩu không đúng' 
+        message: 'Email hoặc mật khẩu không đúng'
       });
     }
 
-    // FIX 2: Use JWT_SECRET from environment (no fallback)
-    // Tạo JWT token
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRE }
-    );
+    if (usingLegacyPlainTextPassword) {
+      const hashedPassword = bcrypt.hashSync(password, 10);
 
-    res.status(200).json({
-      success: true,
-      message: 'Đăng nhập thành công',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
-    });
+      return userModel.updateUserPassword(user.id, hashedPassword, (updateErr) => {
+        if (updateErr) {
+          console.error('[LOGIN_PASSWORD_MIGRATION_ERROR]', updateErr);
+          return res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi nâng cấp mật khẩu tài khoản cũ'
+          });
+        }
+
+        return respondWithLoginSuccess(res, {
+          ...user,
+          password: hashedPassword
+        });
+      });
+    }
+
+    return respondWithLoginSuccess(res, user);
   });
 };
 
-// Lấy thông tin profile
 exports.getProfile = (req, res) => {
-  const user_id = req.user.id;
+  const userId = req.user.id;
 
-  userModel.getUserById(user_id, (err, user) => {
+  userModel.getUserById(userId, (err, user) => {
     if (err) {
       console.error('[GET_PROFILE_ERROR]', err);
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        message: 'Lỗi server' 
+        message: 'Lỗi server'
       });
     }
 
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Người dùng không tồn tại' 
+        message: 'Người dùng không tồn tại'
       });
     }
 
-    res.status(200).json({ 
-      success: true, 
-      data: user 
+    return res.status(200).json({
+      success: true,
+      data: user
     });
   });
 };
 
-// Cập nhật profile
 exports.updateProfile = (req, res) => {
-  const user_id = req.user.id;
+  const userId = req.user.id;
   const { name, email, phone } = req.body;
 
   if (!name || !email) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      message: 'Vui lòng cung cấp đầy đủ thông tin' 
+      message: 'Vui lòng cung cấp đầy đủ thông tin'
     });
   }
 
@@ -174,18 +207,18 @@ exports.updateProfile = (req, res) => {
     phone: phone || ''
   };
 
-  userModel.updateUser(user_id, userData, (err, result) => {
+  return userModel.updateUser(userId, userData, (err) => {
     if (err) {
       console.error('[UPDATE_PROFILE_ERROR]', err);
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        message: 'Lỗi server khi cập nhật profile' 
+        message: 'Lỗi server khi cập nhật profile'
       });
     }
 
-    res.status(200).json({ 
-      success: true, 
-      message: 'Cập nhật profile thành công' 
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật profile thành công'
     });
   });
 };

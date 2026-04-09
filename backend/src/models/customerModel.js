@@ -70,6 +70,11 @@ const updateCustomer = (id, customerData, callback) => {
     values.push(customerData.phone);
   }
 
+  if (typeof customerData.password !== 'undefined') {
+    fields.push('password = ?');
+    values.push(customerData.password);
+  }
+
   if (typeof customerData.is_active !== 'undefined') {
     fields.push('is_active = ?');
     values.push(customerData.is_active ? 1 : 0);
@@ -92,9 +97,29 @@ const updateCustomer = (id, customerData, callback) => {
   });
 };
 
+const getCustomerAppointmentCount = (id, callback) => {
+  const query = 'SELECT COUNT(*) AS total FROM appointments WHERE user_id = ?';
+
+  db.query(query, [id], (err, results) => {
+    if (err) return callback(err);
+    callback(null, Number(results[0]?.total || 0));
+  });
+};
+
+const deleteCustomer = (id, callback) => {
+  const query = "DELETE FROM users WHERE id = ? AND role = 'customer'";
+
+  db.query(query, [id], (err, result) => {
+    if (err) return callback(err);
+    callback(null, result);
+  });
+};
+
 module.exports = {
   getAllCustomers,
   getCustomerById,
   createCustomer,
-  updateCustomer
+  updateCustomer,
+  getCustomerAppointmentCount,
+  deleteCustomer
 };
