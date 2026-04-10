@@ -1,4 +1,4 @@
-.appointments-page {
+﻿.appointments-page {
   width: 100%;
 }
 
@@ -135,6 +135,18 @@
   font-size: 14px;
 }
 
+.awaiting-staff-note {
+  margin-top: 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563eb;
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .appointment-footer {
   padding: 20px;
   border-top: 1px solid #eee;
@@ -144,6 +156,90 @@
 
 .appointment-footer button {
   flex: 1;
+}
+
+.review-form {
+  margin-top: 16px;
+  border: 1px solid #f9d2e1;
+  border-radius: 8px;
+  background: #fff8fb;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.review-form h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #b00050;
+}
+
+.review-row {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.review-row label {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.review-row select,
+.review-form textarea {
+  width: 100%;
+  border: 1px solid #f4bdd4;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.review-row select:focus,
+.review-form textarea:focus {
+  outline: none;
+  border-color: #e91e63;
+  box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.12);
+}
+
+.review-submit-btn {
+  justify-self: start;
+}
+
+.review-result {
+  margin-top: 16px;
+  border: 1px solid #e1e8f0;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.review-result-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.review-result-head strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.review-stars {
+  color: #f59e0b;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.review-result p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+  font-size: 14px;
 }
 
 .no-appointments {
@@ -176,4 +272,30 @@
   .filter-btn {
     width: 100%;
   }
+
+  .review-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.badge-cancel-request {
+  background-color: #fff4ce;
+  color: #9a6700;
+}
+
+.badge-default {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.cancellation-request-note {
+  margin-top: 14px;
+  background: #fff8e6;
+  border: 1px solid #f9d98c;
+  border-left: 4px solid #f59e0b;
+  color: #8a5a00;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
 }

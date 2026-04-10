@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import authService from '../services/authService';
 import bookingService from '../services/bookingService';
 import serviceService from '../services/serviceService';
 import staffService from '../services/staffService';
@@ -8,6 +9,17 @@ import './Booking.css';
 
 const quickSlots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '18:00'];
 
+const getStaffRequestError = (err, fallbackMessage) => {
+  if (err.response?.status === 401) {
+    return 'Phien dang nhap da het han. Vui long dang nhap lai de chon nhan vien.';
+  }
+
+  if (err.response?.status === 403) {
+    return 'Tai khoan hien tai khong co quyen xem danh sach nhan vien.';
+  }
+
+  return fallbackMessage;
+};
 function Booking() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
@@ -16,8 +28,10 @@ function Booking() {
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState('');
-  const [staffOptions, setStaffOptions] = useState([]);
-  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [allStaff, setAllStaff] = useState([]);
+  const [availableStaffIds, setAvailableStaffIds] = useState(() => new Set());
+  const [loadingStaffList, setLoadingStaffList] = useState(true);
+  const [loadingStaffAvailability, setLoadingStaffAvailability] = useState(false);
   const [staffError, setStaffError] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
@@ -55,15 +69,61 @@ function Booking() {
   useEffect(() => {
     let cancelled = false;
 
-    const fetchAvailableStaff = async () => {
-      if (!appointmentDate || !appointmentTime) {
-        setStaffOptions([]);
-        setSelectedStaffId('');
-        setStaffError('');
+    const fetchBookableStaff = async () => {
+      if (!authService.getToken()) {
+        if (!cancelled) {
+          setAllStaff([]);
+          setAvailableStaffIds(new Set());
+          setStaffError('Vui long dang nhap lai de chon nhan vien phu trach.');
+          setLoadingStaffList(false);
+        }
         return;
       }
 
-      setLoadingStaff(true);
+      try {
+        setLoadingStaffList(true);
+        const response = await staffService.getBookableStaff();
+        const nextStaff = response.data.data || [];
+
+        if (!cancelled) {
+          setAllStaff(nextStaff);
+          setAvailableStaffIds(new Set(nextStaff.map((staff) => String(staff.id))));
+          setStaffError('');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setAllStaff([]);
+          setAvailableStaffIds(new Set());
+          setStaffError(getStaffRequestError(err, 'Khong the tai danh sach nhan vien.'));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingStaffList(false);
+        }
+      }
+    };
+
+    fetchBookableStaff();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkAvailableStaff = async () => {
+      if (!appointmentDate || !appointmentTime) {
+        setAvailableStaffIds(new Set(allStaff.map((staff) => String(staff.id))));
+        return;
+      }
+
+      if (allStaff.length === 0) {
+        setAvailableStaffIds(new Set());
+        return;
+      }
+
+      setLoadingStaffAvailability(true);
       setStaffError('');
 
       try {
@@ -72,40 +132,58 @@ function Booking() {
           appointmentTime,
           serviceId
         );
-        const nextStaff = response.data.data || [];
+        const nextAvailableIds = new Set(
+          (response.data.data || []).map((staff) => String(staff.id))
+        );
 
         if (!cancelled) {
-          setStaffOptions(nextStaff);
+          setAvailableStaffIds(nextAvailableIds);
           setSelectedStaffId((prev) => {
             if (!prev) return '';
-            return nextStaff.some((staff) => String(staff.id) === String(prev)) ? prev : '';
+            return nextAvailableIds.has(String(prev)) ? prev : '';
           });
         }
       } catch (err) {
         if (!cancelled) {
-          setStaffOptions([]);
+          setAvailableStaffIds(new Set());
           setSelectedStaffId('');
-          setStaffError('Không thể tải danh sách nhân viên cho khung giờ này.');
+          setStaffError(getStaffRequestError(err, 'Khong the kiem tra lich trong cua nhan vien theo khung gio nay.'));
         }
       } finally {
         if (!cancelled) {
-          setLoadingStaff(false);
+          setLoadingStaffAvailability(false);
         }
       }
     };
 
-    fetchAvailableStaff();
+    checkAvailableStaff();
     return () => {
       cancelled = true;
     };
-  }, [appointmentDate, appointmentTime, serviceId]);
+  }, [appointmentDate, appointmentTime, serviceId, allStaff]);
 
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
+  const staffOptions = useMemo(() => {
+    const shouldCheckAvailability = !!appointmentDate && !!appointmentTime;
+    return allStaff.map((staff) => {
+      const isAvailable = !shouldCheckAvailability || availableStaffIds.has(String(staff.id));
+      return {
+        ...staff,
+        isAvailable
+      };
+    });
+  }, [allStaff, appointmentDate, appointmentTime, availableStaffIds]);
+
   const selectedStaffName = useMemo(() => {
-    const selected = staffOptions.find((staff) => String(staff.id) === String(selectedStaffId));
+    const selected = allStaff.find((staff) => String(staff.id) === String(selectedStaffId));
     return selected ? selected.name : '';
-  }, [selectedStaffId, staffOptions]);
+  }, [selectedStaffId, allStaff]);
+
+  const availableStaffCount = useMemo(
+    () => staffOptions.filter((staff) => staff.isAvailable).length,
+    [staffOptions]
+  );
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -114,6 +192,14 @@ function Booking() {
 
     if (!appointmentDate || !appointmentTime || !selectedStaffId) {
       setError('Vui lòng chọn ngày, giờ và nhân viên trước khi đặt lịch.');
+      return;
+    }
+
+    const selectedOption = staffOptions.find(
+      (staff) => String(staff.id) === String(selectedStaffId)
+    );
+    if (!selectedOption || !selectedOption.isAvailable) {
+      setError('Nhân viên đã bận ở khung giờ này, vui lòng chọn nhân viên khác.');
       return;
     }
 
@@ -199,25 +285,40 @@ function Booking() {
             <select
               value={selectedStaffId}
               onChange={(event) => setSelectedStaffId(event.target.value)}
-              disabled={!appointmentDate || !appointmentTime || loadingStaff}
+              disabled={loadingStaffList || allStaff.length === 0}
               required
             >
               <option value="">
-                {!appointmentDate || !appointmentTime
-                  ? 'Chọn ngày và giờ trước'
-                  : loadingStaff
-                    ? 'Đang tải nhân viên...'
-                    : staffOptions.length === 0
-                      ? 'Không còn nhân viên trong giờ này'
-                      : 'Chọn nhân viên'}
+                {loadingStaffList
+                  ? 'Đang tải danh sách nhân viên...'
+                  : allStaff.length === 0
+                    ? 'Chưa có nhân viên hoạt động'
+                    : loadingStaffAvailability
+                      ? 'Đang kiểm tra lịch trống...'
+                      : availableStaffCount === 0
+                        ? 'Không còn nhân viên trống trong giờ này'
+                        : 'Chọn nhân viên'}
               </option>
               {staffOptions.map((staff) => (
-                <option key={staff.id} value={staff.id}>
+                <option
+                  key={staff.id}
+                  value={staff.id}
+                  disabled={!!appointmentDate && !!appointmentTime && !staff.isAvailable}
+                >
                   {staff.name}
+                  {!!appointmentDate && !!appointmentTime && !staff.isAvailable ? ' - Đang bận' : ''}
                 </option>
               ))}
             </select>
             {staffError && <small className="field-error">{staffError}</small>}
+            {!staffError && allStaff.length > 0 && !appointmentDate && !appointmentTime && (
+              <small className="field-hint">Chọn ngày và giờ để hệ thống lọc nhân viên đang trống.</small>
+            )}
+            {!staffError && !!appointmentDate && !!appointmentTime && !loadingStaffAvailability && (
+              <small className="field-hint">
+                Có {availableStaffCount}/{allStaff.length} nhân viên đang trống ở khung giờ này.
+              </small>
+            )}
           </div>
 
           <div className="form-group">
@@ -269,3 +370,8 @@ function Booking() {
 }
 
 export default Booking;
+
+
+
+
+

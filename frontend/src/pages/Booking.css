@@ -73,6 +73,13 @@
   font-size: 12px;
 }
 
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  color: #51607a;
+  font-size: 12px;
+}
+
 .booking-summary {
   display: grid;
   gap: 10px;

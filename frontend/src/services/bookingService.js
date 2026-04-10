@@ -11,27 +11,28 @@ const bookingService = {
     });
   },
 
-  getMyBookings: () => {
-    return api.get('/bookings/my-bookings');
-  },
+  getMyBookings: () => api.get('/bookings/my-bookings'),
 
-  getAllBookings: () => {
-    return api.get('/bookings');
-  },
+  getAllBookings: () => api.get('/bookings'),
 
-  getBookingById: (id) => {
-    return api.get(`/bookings/${id}`);
-  },
+  getBookingById: (id) => api.get(`/bookings/${id}`),
 
-  updateBookingStatus: (id, status) => {
-    return api.put(`/bookings/${id}/status`, {
+  updateBookingStatus: (id, status) =>
+    api.put(`/bookings/${id}/status`, {
       status
-    });
-  },
+    }),
 
-  cancelBooking: (id) => {
-    return api.put(`/bookings/${id}/cancel`);
-  }
+  cancelBooking: (id) => api.put(`/bookings/${id}/cancel`),
+
+  confirmCancelBooking: (id) => api.put(`/bookings/${id}/confirm-cancel`),
+
+  rejectCancelBooking: (id) => api.put(`/bookings/${id}/reject-cancel`),
+
+  reviewBooking: (id, rating, review) =>
+    api.put(`/bookings/${id}/review`, {
+      rating,
+      review
+    })
 };
 
 export default bookingService;

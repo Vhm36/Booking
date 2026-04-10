@@ -22,7 +22,7 @@ function Dashboard() {
   const [topServices, setTopServices] = useState(null);
   const [revenueByMonth, setRevenueByMonth] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
@@ -93,8 +93,6 @@ function Dashboard() {
   return (
     <div className="dashboard">
       <h1>Dashboard Quản Lý</h1>
-
-      {error && <div className="alert alert-error">{error}</div>}
 
       <div className="kpi-grid">
         <div className="kpi-card">

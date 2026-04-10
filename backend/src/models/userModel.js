@@ -1,17 +1,17 @@
 const db = require('../config/db');
 
-// Tạo user mới
+// Táº¡o user má»›i
 const createUser = (userData, callback) => {
   const { name, email, password, phone, role } = userData;
   const query = 'INSERT INTO users (name, email, password, phone, role, created_at) VALUES (?, ?, ?, ?, ?, NOW())';
-  
+
   db.query(query, [name, email, password, phone, role || 'customer'], (err, result) => {
     if (err) return callback(err);
     callback(null, result);
   });
 };
 
-// Lấy user theo email
+// Láº¥y user theo email
 const getUserByEmail = (email, callback) => {
   const query = 'SELECT * FROM users WHERE email = ?';
   db.query(query, [email], (err, results) => {
@@ -20,7 +20,7 @@ const getUserByEmail = (email, callback) => {
   });
 };
 
-// Lấy user theo ID
+// Láº¥y user theo ID
 const getUserById = (id, callback) => {
   const query = 'SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?';
   db.query(query, [id], (err, results) => {
@@ -29,7 +29,7 @@ const getUserById = (id, callback) => {
   });
 };
 
-// Lấy tất cả users
+// Láº¥y táº¥t cáº£ users
 const getAllUsers = (callback) => {
   const query = 'SELECT id, name, email, phone, role, created_at FROM users';
   db.query(query, (err, results) => {
@@ -38,18 +38,28 @@ const getAllUsers = (callback) => {
   });
 };
 
-// Cập nhật user
+// Cáº­p nháº­t máº­t kháº©u user
+const updateUserPassword = (id, hashedPassword, callback) => {
+  const query = 'UPDATE users SET password = ? WHERE id = ?';
+
+  db.query(query, [hashedPassword, id], (err, result) => {
+    if (err) return callback(err);
+    callback(null, result);
+  });
+};
+
+// Cáº­p nháº­t user
 const updateUser = (id, userData, callback) => {
   const { name, email, phone } = userData;
   const query = 'UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?';
-  
+
   db.query(query, [name, email, phone, id], (err, result) => {
     if (err) return callback(err);
     callback(null, result);
   });
 };
 
-// Xóa user
+// XÃ³a user
 const deleteUser = (id, callback) => {
   const query = 'DELETE FROM users WHERE id = ?';
   db.query(query, [id], (err, result) => {
@@ -63,6 +73,7 @@ module.exports = {
   getUserByEmail,
   getUserById,
   getAllUsers,
+  updateUserPassword,
   updateUser,
   deleteUser
 };

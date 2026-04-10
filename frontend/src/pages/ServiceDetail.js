@@ -3,7 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import authService from '../services/authService';
 import serviceService from '../services/serviceService';
 import { formatDurationLabel, formatVnd } from '../utils/formatters';
+import { resolveServiceImageUrl } from '../utils/serviceImage';
 import './ServiceDetail.css';
+
+const FALLBACK_SERVICE_IMAGE =
+  'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1200&q=80';
 
 function ServiceDetail() {
   const { id } = useParams();
@@ -50,7 +54,7 @@ function ServiceDetail() {
     }
 
     if (user.role !== 'customer') {
-      window.alert('Chỉ tài khoản khách hàng mới có thể đặt lịch.');
+      window.alert('Chỉ tài khoản khách hàng mới có thể đặt lịch dịch vụ.');
       return;
     }
 
@@ -68,10 +72,25 @@ function ServiceDetail() {
   const price = Number(service.price) || 0;
   const duration = Number(service.duration) || 0;
   const isActive = service.status === 'active';
+  const serviceImage = resolveServiceImageUrl(service.image_url, FALLBACK_SERVICE_IMAGE);
 
   return (
     <div className="service-detail-page">
       <section className="service-main">
+        <div className="service-detail-image-wrap">
+          <img
+            src={serviceImage}
+            alt={service.name}
+            className="service-detail-image"
+            loading="lazy"
+            onError={(event) => {
+              if (event.currentTarget.src !== FALLBACK_SERVICE_IMAGE) {
+                event.currentTarget.src = FALLBACK_SERVICE_IMAGE;
+              }
+            }}
+          />
+        </div>
+
         <div className="service-title-row">
           <span className="badge">CHI TIẾT DỊCH VỤ</span>
           <h1>{service.name}</h1>
@@ -81,15 +100,15 @@ function ServiceDetail() {
         <div className="service-trust-grid">
           <article>
             <h3>Uy tín</h3>
-            <p>Đơn vị đã xác minh thông tin và đồng bộ lịch hẹn theo thời gian thực.</p>
+            <p>Dịch vụ được hiển thị từ hệ thống quản lý salon và cập nhật theo thời gian thực.</p>
           </article>
           <article>
             <h3>Linh hoạt</h3>
-            <p>Có thể đổi lịch theo khung giờ trong ngày, nhận thông báo ngay lập tức.</p>
+            <p>Bạn có thể chuyển sang bước đặt lịch ngay khi tìm thấy dịch vụ phù hợp.</p>
           </article>
           <article>
             <h3>An toàn</h3>
-            <p>Thông tin đặt lịch được lưu trữ bảo mật và quản lý theo tài khoản.</p>
+            <p>Thông tin lịch hẹn được lưu theo tài khoản để bạn dễ theo dõi và kiểm tra lại.</p>
           </article>
         </div>
       </section>
@@ -118,11 +137,7 @@ function ServiceDetail() {
             <strong>{service.category || 'Dịch vụ làm đẹp'}</strong>
           </div>
 
-          <button
-            onClick={handleBooking}
-            className="btn-primary"
-            disabled={!isActive}
-          >
+          <button onClick={handleBooking} className="btn-primary" disabled={!isActive}>
             {!isActive
               ? 'Dịch vụ đang tạm dừng'
               : !user
@@ -133,7 +148,7 @@ function ServiceDetail() {
           </button>
 
           <small>
-            Bạn có thể xem lịch đã đặt trong mục tài khoản sau khi xác nhận.
+            Bạn có thể xem lại lịch đã đặt trong mục tài khoản sau khi xác nhận thành công.
           </small>
         </div>
       </aside>

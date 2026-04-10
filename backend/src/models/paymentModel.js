@@ -29,9 +29,25 @@ const getPaymentByAppointmentId = (appointment_id, callback) => {
   });
 };
 
+// Cập nhật thanh toán
+const updatePayment = (id, updateData, callback) => {
+  // FIX 6: Add update payment logic
+  const setClause = Object.keys(updateData)
+    .map(key => `${key} = ?`)
+    .join(', ');
+  const values = Object.values(updateData);
+  
+  const query = `UPDATE payments SET ${setClause} WHERE id = ?`;
+  
+  db.query(query, [...values, id], (err, result) => {
+    if (err) return callback(err);
+    callback(null, result);
+  });
+};
+
 // Cập nhật trạng thái thanh toán
 const updatePaymentStatus = (id, status, callback) => {
-  const query = 'UPDATE payments SET status = ? WHERE id = ?';
+  const query = 'UPDATE payments SET payment_status = ? WHERE id = ?';
   db.query(query, [status, id], (err, result) => {
     if (err) return callback(err);
     callback(null, result);
@@ -59,5 +75,6 @@ module.exports = {
   getPaymentById,
   getPaymentByAppointmentId,
   updatePaymentStatus,
+  updatePayment,
   getAllPayments
 };

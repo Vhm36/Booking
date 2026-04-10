@@ -68,3 +68,71 @@ SET @sql_staff_fk := IF(
 PREPARE stmt_staff_fk FROM @sql_staff_fk;
 EXECUTE stmt_staff_fk;
 DEALLOCATE PREPARE stmt_staff_fk;
+
+-- Add services.image_url if missing
+SET @has_services_image_url := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'services'
+    AND COLUMN_NAME = 'image_url'
+);
+SET @sql_services_image_url := IF(
+  @has_services_image_url = 0,
+  'ALTER TABLE services ADD COLUMN image_url VARCHAR(512) NULL AFTER category',
+  'SELECT "services.image_url already exists"'
+);
+PREPARE stmt_services_image_url FROM @sql_services_image_url;
+EXECUTE stmt_services_image_url;
+DEALLOCATE PREPARE stmt_services_image_url;
+
+-- Add appointments.staff_rating if missing
+SET @has_appointments_staff_rating := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'appointments'
+    AND COLUMN_NAME = 'staff_rating'
+);
+SET @sql_appointments_staff_rating := IF(
+  @has_appointments_staff_rating = 0,
+  'ALTER TABLE appointments ADD COLUMN staff_rating TINYINT UNSIGNED NULL AFTER total_amount',
+  'SELECT "appointments.staff_rating already exists"'
+);
+PREPARE stmt_appointments_staff_rating FROM @sql_appointments_staff_rating;
+EXECUTE stmt_appointments_staff_rating;
+DEALLOCATE PREPARE stmt_appointments_staff_rating;
+
+-- Add appointments.staff_review if missing
+SET @has_appointments_staff_review := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'appointments'
+    AND COLUMN_NAME = 'staff_review'
+);
+SET @sql_appointments_staff_review := IF(
+  @has_appointments_staff_review = 0,
+  'ALTER TABLE appointments ADD COLUMN staff_review TEXT NULL AFTER staff_rating',
+  'SELECT "appointments.staff_review already exists"'
+);
+PREPARE stmt_appointments_staff_review FROM @sql_appointments_staff_review;
+EXECUTE stmt_appointments_staff_review;
+DEALLOCATE PREPARE stmt_appointments_staff_review;
+
+-- Add appointments.reviewed_at if missing
+SET @has_appointments_reviewed_at := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'appointments'
+    AND COLUMN_NAME = 'reviewed_at'
+);
+SET @sql_appointments_reviewed_at := IF(
+  @has_appointments_reviewed_at = 0,
+  'ALTER TABLE appointments ADD COLUMN reviewed_at TIMESTAMP NULL AFTER staff_review',
+  'SELECT "appointments.reviewed_at already exists"'
+);
+PREPARE stmt_appointments_reviewed_at FROM @sql_appointments_reviewed_at;
+EXECUTE stmt_appointments_reviewed_at;
+DEALLOCATE PREPARE stmt_appointments_reviewed_at;

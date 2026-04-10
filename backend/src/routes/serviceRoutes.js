@@ -3,19 +3,15 @@ const router = express.Router();
 const serviceController = require('../controllers/serviceController');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 
-// Lấy tất cả dịch vụ (public)
-router.get('/', serviceController.getAllServices);
-
-// Lấy dịch vụ theo ID (public)
-router.get('/:id', serviceController.getServiceById);
-
-// Tạo dịch vụ mới (admin)
+// Admin routes
+router.get('/admin/all', verifyToken, verifyAdmin, serviceController.getAllServicesForAdmin);
 router.post('/', verifyToken, verifyAdmin, serviceController.createService);
-
-// Cập nhật dịch vụ (admin)
 router.put('/:id', verifyToken, verifyAdmin, serviceController.updateService);
-
-// Xóa dịch vụ (admin)
+router.put('/:id/price', verifyToken, verifyAdmin, serviceController.updateServicePrice);
 router.delete('/:id', verifyToken, verifyAdmin, serviceController.deleteService);
+
+// Public routes
+router.get('/', serviceController.getAllServices);
+router.get('/:id', serviceController.getServiceById);
 
 module.exports = router;

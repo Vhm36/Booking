@@ -1,41 +1,19 @@
 import api from './api';
 
 const serviceService = {
-  // Lấy tất cả dịch vụ
-  getAllServices: () => {
-    return api.get('/services');
-  },
+  getAllServices: () => api.get('/services'),
 
-  // Lấy dịch vụ theo ID
-  getServiceById: (id) => {
-    return api.get(`/services/${id}`);
-  },
+  getAdminServices: () => api.get('/services/admin/all'),
 
-  // Tạo dịch vụ (admin)
-  createService: (name, description, price, duration) => {
-    return api.post('/services', {
-      name,
-      description,
-      price,
-      duration
-    });
-  },
+  getServiceById: (id) => api.get(`/services/${id}`),
 
-  // Cập nhật dịch vụ (admin)
-  updateService: (id, name, description, price, duration, status) => {
-    return api.put(`/services/${id}`, {
-      name,
-      description,
-      price,
-      duration,
-      status
-    });
-  },
+  createService: (payload) => api.post('/services', payload),
 
-  // Xóa dịch vụ (admin)
-  deleteService: (id) => {
-    return api.delete(`/services/${id}`);
-  }
+  updateService: (id, payload) => api.put(`/services/${id}`, payload),
+
+  updateServicePrice: (id, price) => api.put(`/services/${id}/price`, { price }),
+
+  deleteService: (id) => api.delete(`/services/${id}`)
 };
 
 export default serviceService;

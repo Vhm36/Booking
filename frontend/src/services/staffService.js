@@ -5,6 +5,10 @@ const staffService = {
     return api.get('/staff');
   },
 
+  getBookableStaff: () => {
+    return api.get('/staff/bookable');
+  },
+
   getAvailableStaff: (date, time, serviceId) => {
     const params = new URLSearchParams();
     params.set('date', date);

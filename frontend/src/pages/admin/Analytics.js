@@ -7,7 +7,7 @@ function Analytics() {
   const [appointmentStatus, setAppointmentStatus] = useState([]);
   const [cancellationRate, setCancellationRate] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -40,8 +40,6 @@ function Analytics() {
   return (
     <div className="analytics">
       <h1>Phân tích dữ liệu</h1>
-
-      {error && <div className="alert alert-error">{error}</div>}
 
       {cancellationRate && (
         <div className="analytics-card">

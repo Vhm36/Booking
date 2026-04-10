@@ -4,6 +4,7 @@ const staffController = require('../controllers/staffController');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 
 // For booking flow (customer/admin): get free staff by date/time
+router.get('/bookable', verifyToken, staffController.getBookableStaff);
 router.get('/available', verifyToken, staffController.getAvailableStaff);
 
 // Admin staff management

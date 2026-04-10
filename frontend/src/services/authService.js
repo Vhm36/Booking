@@ -35,7 +35,12 @@ const authService = {
 
   // Lưu token
   setToken: (token) => {
-    localStorage.setItem('token', token);
+    if (token) {
+      localStorage.setItem('token', token);
+      return;
+    }
+
+    localStorage.removeItem('token');
   },
 
   // Lấy token
@@ -67,3 +72,4 @@ const authService = {
 };
 
 export default authService;
+
