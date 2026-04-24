@@ -6,3 +6,14 @@ backend/.env
 frontend/.env
 tmp_utf8_test.txt
 *.log
+.tools/
+.npm-cache/
+.agents/
+.qodo/
+.vscode/
+__tmpcmd__.cmd
+.impeccable.md
+.npmrc
+backend/.npmrc
+frontend/.npmrc
+scripts/use-local-node.ps1

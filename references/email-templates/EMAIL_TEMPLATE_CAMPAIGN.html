@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khuyến mãi tuần này</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .hero-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        .hero-banner img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+        .content {
+            padding: 40px 20px;
+        }
+        .greeting {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .intro {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .offers-section {
+            margin: 30px 0;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        .offer-card {
+            background-color: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            transition: transform 0.2s;
+        }
+        .offer-card:hover {
+            transform: translateX(5px);
+        }
+        .offer-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+        .offer-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .offer-badge {
+            display: inline-block;
+            background-color: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        .offer-badge.discount {
+            background-color: #ff6b6b;
+        }
+        .offer-badge.expiry {
+            background-color: #ff9800;
+        }
+        .offer-code {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: bold;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .view-button {
+            display: inline-block;
+            padding: 14px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+        .view-button:hover {
+            transform: translateY(-2px);
+        }
+        .highlighted-offer {
+            background: linear-gradient(135deg, #fff5e1 0%, #ffe8cc 100%);
+            border: 2px solid #ff9800;
+            border-left: 4px solid #ff9800;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .highlighted-offer .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ff9800;
+            margin-bottom: 10px;
+        }
+        .countdown {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .countdown-icon {
+            font-size: 28px;
+        }
+        .countdown-text {
+            font-size: 14px;
+            color: #666;
+        }
+        .countdown-text strong {
+            color: #ff9800;
+            font-size: 16px;
+        }
+        .testimonial {
+            background-color: #f0f7ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-style: italic;
+            color: #666;
+        }
+        .testimonial::before {
+            content: '"';
+            font-size: 32px;
+            color: #667eea;
+            opacity: 0.3;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .social-section {
+            text-align: center;
+            padding: 20px;
+            background-color: #f9f9f9;
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        .social-icon {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background-color: #667eea;
+            border-radius: 50%;
+            line-height: 40px;
+            text-align: center;
+            color: white;
+            margin: 0 8px;
+            text-decoration: none;
+        }
+        .footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            border-top: 1px solid #ddd;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .unsubscribe {
+            font-size: 11px;
+            color: #ccc;
+            margin-top: 10px;
+        }
+        @media (max-width: 600px) {
+            .offer-card {
+                font-size: 14px;
+            }
+            .offer-title {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>?? KHUY?N M?I TU?N N?Y</h1>
+            <p>{{weekNumber}} - Don't Miss Out!</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Hallo {{customerName}},
+            </div>
+
+            <div class="intro">
+                <p>Chúng tôi vừa chọn những ưu đãi <strong>độc quyền dành cho bạn</strong> dựa trên sở thích của bạn. Đây là cơ hội tuyệt vời để tìm kiếm những điều bạn yêu thích với giá tốt hơn!</p>
+            </div>
+
+            <!-- Main Highlighted Offer -->
+            {{mainOffer}}
+
+            <!-- Regular Offers -->
+            <div class="offers-section">
+                <div class="section-title">🎁 Các ưu đãi khác</div>
+
+                {{offersCards}}
+
+            </div>
+
+            <!-- Countdown Timer -->
+            <div class="countdown">
+                <div class="countdown-icon">⏰</div>
+                <div class="countdown-text">
+                    <strong>Cơ hội hạn chế!</strong> Nhiều ưu đãi sắp kết thúc vào {{endDate}}. Hãy nhanh chóng sử dụng.
+                </div>
+            </div>
+
+            <!-- Call to Action -->
+            <div class="button-container">
+                <a href="{{shopLink}}" class="view-button">🛍️ Xem tất cả ưu đãi</a>
+            </div>
+
+            <!-- Customer Testimonial -->
+            <div class="testimonial">
+                {{testimonial}}
+                <div style="text-align: right; margin-top: 10px; font-style: normal;">- {{testimonialAuthor}}</div>
+            </div>
+
+            <!-- Additional Info -->
+            <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea;">
+                <p style="margin: 0 0 10px 0; color: #333;"><strong>💡 Mẹo:</strong></p>
+                <p style="margin: 0; color: #666; font-size: 14px;">Hãy kiểm tra danh sách ưu đãi hàng tuần để không bỏ lỡ bất kỳ mã giảm giá tuyệt vời nào. Bạn cũng có thể bật thông báo push để nhận được cảnh báo ngay khi có ưu đãi mới!</p>
+            </div>
+
+            <!-- Social Section -->
+            <div class="social-section">
+                <p style="margin: 0 0 15px 0; color: #666; font-size: 14px;">Theo dõi chúng tôi để cập nhật thêm:</p>
+                <a href="{{facebookLink}}" class="social-icon">f</a>
+                <a href="{{instagramLink}}" class="social-icon">📷</a>
+                <a href="{{twitterLink}}" class="social-icon">𝕏</a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p style="margin: 0;">Có câu hỏi? Liên hệ: <a href="mailto:support@yourbusiness.com">support@yourbusiness.com</a></p>
+            <p style="margin: 10px 0 0 0;">© 2026 Your Business Name. Tất cả quyền được bảo lưu.</p>
+            <div class="unsubscribe">
+                Bạn không muốn nhận email này nữa? <a href="{{unsubscribeLink}}">Hủy đăng ký</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

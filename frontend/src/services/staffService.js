@@ -9,15 +9,26 @@ const staffService = {
     return api.get('/staff/bookable');
   },
 
-  getAvailableStaff: (date, time, serviceId) => {
+  getAvailableStaff: (date, time, serviceIds = []) => {
     const params = new URLSearchParams();
     params.set('date', date);
     params.set('time', time);
-    if (serviceId) {
-      params.set('serviceId', serviceId);
+    const normalizedServiceIds = Array.isArray(serviceIds)
+      ? serviceIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+      : [];
+
+    if (normalizedServiceIds.length > 0) {
+      params.set('serviceId', String(normalizedServiceIds[0]));
+      params.set('serviceIds', normalizedServiceIds.join(','));
     }
 
     return api.get(`/staff/available?${params.toString()}`);
+  },
+
+  getBusyTimeSlots: (staffId, date) => {
+    const params = new URLSearchParams();
+    params.set('date', date);
+    return api.get(`/staff/${staffId}/busy-slots?${params.toString()}`);
   },
 
   createStaff: (name, email, password, phone, staff_role_id, is_active = true) => {

@@ -1,0 +1,31 @@
+﻿{
+  "name": "pbakaus-impeccable",
+  "version": "0.1.0",
+  "description": "Local marketplace wrapper for pbakaus/impeccable",
+  "author": {
+    "name": "[TODO: author-name]",
+    "email": "[TODO: author-email]",
+    "url": "https://github.com/pbakaus"
+  },
+  "homepage": "https://github.com/pbakaus/impeccable",
+  "repository": "https://github.com/pbakaus/impeccable",
+  "license": "[TODO: license]",
+  "keywords": ["frontend", "design", "impeccable"],
+  "interface": {
+    "displayName": "Impeccable",
+    "shortDescription": "Premium frontend design skill",
+    "longDescription": "Marketplace entry for pbakaus/impeccable plugin.",
+    "developerName": "pbakaus",
+    "category": "Productivity",
+    "capabilities": ["Write", "Interactive"],
+    "websiteURL": "https://github.com/pbakaus/impeccable",
+    "privacyPolicyURL": "[TODO: privacy-policy-url]",
+    "termsOfServiceURL": "[TODO: terms-of-service-url]",
+    "defaultPrompt": [
+      "Refresh admin UI with stronger visual hierarchy.",
+      "Create a polished dashboard layout.",
+      "Improve mobile responsiveness without losing style."
+    ],
+    "brandColor": "#0F766E"
+  }
+}

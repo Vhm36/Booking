@@ -9,13 +9,20 @@ import ServiceDetail from './pages/ServiceDetail';
 import Booking from './pages/Booking';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import MyAppointments from './pages/MyAppointments';
+import PaymentInvoice from './pages/PaymentInvoice';
+import PaymentReturn from './pages/PaymentReturn';
+import PaymentTransfer from './pages/PaymentTransfer';
 import Profile from './pages/Profile';
+import ChatBot from './pages/ChatBot';
 import AdminDashboard from './pages/admin/Dashboard';
 import ManageServices from './pages/admin/ManageServices';
 import ManageAppointments from './pages/admin/ManageAppointments';
 import Analytics from './pages/admin/Analytics';
 import ManageStaff from './pages/admin/ManageStaff';
+import StaffLeaveManagement from './pages/admin/StaffLeaveManagement';
 import ManageCustomers from './pages/admin/ManageCustomers';
 import ServiceStaffDashboard from './pages/staff/ServiceStaffDashboard';
 
@@ -68,6 +75,9 @@ function App() {
             <Route path="/" element={<Home userLocation={userLocation} />} />
             <Route path="/services" element={<Services />} />
             <Route path="/services/:id" element={<ServiceDetail />} />
+            <Route path="/payment-result" element={<PaymentReturn />} />
+            <Route path="/payment-transfer/:paymentId" element={<PaymentTransfer />} />
+            <Route path="/payment-bill/:paymentId" element={<PaymentInvoice />} />
             <Route
               path="/login"
               element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
@@ -75,6 +85,14 @@ function App() {
             <Route
               path="/register"
               element={isAuthenticated ? <Navigate to="/" /> : <Register />}
+            />
+            <Route
+              path="/forgot-password"
+              element={isAuthenticated ? <Navigate to="/" /> : <ForgotPassword />}
+            />
+            <Route
+              path="/reset-password"
+              element={isAuthenticated ? <Navigate to="/" /> : <ResetPassword />}
             />
 
             {isAuthenticated && user.role === 'customer' && (
@@ -90,6 +108,7 @@ function App() {
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/admin/services" element={<ManageServices />} />
                 <Route path="/admin/staff" element={<ManageStaff />} />
+                <Route path="/admin/staff-leave" element={<StaffLeaveManagement />} />
                 <Route path="/admin/customers" element={<ManageCustomers />} />
                 <Route path="/admin/appointments" element={<ManageAppointments />} />
                 <Route path="/admin/analytics" element={<Analytics />} />
@@ -114,6 +133,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
+        <ChatBot />
         <ConsentBanner onLocationChange={setUserLocation} />
         <Footer />
       </div>
@@ -122,3 +142,4 @@ function App() {
 }
 
 export default App;
+

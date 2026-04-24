@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const { rateLimit } = require('express-rate-limit');
 const bodyParser = require('body-parser');
-require('dotenv').config();
+require('./config/loadEnv');
 
 const authRoutes = require('./routes/authRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
@@ -12,8 +12,11 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const staffRoutes = require('./routes/staffRoutes');
 const customerRoutes = require('./routes/customerRoutes');
+const adminUserRoutes = require('./routes/adminUserRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
+app.set('trust proxy', 1);
 
 const defaultAllowedOrigins = [
   'http://localhost:3000',
@@ -28,10 +31,16 @@ const envAllowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL
   .filter(Boolean);
 
 const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
+const isLocalDevelopmentOrigin = (origin) =>
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      (process.env.NODE_ENV !== 'production' && isLocalDevelopmentOrigin(origin))
+    ) {
       return callback(null, true);
     }
 
@@ -77,6 +86,8 @@ app.use('/api/bookings', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/admin-users', adminUserRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 
 app.get('/', (req, res) => {

@@ -1,10 +1,15 @@
 import api from './api';
 
 const bookingService = {
-  createBooking: (service_id, staff_id, appointment_date, appointment_time, notes) => {
+  createBooking: (selectedServiceIds, staff_id, appointment_date, appointment_time, notes) => {
+    const normalizedServiceIds = Array.isArray(selectedServiceIds)
+      ? selectedServiceIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+      : [];
+
     return api.post('/bookings', {
-      service_id,
-      staff_id,
+      service_id: normalizedServiceIds[0],
+      selected_service_ids: normalizedServiceIds,
+      staff_id: staff_id || undefined,
       appointment_date,
       appointment_time,
       notes

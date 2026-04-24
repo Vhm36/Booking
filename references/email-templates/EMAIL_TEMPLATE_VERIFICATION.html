@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác thực tài khoản</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 15px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .content {
+            padding: 40px 20px;
+            text-align: left;
+        }
+        .greeting {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .message {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .button-container {
+            text-align: center;
+            margin: 40px 0;
+        }
+        .verify-button {
+            display: inline-block;
+            padding: 14px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+        .verify-button:hover {
+            transform: translateY(-2px);
+        }
+        .divider {
+            text-align: center;
+            font-size: 14px;
+            color: #999;
+            margin: 30px 0;
+        }
+        .link-container {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+        .link-container p {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .link-text {
+            color: #667eea;
+            word-break: break-all;
+            font-size: 13px;
+            font-family: monospace;
+        }
+        .footer {
+            background-color: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            border-top: 1px solid #ddd;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #666;
+        }
+        .highlight {
+            color: #764ba2;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">✓</div>
+            <h1>Chào mừng đến với chúng tôi</h1>
+            <p style="margin: 10px 0 0 0;">Welcome to Our Service</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Xin chào {{customerName}},
+            </div>
+
+            <div class="message">
+                <p>Cảm ơn bạn đã đăng ký tài khoản! 🎉</p>
+                <p>Để kích hoạt tài khoản và bắt đầu sử dụng dịch vụ của chúng tôi, vui lòng xác thực email của bạn bằng cách nhấn nút dưới đây:</p>
+            </div>
+
+            <!-- Verify Button -->
+            <div class="button-container">
+                <a href="{{verificationLink}}" class="verify-button">✓ Xác thực tài khoản</a>
+            </div>
+
+            <div class="divider">Hoặc sao chép link dưới đây:</div>
+
+            <!-- Link Container -->
+            <div class="link-container">
+                <p><strong>Link xác thực:</strong></p>
+                <div class="link-text">{{verificationLink}}</div>
+            </div>
+
+            <!-- Warning -->
+            <div class="warning">
+                <strong>⏱ Lưu ý quan trọng:</strong><br>
+                Link xác thực sẽ hết hạn trong <span class="highlight">24 giờ</span>. Vui lòng xác thực tài khoản sớm để tránh phải đăng ký lại.
+            </div>
+
+            <div class="message" style="margin-top: 30px;">
+                <p><strong>Lợi ích khi tài khoản được kích hoạt:</strong></p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>Đăng nhập vào tài khoản cá nhân</li>
+                    <li>Nhận voucher và khuyến mãi độc quyền</li>
+                    <li>Quản lý lịch sử đặt chỗ</li>
+                    <li>Lưu thông tin thanh toán an toàn</li>
+                </ul>
+            </div>
+
+            <div class="message">
+                <p>Nếu bạn không phải là người tạo tài khoản này, bạn có thể bỏ qua thư này một cách an toàn.</p>
+                <p>Nếu gặp vấn đề, vui lòng liên hệ: <a href="mailto:support@yourbusiness.com" style="color: #667eea;">support@yourbusiness.com</a></p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p style="margin: 0;">© 2026 Your Business Name. Tất cả quyền được bảo lưu.</p>
+            <p style="margin: 5px 0 0 0;">
+                <a href="#">Chính sách bảo mật</a> | 
+                <a href="#">Điều khoản dịch vụ</a> | 
+                <a href="#">Quản lý tùy chọn email</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

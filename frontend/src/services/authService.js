@@ -19,6 +19,25 @@ const authService = {
     });
   },
 
+  googleLogin: (idToken) => {
+    return api.post('/auth/google-login', {
+      idToken
+    });
+  },
+
+  forgotPassword: (email) => {
+    return api.post('/auth/forgot-password', {
+      email
+    });
+  },
+
+  resetPassword: (token, newPassword) => {
+    return api.post('/auth/reset-password', {
+      token,
+      newPassword
+    });
+  },
+
   // Lấy profile
   getProfile: () => {
     return api.get('/auth/profile');

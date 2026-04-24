@@ -1,0 +1,327 @@
+.payment-transfer-page {
+  display: grid;
+}
+
+.payment-transfer-card {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid #d9e6f3;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.payment-transfer-status {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+}
+
+.payment-transfer-status.pending {
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #93c5fd;
+}
+
+.payment-transfer-status.success {
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  border-color: #86efac;
+}
+
+.payment-transfer-status.failed {
+  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+  border-color: #fda4af;
+}
+
+.payment-transfer-kicker {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #475569;
+}
+
+.payment-transfer-status h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  color: #0f172a;
+}
+
+.payment-transfer-status p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.7;
+}
+
+.payment-transfer-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+}
+
+.transfer-qr-panel,
+.transfer-info-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #dce5ef;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.transfer-qr-head,
+.transfer-info-panel h2 {
+  margin: 0;
+}
+
+.transfer-qr-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.transfer-qr-head h2,
+.transfer-info-panel h2 {
+  color: #10233d;
+  font-size: 20px;
+}
+
+.transfer-qr-head span {
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.qr-box {
+  display: grid;
+  place-items: center;
+  min-height: 332px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #d7e4f2;
+  background: #ffffff;
+}
+
+.qr-box img {
+  width: min(100%, 360px);
+  height: auto;
+  display: block;
+}
+
+.transfer-state-box {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  justify-items: center;
+  min-height: 332px;
+  padding: 24px;
+  text-align: center;
+  border-radius: 20px;
+  border: 1px dashed #cbd5e1;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5fb 100%);
+}
+
+.transfer-state-box strong {
+  color: #10233d;
+  font-size: 24px;
+}
+
+.transfer-state-box span {
+  max-width: 320px;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.transfer-state-box.success {
+  border-color: #86efac;
+  background: linear-gradient(180deg, #ecfdf5 0%, #dcfce7 100%);
+}
+
+.transfer-state-box.expired {
+  border-color: #fca5a5;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffe4e6 100%);
+}
+
+.transfer-amount-box {
+  display: grid;
+  gap: 4px;
+  padding: 15px 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #eefcf7 0%, #ddf7ef 100%);
+  border: 1px solid #b7ead6;
+}
+
+.transfer-amount-box span {
+  color: #0f5d56;
+  font-size: 13px;
+}
+
+.transfer-amount-box strong {
+  color: #0f172a;
+  font-size: 28px;
+}
+
+.transfer-expire-box {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.transfer-expire-box span,
+.transfer-expire-box small {
+  color: #1e3a8a;
+}
+
+.transfer-expire-box strong {
+  color: #0f172a;
+  font-size: 32px;
+  letter-spacing: 0.06em;
+}
+
+.transfer-expire-box small {
+  line-height: 1.6;
+}
+
+.transfer-expire-box.urgent {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+}
+
+.transfer-expire-box.urgent span,
+.transfer-expire-box.urgent small {
+  color: #9a3412;
+}
+
+.transfer-copy-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.transfer-copy-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f8fbff;
+  border: 1px solid #e3ebf4;
+}
+
+.transfer-copy-item span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.transfer-copy-item strong {
+  color: #10233d;
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.transfer-copy-item .btn-secondary {
+  width: fit-content;
+}
+
+.transfer-summary {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e3ebf4;
+  background: #ffffff;
+}
+
+.transfer-support-note {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  line-height: 1.6;
+}
+
+.payment-transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.payment-transfer-actions .btn-primary,
+.payment-transfer-actions .btn-secondary {
+  min-height: 52px;
+  padding: 0 22px;
+  border-radius: 16px;
+  font-weight: 700;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.payment-transfer-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payment-transfer-actions .btn-secondary {
+  border: 1px solid #d7e4ef;
+  background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+  color: #10233d;
+}
+
+.payment-transfer-actions .btn-secondary:hover {
+  border-color: #0f766e;
+  background: linear-gradient(180deg, #ffffff 0%, #e8f7f5 100%);
+  color: #0f766e;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(15, 118, 110, 0.12);
+}
+
+.payment-transfer-actions .btn-secondary:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.payment-transfer-actions .btn-primary {
+  background: linear-gradient(135deg, #0f766e 0%, #0b5f58 100%);
+  color: #ffffff;
+  box-shadow: 0 16px 28px rgba(15, 118, 110, 0.22);
+}
+
+.payment-transfer-actions .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 32px rgba(15, 118, 110, 0.26);
+}
+
+.payment-transfer-link.secondary {
+  background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+}
+
+@media (max-width: 920px) {
+  .payment-transfer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .payment-transfer-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .payment-transfer-actions > * {
+    width: 100%;
+  }
+
+  .transfer-qr-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

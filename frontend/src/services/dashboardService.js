@@ -34,6 +34,18 @@ const dashboardService = {
   // Lấy tỷ lệ hủy lịch
   getCancellationRate: () => {
     return api.get('/admin/dashboard/cancellation-rate');
+  },
+
+  getCustomerBehaviorBot: () => {
+    return api.get('/admin/dashboard/customer-behavior-bot');
+  },
+
+  getStaffCommissionByMonth: (month, year) => {
+    const params = new URLSearchParams();
+    if (month) params.set('month', String(month));
+    if (year) params.set('year', String(year));
+    const query = params.toString();
+    return api.get(`/admin/dashboard/staff-commission-by-month${query ? `?${query}` : ''}`);
   }
 };
 

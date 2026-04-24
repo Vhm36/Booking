@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voucher mới từ BeautyBook</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 24px 0;
+            background: #f4f7fb;
+            color: #12223b;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            overflow: hidden;
+            border: 1px solid #dbe5f1;
+            border-radius: 24px;
+            background: #ffffff;
+            box-shadow: 0 18px 48px rgba(18, 34, 59, 0.08);
+        }
+        .header {
+            padding: 28px 24px;
+            background: linear-gradient(135deg, #0f766e 0%, #155e75 100%);
+            color: #ffffff;
+        }
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .header h1 {
+            margin: 16px 0 8px;
+            font-size: 28px;
+            line-height: 1.15;
+        }
+        .header p {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.65;
+            opacity: 0.92;
+        }
+        .content {
+            padding: 24px;
+        }
+        .greeting {
+            margin: 0 0 16px;
+            font-size: 16px;
+            line-height: 1.7;
+        }
+        .voucher-card {
+            margin: 22px 0;
+            padding: 22px;
+            border: 1px dashed #8fb9d7;
+            border-radius: 22px;
+            background: #f8fbff;
+            text-align: center;
+        }
+        .voucher-label {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #0f766e;
+        }
+        .voucher-code {
+            margin-top: 12px;
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            color: #12223b;
+        }
+        .voucher-discount {
+            margin-top: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f766e;
+        }
+        .voucher-description {
+            margin: 12px 0 0;
+            font-size: 14px;
+            line-height: 1.65;
+            color: #51607a;
+        }
+        .source-box {
+            margin: 20px 0;
+            padding: 18px;
+            border-radius: 18px;
+            background: #f9fbfd;
+            border: 1px solid #e2e8f0;
+        }
+        .source-box h3,
+        .details h3 {
+            margin: 0 0 10px;
+            font-size: 16px;
+            color: #12223b;
+        }
+        .source-box p,
+        .details p {
+            margin: 8px 0;
+            font-size: 14px;
+            line-height: 1.65;
+            color: #51607a;
+        }
+        .details {
+            margin: 20px 0;
+            padding: 18px;
+            border-radius: 18px;
+            background: #f9fbfd;
+            border: 1px solid #e2e8f0;
+        }
+        .cta-wrap {
+            margin-top: 22px;
+        }
+        .cta {
+            display: inline-block;
+            min-height: 46px;
+            padding: 0 22px;
+            line-height: 46px;
+            border-radius: 999px;
+            background: #0f766e;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .footer {
+            padding: 0 24px 24px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: #64748b;
+        }
+        .footer a {
+            color: #0f766e;
+            text-decoration: none;
+        }
+        @media (max-width: 640px) {
+            body {
+                padding: 12px;
+            }
+            .voucher-code {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="badge">{{voucherSourceLabel}}</span>
+            <h1>Voucher mới dành cho {{customerName}}</h1>
+            <p>{{voucherSourceMessage}}</p>
+        </div>
+
+        <div class="content">
+            <p class="greeting">
+                Xin chào {{customerName}}, BeautyBook vừa thêm một ưu đãi mới vào tài khoản của bạn.
+                Bạn có thể dùng voucher này khi đặt lịch hoặc thanh toán dịch vụ phù hợp.
+            </p>
+
+            <div class="voucher-card">
+                <div class="voucher-label">Mã voucher</div>
+                <div class="voucher-code">{{voucherCode}}</div>
+                <div class="voucher-discount">{{discountValue}}</div>
+                <p class="voucher-description">{{voucherDescription}}</p>
+            </div>
+
+            <div class="source-box">
+                <h3>Voucher được gửi như thế nào?</h3>
+                <p>{{voucherSourceMessage}}</p>
+                {{#if issuedByName}}
+                <p><strong>Người gửi:</strong> {{issuedByName}}</p>
+                {{/if}}
+                {{#if voucherReason}}
+                <p><strong>Ghi chú:</strong> {{voucherReason}}</p>
+                {{/if}}
+            </div>
+
+            <div class="details">
+                <h3>Thông tin áp dụng</h3>
+                <p><strong>Hạn sử dụng:</strong> {{expiryDate}}</p>
+                <p><strong>Đơn tối thiểu:</strong> {{minOrder}}</p>
+                <p><strong>Giảm tối đa:</strong> {{maxDiscount}}</p>
+                <p><strong>Số ngày còn lại:</strong> {{daysRemaining}} ngày</p>
+            </div>
+
+            <div class="cta-wrap">
+                <a href="{{shopLink}}" class="cta">Xem voucher của tôi</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Nếu cần hỗ trợ thêm, vui lòng liên hệ <a href="mailto:support@beautybook.vn">support@beautybook.vn</a>.</p>
+            <p>© 2026 BeautyBook. Mọi quyền được bảo lưu.</p>
+        </div>
+    </div>
+</body>
+</html>
