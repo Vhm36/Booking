@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import authService from '../../../services/authService';
 import bookingService from '../../../services/bookingService';
 import paymentService from '../../../services/paymentService';
+import { exportToExcel } from '../../../utils/exportExcel';
 import './ManageAppointments.css';
 
 const formatRating = (rating) => {
@@ -429,6 +430,39 @@ function ManageAppointments() {
             </button>
           ))}
         </div>
+        <button
+          className="btn-export-excel"
+          onClick={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            exportToExcel({
+              fileName: `lich-hen_${today}`,
+              sheets: [
+                {
+                  name: 'Lịch hẹn',
+                  columns: [
+                    { key: 'id', header: 'ID', width: 8 },
+                    { key: 'customer_name', header: 'Khách hàng', width: 22 },
+                    { key: 'customer_email', header: 'Email', width: 26 },
+                    { key: 'customer_phone', header: 'SĐT', width: 14 },
+                    { key: 'service_name', header: 'Dịch vụ', width: 28 },
+                    { key: 'staff_name', header: 'Nhân viên', width: 20 },
+                    { key: 'appointment_date', header: 'Ngày hẹn', width: 14, transform: (v) => v ? new Date(v).toLocaleDateString('vi-VN') : '' },
+                    { key: 'appointment_time', header: 'Giờ hẹn', width: 10 },
+                    { key: 'status', header: 'Trạng thái', width: 16, transform: (v, row) => getDisplayStatus(row) },
+                    { key: 'total_amount', header: 'Tổng tiền (VNĐ)', width: 18, transform: (v) => Number(v || 0) },
+                    { key: 'payment_method', header: 'Phương thức TT', width: 16, transform: (v) => v ? String(v).toUpperCase() : 'Chưa chọn' },
+                    { key: 'payment_status', header: 'TT thanh toán', width: 16, transform: (v, row) => getPaymentLabel(row) },
+                    { key: 'staff_rating', header: 'Đánh giá NV', width: 12, transform: (v) => { const n = Number(v); return n >= 1 && n <= 5 ? `${n}/5` : ''; } },
+                    { key: 'notes', header: 'Ghi chú', width: 30 }
+                  ],
+                  rows: filteredAppointments
+                }
+              ]
+            });
+          }}
+        >
+          📥 Xuất Excel
+        </button>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

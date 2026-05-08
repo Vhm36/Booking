@@ -485,6 +485,55 @@ const getAutoAssignableStaff = (appointmentDate, requestedStartTime, requestedEn
   });
 };
 
+const createLeaveRequest = (staffId, startDate, endDate, reason, callback) => {
+  const query = `
+    INSERT INTO staff_leave_requests (staff_id, start_date, end_date, reason)
+    VALUES (?, ?, ?, ?)
+  `;
+  db.query(query, [staffId, startDate, endDate, reason], (err, result) => {
+    if (err) return callback(err);
+    callback(null, result);
+  });
+};
+
+const getLeaveRequestsByStaff = (staffId, callback) => {
+  const query = `
+    SELECT id, start_date, end_date, reason, status, created_at
+    FROM staff_leave_requests
+    WHERE staff_id = ?
+    ORDER BY created_at DESC
+  `;
+  db.query(query, [staffId], (err, results) => {
+    if (err) return callback(err);
+    callback(null, results);
+  });
+};
+
+const getAllLeaveRequests = (callback) => {
+  const query = `
+    SELECT lr.id, lr.staff_id, u.name AS staff_name, lr.start_date, lr.end_date, lr.reason, lr.status, lr.created_at
+    FROM staff_leave_requests lr
+    JOIN users u ON u.id = lr.staff_id
+    ORDER BY lr.created_at DESC
+  `;
+  db.query(query, (err, results) => {
+    if (err) return callback(err);
+    callback(null, results);
+  });
+};
+
+const updateLeaveRequestStatus = (id, status, callback) => {
+  const query = `
+    UPDATE staff_leave_requests
+    SET status = ?
+    WHERE id = ?
+  `;
+  db.query(query, [status, id], (err, result) => {
+    if (err) return callback(err);
+    callback(null, result);
+  });
+};
+
 module.exports = {
   getAllStaff,
   getBookableStaff,
@@ -501,5 +550,9 @@ module.exports = {
   isStaffAvailableForWeeklySchedule,
   getBusyTimeSlots,
   isStaffRoleExcludedFromCustomerBooking,
-  getStaffRoleNameByUserId
+  getStaffRoleNameByUserId,
+  createLeaveRequest,
+  getLeaveRequestsByStaff,
+  getAllLeaveRequests,
+  updateLeaveRequestStatus
 };

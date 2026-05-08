@@ -2,6 +2,7 @@ const appointmentModel = require('../../models/appointmentModel');
 const paymentModel = require('../../models/paymentModel');
 const { getPaymentSchemaInfo } = require('../../utils/paymentSchema');
 const { buildVietQrImageUrl, getVietQrConfig } = require('../../utils/vietqr');
+const { emitDashboardUpdate } = require('../../utils/realtime');
 const {
   addMinutes,
   buildInvoiceNumber,
@@ -452,6 +453,17 @@ exports.createPayment = (req, res) => {
         });
       }
 
+      if (
+        normalizedMethod === 'cash' &&
+        Number(appointment.deposit_required) === 1 &&
+        Number(appointment.deposit_amount || 0) > 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Lich co rui ro huy cao can thanh toan coc online de giu cho.'
+        });
+      }
+
       paymentModel.getLatestPaymentByAppointmentId(appointment_id, (latestErr, latestPayment) => {
         if (latestErr) {
           console.error('[GET_LATEST_PAYMENT_ERROR]', latestErr);
@@ -472,7 +484,10 @@ exports.createPayment = (req, res) => {
             });
           }
 
-          const amount = Number(appointment.total_amount || appointment.service_price || 0);
+          const amount =
+            Number(appointment.deposit_required) === 1 && Number(appointment.deposit_amount || 0) > 0
+              ? Number(appointment.deposit_amount || 0)
+              : Number(appointment.total_amount || appointment.service_price || 0);
 
           if (canReusePendingPayment(normalizedLatestPayment, normalizedMethod)) {
             const paymentUrl =
@@ -529,6 +544,13 @@ exports.createPayment = (req, res) => {
                   message: 'Đã tạo giao dịch nhưng không tải được thông tin thanh toán'
                 });
               }
+
+              emitDashboardUpdate(req, 'payment.created', {
+                paymentId,
+                appointmentId: Number(appointment_id),
+                amount,
+                method: normalizedMethod
+              });
 
               if (normalizedMethod === 'cash') {
                 return respondWithPayment(res, 201, 'Đã tạo phiếu thanh toán tại salon', createdPayment);
@@ -682,6 +704,13 @@ exports.confirmTransferPayment = (req, res) => {
           });
         }
 
+        emitDashboardUpdate(req, 'payment.paid', {
+          paymentId: payment.id,
+          appointmentId: payment.appointment_id,
+          amount: payment.amount,
+          method: payment.payment_method
+        });
+
         return res.status(200).json({
           success: true,
           message: 'Đã xác nhận thanh toán VietQR thành công',
@@ -769,6 +798,15 @@ exports.handleVnpayReturn = (req, res) => {
       const finalPayment = finalResult.payment || payment;
       const isSuccess = finalPayment.payment_status === 'paid';
 
+      if (isSuccess && finalResult.updated) {
+        emitDashboardUpdate(req, 'payment.paid', {
+          paymentId: finalPayment.id,
+          appointmentId: finalPayment.appointment_id,
+          amount: finalPayment.amount,
+          method: finalPayment.payment_method
+        });
+      }
+
       return res.redirect(
         buildFrontendRedirectUrl({
           payment_id: finalPayment.id,
@@ -813,10 +851,20 @@ exports.handleVnpayIpn = (req, res) => {
       return res.status(200).json({ RspCode: '02', Message: 'Order already confirmed' });
     }
 
-    return finalizePaymentResult(payment, verification.params, (finalizeErr) => {
+    return finalizePaymentResult(payment, verification.params, (finalizeErr, finalResult) => {
       if (finalizeErr) {
         console.error('[VNPAY_IPN_FINALIZE_ERROR]', finalizeErr);
         return res.status(200).json({ RspCode: '99', Message: 'Unknown error' });
+      }
+
+      const finalPayment = finalResult?.payment || payment;
+      if (finalPayment.payment_status === 'paid' && finalResult?.updated) {
+        emitDashboardUpdate(req, 'payment.paid', {
+          paymentId: finalPayment.id,
+          appointmentId: finalPayment.appointment_id,
+          amount: finalPayment.amount,
+          method: finalPayment.payment_method
+        });
       }
 
       return res.status(200).json({ RspCode: '00', Message: 'Confirm Success' });

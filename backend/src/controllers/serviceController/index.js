@@ -2,22 +2,25 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const serviceModel = require('../../models/serviceModel');
+const fsPromises = fs.promises;
 
-const SERVICE_UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'services');
+const SERVICE_UPLOAD_DIR = path.join(__dirname, '..', '..', '..', 'uploads', 'services');
 const SERVICE_UPLOAD_URL_PREFIX = '/uploads/services/';
-const IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/;
+const IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:png|jpeg|jpg|webp|gif|jfif));base64,([A-Za-z0-9+/=]+)$/;
 const MIME_TO_EXTENSION = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
   'image/webp': 'webp',
-  'image/gif': 'gif'
+  'image/gif': 'gif',
+  'image/jfif': 'jpg'
 };
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
 const isUploadedServiceImage = (imageUrl) =>
   typeof imageUrl === 'string' && imageUrl.startsWith(SERVICE_UPLOAD_URL_PREFIX);
 
-const deleteUploadedServiceImage = (imageUrl) => {
+const deleteUploadedServiceImage = async (imageUrl) => {
   if (!isUploadedServiceImage(imageUrl)) {
     return;
   }
@@ -25,12 +28,16 @@ const deleteUploadedServiceImage = (imageUrl) => {
   const safeFileName = path.basename(imageUrl);
   const filePath = path.join(SERVICE_UPLOAD_DIR, safeFileName);
 
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  try {
+    await fsPromises.unlink(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
   }
 };
 
-const saveServiceImage = (imageData) => {
+const saveServiceImage = async (imageData) => {
   if (typeof imageData !== 'string' || imageData.trim() === '') {
     return '';
   }
@@ -58,13 +65,13 @@ const saveServiceImage = (imageData) => {
     throw error;
   }
 
-  fs.mkdirSync(SERVICE_UPLOAD_DIR, { recursive: true });
+  await fsPromises.mkdir(SERVICE_UPLOAD_DIR, { recursive: true });
 
   const extension = MIME_TO_EXTENSION[mimeType] || 'png';
   const fileName = `service-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${extension}`;
   const filePath = path.join(SERVICE_UPLOAD_DIR, fileName);
 
-  fs.writeFileSync(filePath, buffer);
+  await fsPromises.writeFile(filePath, buffer);
 
   return `${SERVICE_UPLOAD_URL_PREFIX}${fileName}`;
 };
@@ -118,7 +125,7 @@ exports.getServiceById = (req, res) => {
   });
 };
 
-exports.createService = (req, res) => {
+exports.createService = async (req, res) => {
   const { name, description, price, duration, category, image_url, image_data } = req.body;
 
   if (!name || !price || !duration) {
@@ -137,7 +144,7 @@ exports.createService = (req, res) => {
 
   try {
     if (typeof image_data === 'string' && image_data.trim() !== '') {
-      uploadedImageUrl = saveServiceImage(image_data);
+      uploadedImageUrl = await saveServiceImage(image_data);
       storedImageUrl = uploadedImageUrl;
     }
   } catch (error) {
@@ -149,10 +156,14 @@ exports.createService = (req, res) => {
     storedImageUrl
   );
 
-  serviceModel.createService(serviceData, (err, result) => {
+  serviceModel.createService(serviceData, async (err, result) => {
     if (err) {
       if (uploadedImageUrl) {
-        deleteUploadedServiceImage(uploadedImageUrl);
+        try {
+          await deleteUploadedServiceImage(uploadedImageUrl);
+        } catch (cleanupError) {
+          console.error('[SERVICE_IMAGE_CLEANUP_CREATE_ERROR]', cleanupError);
+        }
       }
 
       return res.status(500).json({ message: 'Lỗi server', error: err });
@@ -181,7 +192,7 @@ exports.updateService = (req, res) => {
     return res.status(400).json({ message: 'Giá và thời gian dịch vụ không hợp lệ' });
   }
 
-  return serviceModel.getServiceById(id, (findErr, existingService) => {
+  return serviceModel.getServiceById(id, async (findErr, existingService) => {
     if (findErr) {
       return res.status(500).json({ message: 'Lỗi server', error: findErr });
     }
@@ -195,7 +206,7 @@ exports.updateService = (req, res) => {
 
     try {
       if (typeof image_data === 'string' && image_data.trim() !== '') {
-        uploadedImageUrl = saveServiceImage(image_data);
+        uploadedImageUrl = await saveServiceImage(image_data);
         storedImageUrl = uploadedImageUrl;
       }
     } catch (error) {
@@ -207,10 +218,14 @@ exports.updateService = (req, res) => {
       storedImageUrl
     );
 
-    return serviceModel.updateService(id, serviceData, (updateErr, result) => {
+    return serviceModel.updateService(id, serviceData, async (updateErr, result) => {
       if (updateErr) {
         if (uploadedImageUrl) {
-          deleteUploadedServiceImage(uploadedImageUrl);
+          try {
+            await deleteUploadedServiceImage(uploadedImageUrl);
+          } catch (cleanupError) {
+            console.error('[SERVICE_IMAGE_CLEANUP_UPDATE_ERROR]', cleanupError);
+          }
         }
 
         return res.status(500).json({ message: 'Lỗi server', error: updateErr });
@@ -218,14 +233,22 @@ exports.updateService = (req, res) => {
 
       if (!result?.affectedRows) {
         if (uploadedImageUrl) {
-          deleteUploadedServiceImage(uploadedImageUrl);
+          try {
+            await deleteUploadedServiceImage(uploadedImageUrl);
+          } catch (cleanupError) {
+            console.error('[SERVICE_IMAGE_CLEANUP_NOT_FOUND_ERROR]', cleanupError);
+          }
         }
 
         return res.status(404).json({ message: 'Dịch vụ không tồn tại' });
       }
 
       if (uploadedImageUrl && isUploadedServiceImage(existingService.image_url)) {
-        deleteUploadedServiceImage(existingService.image_url);
+        try {
+          await deleteUploadedServiceImage(existingService.image_url);
+        } catch (cleanupError) {
+          console.error('[SERVICE_IMAGE_CLEANUP_OLD_IMAGE_ERROR]', cleanupError);
+        }
       }
 
       return res.status(200).json({ success: true, message: 'Cập nhật dịch vụ thành công' });
@@ -316,7 +339,7 @@ exports.getAllCategories = (req, res) => {
 exports.deleteService = (req, res) => {
   const { id } = req.params;
 
-  return serviceModel.getServiceById(id, (findErr, existingService) => {
+  return serviceModel.getServiceById(id, async (findErr, existingService) => {
     if (findErr) {
       return res.status(500).json({ message: 'Lỗi server', error: findErr });
     }
@@ -325,7 +348,7 @@ exports.deleteService = (req, res) => {
       return res.status(404).json({ message: 'Dịch vụ không tồn tại' });
     }
 
-    return serviceModel.deleteService(id, (deleteErr, result) => {
+    return serviceModel.deleteService(id, async (deleteErr, result) => {
       if (deleteErr) {
         return res.status(500).json({ message: 'Lỗi server', error: deleteErr });
       }
@@ -335,7 +358,11 @@ exports.deleteService = (req, res) => {
       }
 
       if (isUploadedServiceImage(existingService.image_url)) {
-        deleteUploadedServiceImage(existingService.image_url);
+        try {
+          await deleteUploadedServiceImage(existingService.image_url);
+        } catch (cleanupError) {
+          console.error('[SERVICE_IMAGE_CLEANUP_DELETE_ERROR]', cleanupError);
+        }
       }
 
       return res.status(200).json({ success: true, message: 'Xóa dịch vụ thành công' });

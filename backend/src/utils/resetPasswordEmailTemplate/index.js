@@ -2,6 +2,21 @@ const fs = require('fs');
 const path = require('path');
 
 const TEMPLATE_PATH = path.resolve(__dirname, '..', '..', 'templates', 'email', 'reset-password.html');
+const FALLBACK_TEMPLATE = `
+  <html><body>
+  <p>Xin chao <strong>{{userName}}</strong>,</p>
+  <p>Nhan vao link sau de dat lai mat khau: <a href="{{resetLink}}">{{resetLink}}</a></p>
+  <p>Link co hieu luc trong {{expireInLabel}}.</p>
+  <p>Ho tro: {{supportEmail}}</p>
+  </body></html>
+`;
+
+let cachedResetTemplate = '';
+try {
+  cachedResetTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+} catch (error) {
+  cachedResetTemplate = '';
+}
 
 const escapeHtml = (value = '') =>
   String(value)
@@ -20,26 +35,14 @@ const fillTemplate = (template, variables) =>
 const buildResetPasswordEmailPayload = ({
   userName = '',
   resetLink = '',
-  expireInLabel = '15 phút',
+  expireInLabel = '15 ph\u00fat',
   supportEmail = 'support@beautybook.vn'
 } = {}) => {
-  const safeName = userName || 'bạn';
+  const safeName = userName || 'b\u1ea1n';
   const safeLink = resetLink || '#';
 
-  const subject = 'BeautyBook - Đặt lại mật khẩu';
-  let htmlTemplate = '';
-  try {
-    htmlTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf8');
-  } catch (error) {
-    htmlTemplate = `
-      <html><body>
-      <p>Xin chào <strong>{{userName}}</strong>,</p>
-      <p>Nhấn vào link sau để đặt lại mật khẩu: <a href="{{resetLink}}">{{resetLink}}</a></p>
-      <p>Link có hiệu lực trong {{expireInLabel}}.</p>
-      <p>Hỗ trợ: {{supportEmail}}</p>
-      </body></html>
-    `;
-  }
+  const subject = 'BeautyBook - \u0110\u1eb7t l\u1ea1i m\u1eadt kh\u1ea9u';
+  const htmlTemplate = cachedResetTemplate || FALLBACK_TEMPLATE;
 
   const html = fillTemplate(htmlTemplate, {
     subject,

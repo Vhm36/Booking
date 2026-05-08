@@ -68,6 +68,14 @@ const staffService = {
 
   getMyLeaveRequests: () => {
     return api.get('/staff/my-leave-requests');
+  },
+
+  getAllLeaveRequests: () => {
+    return api.get('/staff/leave-requests');
+  },
+
+  updateLeaveRequestStatus: (id, status) => {
+    return api.put(`/staff/leave-requests/${id}/status`, { status });
   }
 };
 

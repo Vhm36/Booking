@@ -5,6 +5,7 @@ import bookingService from '../../services/bookingService';
 import paymentService from '../../services/paymentService';
 import serviceService from '../../services/serviceService';
 import staffService from '../../services/staffService';
+import voucherService from '../../services/voucherService';
 import { formatDurationLabel, formatVnd } from '../../utils/formatters';
 import './Booking.css';
 
@@ -229,6 +230,14 @@ function Booking() {
   const [success, setSuccess] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentOptions, setPaymentOptions] = useState([]);
+  const [myVouchers, setMyVouchers] = useState([]);
+  const [selectedVoucherCode, setSelectedVoucherCode] = useState('');
+  const [voucherPreview, setVoucherPreview] = useState(null);
+  const [voucherError, setVoucherError] = useState('');
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
+  const [validatingVoucher, setValidatingVoucher] = useState(false);
+  const [cancellationRisk, setCancellationRisk] = useState(null);
+  const [loadingCancellationRisk, setLoadingCancellationRisk] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -236,17 +245,21 @@ function Booking() {
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const [servicesResult, selectedServiceResult, categoriesResult] = await Promise.allSettled([
-          serviceService.getAllServices(),
-          serviceService.getServiceById(serviceId),
-          serviceService.getAllCategories()
-        ]);
+        const requests = [serviceService.getAllServices(), serviceService.getAllCategories()];
+        if (serviceId) {
+          requests.splice(1, 0, serviceService.getServiceById(serviceId));
+        }
 
-        if (selectedServiceResult.status !== 'fulfilled') {
+        const results = await Promise.allSettled(requests);
+        const servicesResult = results[0];
+        const selectedServiceResult = serviceId ? results[1] : null;
+        const categoriesResult = serviceId ? results[2] : results[1];
+
+        if (serviceId && selectedServiceResult.status !== 'fulfilled') {
           throw selectedServiceResult.reason || new Error('Không thể tải dịch vụ đã chọn.');
         }
 
-        const currentService = selectedServiceResult.value.data?.data || null;
+        const currentService = serviceId ? selectedServiceResult.value.data?.data || null : null;
         const serviceList =
           servicesResult.status === 'fulfilled' ? servicesResult.value.data?.data || [] : [];
         const categoryList =
@@ -254,7 +267,7 @@ function Booking() {
         const mergedServices = dedupeServices([currentService, ...serviceList]);
 
         if (!cancelled) {
-          if (!currentService) {
+          if (serviceId && !currentService) {
             setError('Không tìm thấy dịch vụ để đặt lịch.');
             setAllServices([]);
             setServiceCategoriesFromDb(categoryList);
@@ -262,7 +275,7 @@ function Booking() {
           } else {
             setAllServices(mergedServices);
             setServiceCategoriesFromDb(categoryList);
-            setSelectedServices([currentService]);
+            setSelectedServices(currentService ? [currentService] : []);
             setError('');
           }
         }
@@ -364,6 +377,39 @@ function Booking() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchMyVouchers = async () => {
+      if (!authService.getToken()) {
+        return;
+      }
+
+      try {
+        setLoadingVouchers(true);
+        const response = await voucherService.getMyVouchers();
+        const nextVouchers = response.data?.data || [];
+
+        if (!cancelled) {
+          setMyVouchers(nextVouchers);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setMyVouchers([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingVouchers(false);
+        }
+      }
+    };
+
+    fetchMyVouchers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selectedServiceIds = useMemo(
     () => selectedServices.map((service) => Number(service.id)).filter((id) => Number.isInteger(id) && id > 0),
     [selectedServices]
@@ -378,6 +424,76 @@ function Booking() {
     () => selectedServices.reduce((sum, service) => sum + (Number(service.price) || 0), 0),
     [selectedServices]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const validateSelectedVoucher = async () => {
+      const cleanCode = selectedVoucherCode.trim();
+      setVoucherPreview(null);
+      setVoucherError('');
+
+      if (!cleanCode || totalPrice <= 0) {
+        return;
+      }
+
+      try {
+        setValidatingVoucher(true);
+        const response = await voucherService.validateVoucher(cleanCode, totalPrice);
+
+        if (!cancelled) {
+          setVoucherPreview(response.data?.data || null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setVoucherError(err.response?.data?.message || 'Voucher không hợp lệ cho lịch này.');
+        }
+      } finally {
+        if (!cancelled) {
+          setValidatingVoucher(false);
+        }
+      }
+    };
+
+    validateSelectedVoucher();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVoucherCode, totalPrice]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchCancellationRisk = async () => {
+      setCancellationRisk(null);
+
+      if (!appointmentDate || !appointmentTime || !authService.getToken()) {
+        return;
+      }
+
+      try {
+        setLoadingCancellationRisk(true);
+        const response = await bookingService.getCancellationScore(appointmentDate, appointmentTime);
+
+        if (!cancelled) {
+          setCancellationRisk(response.data?.data || null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCancellationRisk(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingCancellationRisk(false);
+        }
+      }
+    };
+
+    fetchCancellationRisk();
+    return () => {
+      cancelled = true;
+    };
+  }, [appointmentDate, appointmentTime]);
 
   const selectedSlotEndTime = useMemo(
     () => (appointmentTime && totalDuration > 0 ? addMinutesToShortTime(appointmentTime, totalDuration) : ''),
@@ -534,6 +650,16 @@ function Booking() {
     [appointmentTime, selectedSlotEndTime, busySlotRanges]
   );
 
+  const voucherDiscount = Number(voucherPreview?.discountAmount || 0);
+  const finalTotalPrice = Math.max(totalPrice - voucherDiscount, 0);
+  const depositRequired = Boolean(cancellationRisk?.requireDeposit) && finalTotalPrice > 0;
+  const estimatedDepositAmount = depositRequired
+    ? Math.min(
+        finalTotalPrice,
+        Math.max(1000, Math.round((finalTotalPrice * Number(cancellationRisk?.depositPercent || 20)) / 100))
+      )
+    : 0;
+
   const enabledPaymentOptions = useMemo(
     () =>
       paymentOptions
@@ -561,6 +687,7 @@ function Booking() {
           if (option.method === 'cash') {
             return {
               ...option,
+              enabled: depositRequired ? false : option.enabled,
               label: 'Thanh toán tại tiệm',
               description: 'Đặt lịch trước và thanh toán khi đến sử dụng dịch vụ.'
             };
@@ -568,8 +695,20 @@ function Booking() {
 
           return option;
         }),
-    [paymentOptions]
+    [paymentOptions, depositRequired]
   );
+
+  useEffect(() => {
+    if (!depositRequired || paymentMethod !== 'cash') {
+      return;
+    }
+
+    const nextOnlineMethod =
+      enabledPaymentOptions.find((option) => option.enabled && onlinePaymentMethodSet.has(option.method))?.method ||
+      paymentMethod;
+
+    setPaymentMethod(nextOnlineMethod);
+  }, [depositRequired, enabledPaymentOptions, paymentMethod]);
 
   const selectedServiceSummary = useMemo(() => {
     if (selectedServices.length === 0) {
@@ -582,6 +721,14 @@ function Booking() {
 
     return `${selectedServices.length} dịch vụ đã chọn`;
   }, [selectedServices]);
+
+  const usableVouchers = useMemo(
+    () =>
+      myVouchers.filter((voucher) =>
+        ['active', 'expiring_soon'].includes(String(voucher.status || '').toLowerCase())
+      ),
+    [myVouchers]
+  );
 
   const serviceCategories = useMemo(() => {
     const groupedCategories = new Map();
@@ -804,6 +951,16 @@ function Booking() {
       }
     }
 
+    if (selectedVoucherCode && (voucherError || !voucherPreview)) {
+      setError(voucherError || 'Voucher đang được kiểm tra, vui lòng thử lại sau vài giây.');
+      return;
+    }
+
+    if (depositRequired && !onlinePaymentMethodSet.has(paymentMethod)) {
+      setError('Lich nay can thanh toan coc online do AI danh gia rui ro huy cao.');
+      return;
+    }
+
     setSubmitting(true);
     let createdAppointmentId = null;
 
@@ -813,7 +970,8 @@ function Booking() {
         selectedStaffId ? Number(selectedStaffId) : null,
         appointmentDate,
         appointmentTime,
-        notes
+        notes,
+        selectedVoucherCode
       );
       createdAppointmentId = getCreatedAppointmentId(bookingResponse);
 
@@ -1161,6 +1319,72 @@ function Booking() {
               ))}
             </div>
           </div>
+
+          <div className="voucher-picker-panel">
+            <div className="voucher-picker-head">
+              <strong>Voucher</strong>
+              <span>{loadingVouchers ? 'Đang tải voucher...' : `${usableVouchers.length} mã khả dụng`}</span>
+            </div>
+
+            <select
+              value={selectedVoucherCode}
+              onChange={(event) => setSelectedVoucherCode(event.target.value)}
+              disabled={loadingVouchers || usableVouchers.length === 0}
+            >
+              <option value="">
+                {usableVouchers.length === 0 ? 'Chưa có voucher khả dụng' : 'Không dùng voucher'}
+              </option>
+              {usableVouchers.map((voucher) => (
+                <option key={voucher.assignment_id || voucher.id} value={voucher.code}>
+                  {voucher.code} - {voucher.discount_label}
+                </option>
+              ))}
+            </select>
+
+            {selectedVoucherCode && validatingVoucher && (
+              <small className="voucher-note">Đang kiểm tra voucher...</small>
+            )}
+            {selectedVoucherCode && voucherError && (
+              <small className="voucher-note error">{voucherError}</small>
+            )}
+            {selectedVoucherCode && voucherPreview && !voucherError && (
+              <small className="voucher-note success">
+                Áp dụng {voucherPreview.voucher?.code}: giảm {formatVnd(voucherDiscount)}
+              </small>
+            )}
+          </div>
+
+          {voucherDiscount > 0 && (
+            <div className="summary-row discount">
+              <span>Voucher giảm</span>
+              <strong>-{formatVnd(voucherDiscount)}</strong>
+            </div>
+          )}
+
+          <div className="summary-row total">
+            <span>Tạm tính thanh toán</span>
+            <strong>{formatVnd(finalTotalPrice)}</strong>
+          </div>
+
+          {(loadingCancellationRisk || cancellationRisk) && (
+            <div className={`cancellation-risk-panel risk-${cancellationRisk?.riskLevel || 'loading'}`}>
+              <div className="cancellation-risk-head">
+                <strong>AI chong boom lich</strong>
+                <span>
+                  {loadingCancellationRisk
+                    ? 'Dang tinh...'
+                    : `${Number(cancellationRisk?.score || 0)}% - ${cancellationRisk?.riskLevel || 'low'}`}
+                </span>
+              </div>
+              {depositRequired ? (
+                <p>
+                  Lich nay can coc {formatVnd(estimatedDepositAmount)} qua thanh toan online de giu cho.
+                </p>
+              ) : (
+                <p>Rui ro huy lich thap, co the thanh toan linh hoat tai salon.</p>
+              )}
+            </div>
+          )}
 
           <div className="payment-method-panel">
             <div className="payment-method-head">

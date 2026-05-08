@@ -11,7 +11,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import ZaloCallback from './pages/Auth/ZaloCallback';
 import MyAppointments from './pages/MyAppointments';
+import MyVouchers from './pages/MyVouchers';
 import PaymentInvoice from './pages/PaymentInvoice';
 import PaymentReturn from './pages/PaymentReturn';
 import PaymentTransfer from './pages/PaymentTransfer';
@@ -24,10 +26,13 @@ import Analytics from './pages/admin/Analytics';
 import ManageStaff from './pages/admin/ManageStaff';
 import StaffLeaveManagement from './pages/admin/StaffLeaveManagement';
 import ManageCustomers from './pages/admin/ManageCustomers';
+import ManageVouchers from './pages/admin/ManageVouchers';
 import ServiceStaffDashboard from './pages/staff/ServiceStaffDashboard';
+import StaffScheduleCalendar from './pages/admin/StaffScheduleCalendar';
 
 import Header from './components/Header';
 import Footer from './components/Footer';
+import BottomNav from './components/BottomNav/BottomNav';
 import ConsentBanner from './components/ConsentBanner';
 import { readUserLocation } from './utils/consent';
 
@@ -48,6 +53,15 @@ function App() {
 
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      document.body.classList.add('has-bottom-nav');
+    } else {
+      document.body.classList.remove('has-bottom-nav');
+    }
+    return () => document.body.classList.remove('has-bottom-nav');
+  }, [user]);
 
   const isAuthenticated = Boolean(user && authService.getToken());
   const authenticatedUser = isAuthenticated ? user : null;
@@ -94,12 +108,16 @@ function App() {
               path="/reset-password"
               element={isAuthenticated ? <Navigate to="/" /> : <ResetPassword />}
             />
+            <Route
+              path="/auth/zalo-callback"
+              element={isAuthenticated ? <Navigate to="/" /> : <ZaloCallback onLogin={handleLogin} />}
+            />
 
             {isAuthenticated && user.role === 'customer' && (
               <>
                 <Route path="/booking/:serviceId" element={<Booking />} />
                 <Route path="/my-appointments" element={<MyAppointments />} />
-                <Route path="/profile" element={<Profile user={user} setUser={setUser} />} />
+                <Route path="/my-vouchers" element={<MyVouchers />} />
               </>
             )}
 
@@ -110,7 +128,9 @@ function App() {
                 <Route path="/admin/staff" element={<ManageStaff />} />
                 <Route path="/admin/staff-leave" element={<StaffLeaveManagement />} />
                 <Route path="/admin/customers" element={<ManageCustomers />} />
+                <Route path="/admin/vouchers" element={<ManageVouchers />} />
                 <Route path="/admin/appointments" element={<ManageAppointments />} />
+                <Route path="/admin/schedule" element={<StaffScheduleCalendar />} />
                 <Route path="/admin/analytics" element={<Analytics />} />
               </>
             )}
@@ -130,16 +150,20 @@ function App() {
               </>
             )}
 
+            {isAuthenticated && (
+              <Route path="/profile" element={<Profile user={user} setUser={setUser} />} />
+            )}
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
         <ChatBot />
         <ConsentBanner onLocationChange={setUserLocation} />
         <Footer />
+        {authenticatedUser && <BottomNav user={authenticatedUser} />}
       </div>
     </Router>
   );
 }
 
 export default App;
-

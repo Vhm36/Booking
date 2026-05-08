@@ -2,6 +2,7 @@ const { promisify } = require('util');
 const chatModel = require('../../models/chatModel');
 const { buildSmartRuleResponse } = require('../../utils/chatResponseEngine');
 const { generateSalonAIReply, isOpenAIEnabled } = require('../../utils/openAiChat');
+const { executeTool } = require('../../utils/toolRegistry');
 
 const getConversationByIdAsync = promisify(chatModel.getConversationById);
 const createMessageAsync = promisify(chatModel.createMessage);
@@ -314,7 +315,7 @@ exports.getFAQByCategory = (req, res) => {
 };
 
 // ============================================================================
-// Chat Bot
+// Chat Bot — AI Agent with MCP Pattern (Function Calling + Sentiment)
 // ============================================================================
 
 exports.chatWithBot = async (req, res) => {
@@ -365,28 +366,34 @@ exports.chatWithBot = async (req, res) => {
       suggestions
     });
 
+    let sentiment = 'neutral';
+
     const shouldUseAI =
       isOpenAIEnabled() &&
       (!finalReply || finalReply.source === 'fallback' || Number(finalReply.confidence || 0) < 1.2);
 
     if (shouldUseAI) {
       try {
-        const aiReply = await generateSalonAIReply({
+        const aiResult = await generateSalonAIReply({
           messageText: normalizedMessage,
           recentMessages: Array.isArray(recentMessages) ? [...recentMessages].reverse() : [],
           services,
           faqs,
-          suggestions
+          suggestions,
+          userId,
+          toolExecutor: executeTool
         });
 
-        if (aiReply) {
+        if (aiResult && aiResult.text) {
           finalReply = {
-            text: aiReply,
+            text: aiResult.text,
             type: 'text',
-            source: 'ai',
-            escalated: false,
-            confidence: 2
+            source: aiResult.functionCalled ? 'ai-agent' : 'ai',
+            escalated: aiResult.escalated || false,
+            confidence: 2,
+            toolsUsed: aiResult.toolsUsed || []
           };
+          sentiment = aiResult.sentiment || 'neutral';
         }
       } catch (aiErr) {
         console.error('[OPENAI_CHAT_ERROR]', aiErr);
@@ -409,10 +416,10 @@ exports.chatWithBot = async (req, res) => {
       null,
       finalReply.text,
       finalReply.type || 'text',
-      finalReply.source ? { source: finalReply.source } : null
+      finalReply.source ? { source: finalReply.source, sentiment } : null
     );
 
-    if (finalReply.escalated) {
+    if (finalReply.escalated || sentiment === 'complaint') {
       try {
         await updateConversationStatusAsync(conversationId, 'escalated', null);
       } catch (updateErr) {
@@ -427,7 +434,9 @@ exports.chatWithBot = async (req, res) => {
         text: finalReply.text,
         type: finalReply.type || 'text',
         escalated: !!finalReply.escalated,
-        source: finalReply.source || 'rule'
+        source: finalReply.source || 'rule',
+        sentiment,
+        toolsUsed: finalReply.toolsUsed || []
       }
     });
   } catch (err) {

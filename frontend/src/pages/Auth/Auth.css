@@ -164,21 +164,71 @@
   margin-bottom: 16px;
 }
 
-.google-login-block {
+.social-login-block {
   margin: 8px 0 20px;
 }
 
-.google-login-divider {
+.social-login-divider {
   text-align: center;
   color: #999;
   font-size: 13px;
   margin: 6px 0 12px;
 }
 
+.google-login-block {
+  margin-bottom: 10px;
+}
+
 .google-login-button {
   display: flex;
   justify-content: center;
   min-height: 42px;
+}
+
+.zalo-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  min-height: 42px;
+  background: #0068FF;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.zalo-login-button:hover {
+  background: #0054cc;
+  box-shadow: 0 2px 8px rgba(0, 104, 255, 0.3);
+}
+
+.zalo-login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.zalo-login-button .zalo-icon {
+  flex-shrink: 0;
+}
+
+.zalo-callback-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #eee;
+  border-top-color: #0068FF;
+  border-radius: 50%;
+  margin: 20px auto;
+  animation: zalo-spin 0.7s linear infinite;
+}
+
+@keyframes zalo-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 480px) {

@@ -25,7 +25,7 @@ const parseActiveValue = (value) => {
 exports.getAllStaff = (req, res) => {
   staffModel.getAllStaff((err, staffList) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     return res.status(200).json({ success: true, data: staffList });
@@ -35,7 +35,7 @@ exports.getAllStaff = (req, res) => {
 exports.getBookableStaff = (req, res) => {
   staffModel.getBookableStaff((err, staffList) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     return res.status(200).json({ success: true, data: staffList });
@@ -57,11 +57,11 @@ exports.getAvailableStaff = (req, res) => {
 
   serviceModel.getServicesByIds(requestedServiceIds, (serviceErr, services) => {
     if (serviceErr) {
-      return res.status(500).json({ message: 'Loi server', error: serviceErr });
+      return res.status(500).json({ message: 'Lỗi server', error: serviceErr });
     }
 
     if (!services || services.length !== requestedServiceIds.length) {
-      return res.status(404).json({ message: 'Co dich vu khong ton tai' });
+      return res.status(404).json({ message: 'Có dịch vụ không tồn tại' });
     }
 
     const serviceById = new Map(services.map((service) => [Number(service.id), service]));
@@ -80,7 +80,7 @@ exports.getAvailableStaff = (req, res) => {
 
     staffModel.getAvailableStaff(date, normalizedTime, requestedEndTime, (err, availability) => {
       if (err) {
-        return res.status(500).json({ message: 'Loi server', error: err });
+        return res.status(500).json({ message: 'Lỗi server', error: err });
       }
 
       return res.status(200).json({
@@ -108,16 +108,16 @@ exports.getBusyTimeSlots = (req, res) => {
 
   return staffModel.getStaffById(id, (staffErr, staff) => {
     if (staffErr) {
-      return res.status(500).json({ success: false, message: 'Loi server', error: staffErr });
+      return res.status(500).json({ success: false, message: 'Lỗi server', error: staffErr });
     }
 
     if (!staff || !staff.is_active) {
-      return res.status(404).json({ success: false, message: 'Nhan vien khong ton tai hoac dang bi khoa' });
+      return res.status(404).json({ success: false, message: 'Nhân viên không tồn tại hoặc đang bị khóa' });
     }
 
     return staffModel.getBusyTimeSlots(id, date, (busyErr, busySlots) => {
       if (busyErr) {
-        return res.status(500).json({ success: false, message: 'Loi server', error: busyErr });
+        return res.status(500).json({ success: false, message: 'Lỗi server', error: busyErr });
       }
 
       return res.status(200).json({
@@ -131,7 +131,7 @@ exports.getBusyTimeSlots = (req, res) => {
 exports.getAllStaffRoles = (req, res) => {
   staffModel.getAllStaffRoles((err, roleList) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     return res.status(200).json({ success: true, data: roleList });
@@ -148,7 +148,7 @@ exports.createStaffRole = (req, res) => {
 
   return staffModel.createStaffRole(normalizedRole, (err, result) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     return res.status(201).json({
@@ -171,13 +171,13 @@ exports.createStaff = (req, res) => {
     return res.status(400).json({ message: 'Vai tro khong hop le' });
   }
 
-  userModel.getUserByEmail(email, (err, existingUser) => {
+  userModel.getUserByEmail(email, async (err, existingUser) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     if (existingUser) {
-      return res.status(400).json({ message: 'Email da ton tai' });
+      return res.status(400).json({ message: 'Email đã tồn tại' });
     }
 
     const activeValue =
@@ -187,15 +187,20 @@ exports.createStaff = (req, res) => {
       return res.status(400).json({ message: 'is_active khong hop le' });
     }
 
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    let hashedPassword = '';
+    try {
+      hashedPassword = await bcrypt.hash(password, 10);
+    } catch (hashErr) {
+      return res.status(500).json({ message: 'Lỗi server', error: hashErr });
+    }
 
     return staffModel.getStaffRoleById(parsedRoleId, (roleErr, role) => {
       if (roleErr) {
-        return res.status(500).json({ message: 'Loi server', error: roleErr });
+        return res.status(500).json({ message: 'Lỗi server', error: roleErr });
       }
 
       if (!role) {
-        return res.status(400).json({ message: 'Vai tro khong ton tai' });
+        return res.status(400).json({ message: 'Vai trò không tồn tại' });
       }
 
       return staffModel.createStaff(
@@ -209,12 +214,12 @@ exports.createStaff = (req, res) => {
         },
         (createErr, result) => {
           if (createErr) {
-            return res.status(500).json({ message: 'Loi server', error: createErr });
+            return res.status(500).json({ message: 'Lỗi server', error: createErr });
           }
 
           return res.status(201).json({
             success: true,
-            message: 'Tao nhan vien thanh cong',
+            message: 'Tạo nhân viên thành công',
             staffId: result.insertId
           });
         }
@@ -245,16 +250,16 @@ exports.getWeeklyAvailability = (req, res) => {
 
   staffModel.getStaffById(id, (err, staff) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     if (!staff) {
-      return res.status(404).json({ message: 'Nhan vien khong ton tai' });
+      return res.status(404).json({ message: 'Nhân viên không tồn tại' });
     }
 
     return staffModel.getWeeklyAvailabilityByStaffId(id, (loadErr, rows) => {
       if (loadErr) {
-        return res.status(500).json({ message: 'Loi server', error: loadErr });
+        return res.status(500).json({ message: 'Lỗi server', error: loadErr });
       }
 
       return res.status(200).json({ success: true, data: rows });
@@ -267,16 +272,16 @@ exports.replaceWeeklyAvailability = (req, res) => {
   const { slots } = req.body;
 
   if (!Array.isArray(slots)) {
-    return res.status(400).json({ message: 'slots phai la mang' });
+    return res.status(400).json({ message: 'slots phải là mảng' });
   }
 
   staffModel.getStaffById(id, (err, staff) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     if (!staff) {
-      return res.status(404).json({ message: 'Nhan vien khong ton tai' });
+      return res.status(404).json({ message: 'Nhân viên không tồn tại' });
     }
 
     const normalized = [];
@@ -288,15 +293,15 @@ exports.replaceWeeklyAvailability = (req, res) => {
       const end = normalizeTimeString(row.end_time);
 
       if (!Number.isInteger(day) || day < 0 || day > 6) {
-        return res.status(400).json({ message: 'day_of_week phai tu 0 den 6' });
+        return res.status(400).json({ message: 'day_of_week phải từ 0 đến 6' });
       }
 
       if (!start || !end) {
-        return res.status(400).json({ message: 'Gio bat dau / ket thuc khong hop le' });
+        return res.status(400).json({ message: 'Giờ bắt đầu / kết thúc không hợp lệ' });
       }
 
       if (start >= end) {
-        return res.status(400).json({ message: 'Gio ket thuc phai sau gio bat dau' });
+        return res.status(400).json({ message: 'Giờ kết thúc phải sau giờ bắt đầu' });
       }
 
       normalized.push({ day_of_week: day, start_time: start, end_time: end });
@@ -304,12 +309,12 @@ exports.replaceWeeklyAvailability = (req, res) => {
 
     return staffModel.replaceWeeklyAvailability(id, normalized, (saveErr) => {
       if (saveErr) {
-        return res.status(500).json({ message: 'Loi server', error: saveErr });
+        return res.status(500).json({ message: 'Lỗi server', error: saveErr });
       }
 
       return res.status(200).json({
         success: true,
-        message: 'Da luu lich lam viec hang tuan'
+        message: 'Đã lưu lịch làm việc hàng tuần'
       });
     });
   });
@@ -329,13 +334,13 @@ exports.updateStaff = (req, res) => {
     return res.status(400).json({ message: 'Khong co du lieu de cap nhat' });
   }
 
-  staffModel.getStaffById(id, (err, staff) => {
+  staffModel.getStaffById(id, async (err, staff) => {
     if (err) {
-      return res.status(500).json({ message: 'Loi server', error: err });
+      return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
     if (!staff) {
-      return res.status(404).json({ message: 'Nhan vien khong ton tai' });
+      return res.status(404).json({ message: 'Nhân viên không tồn tại' });
     }
 
     const payload = {};
@@ -351,7 +356,11 @@ exports.updateStaff = (req, res) => {
         return res.status(400).json({ message: 'Mat khau moi phai it nhat 6 ky tu' });
       }
 
-      payload.password = bcrypt.hashSync(password, 10);
+      try {
+        payload.password = await bcrypt.hash(password, 10);
+      } catch (hashErr) {
+        return res.status(500).json({ message: 'Lỗi server', error: hashErr });
+      }
     }
 
     if (typeof is_active !== 'undefined') {
@@ -365,7 +374,7 @@ exports.updateStaff = (req, res) => {
     const finishUpdate = () =>
       staffModel.updateStaff(id, payload, (updateErr) => {
         if (updateErr) {
-          return res.status(500).json({ message: 'Loi server', error: updateErr });
+          return res.status(500).json({ message: 'Lỗi server', error: updateErr });
         }
 
         return res.status(200).json({
@@ -373,7 +382,7 @@ exports.updateStaff = (req, res) => {
         message:
           typeof password !== 'undefined'
             ? 'Cap nhat nhan vien va mat khau thanh cong'
-            : 'Cap nhat nhan vien thanh cong'
+            : 'Cập nhật nhân viên thành công'
         });
       });
 
@@ -385,11 +394,11 @@ exports.updateStaff = (req, res) => {
 
       return staffModel.getStaffRoleById(parsedRoleId, (roleErr, role) => {
         if (roleErr) {
-          return res.status(500).json({ message: 'Loi server', error: roleErr });
+          return res.status(500).json({ message: 'Lỗi server', error: roleErr });
         }
 
         if (!role) {
-          return res.status(400).json({ message: 'Vai tro khong ton tai' });
+          return res.status(400).json({ message: 'Vai trò không tồn tại' });
         }
 
         payload.staff_role_id = parsedRoleId;
@@ -398,5 +407,56 @@ exports.updateStaff = (req, res) => {
     }
 
     return finishUpdate();
+  });
+};
+
+exports.requestLeave = (req, res) => {
+  const { start_date, end_date, reason } = req.body;
+  const staffId = req.user.id;
+
+  if (!start_date || !end_date || !reason) {
+    return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' });
+  }
+
+  staffModel.createLeaveRequest(staffId, start_date, end_date, reason, (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+    return res.status(201).json({ success: true, message: 'Gửi yêu cầu nghỉ phép thành công', data: { id: result.insertId } });
+  });
+};
+
+exports.getMyLeaveRequests = (req, res) => {
+  const staffId = req.user.id;
+  staffModel.getLeaveRequestsByStaff(staffId, (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+    return res.status(200).json({ success: true, data: results });
+  });
+};
+
+exports.getAllLeaveRequests = (req, res) => {
+  staffModel.getAllLeaveRequests((err, results) => {
+    if (err) {
+      return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+    return res.status(200).json({ success: true, data: results });
+  });
+};
+
+exports.updateLeaveRequestStatus = (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!['approved', 'rejected'].includes(status)) {
+    return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
+  }
+
+  staffModel.updateLeaveRequestStatus(id, status, (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+    return res.status(200).json({ success: true, message: 'Cập nhật trạng thái thành công' });
   });
 };

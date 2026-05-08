@@ -49,6 +49,22 @@ function StaffLeaveManagement() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [activeTab, setActiveTab] = useState('weekly');
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+
+  const loadLeaveRequests = async () => {
+    try {
+      setLoadingRequests(true);
+      const response = await staffService.getAllLeaveRequests();
+      setLeaveRequests(response.data?.data || []);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách yêu cầu nghỉ phép:', err);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -66,6 +82,7 @@ function StaffLeaveManagement() {
       }
     };
     load();
+    loadLeaveRequests();
   }, []);
 
   useEffect(() => {
@@ -166,6 +183,17 @@ function StaffLeaveManagement() {
     }
   };
 
+  const handleUpdateStatus = async (id, status) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn ${status === 'approved' ? 'duyệt' : 'từ chối'} yêu cầu này?`)) return;
+    try {
+      await staffService.updateLeaveRequestStatus(id, status);
+      window.alert('Cập nhật trạng thái thành công');
+      loadLeaveRequests();
+    } catch (err) {
+      window.alert('Lỗi: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   if (loading) {
     return <div className="loading">Đang tải dữ liệu nhân viên...</div>;
   }
@@ -176,8 +204,9 @@ function StaffLeaveManagement() {
         <div className="staff-leave-head-copy">
           <p className="staff-leave-kicker">Admin</p>
           <h1>Quản lý lịch nghỉ nhân viên</h1>
-          <p>Thiết lập ngày làm/lịch nghỉ theo tuần cho từng nhân viên một cách rõ ràng.</p>
+          <p>Thiết lập ngày làm/lịch nghỉ theo tuần cho từng nhân viên.</p>
         </div>
+
         <div className="staff-leave-head-actions">
           <button type="button" className="btn-secondary" onClick={() => navigate('/admin/staff')}>
             Quay lại quản lý nhân viên
@@ -188,8 +217,27 @@ function StaffLeaveManagement() {
       {error && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
+      <div className="staff-leave-tabs">
+        <button
+          type="button"
+          className={`btn-tab ${activeTab === 'weekly' ? 'active' : ''}`}
+          onClick={() => setActiveTab('weekly')}
+        >
+          Lịch nghỉ cố định
+        </button>
+        <button
+          type="button"
+          className={`btn-tab ${activeTab === 'requests' ? 'active' : ''}`}
+          onClick={() => setActiveTab('requests')}
+        >
+          Yêu cầu xin nghỉ phép (Ad-hoc)
+        </button>
+      </div>
+
       <div className="staff-leave-panel">
-        <div className="staff-leave-control-grid">
+        {activeTab === 'weekly' && (
+          <>
+            <div className="staff-leave-control-grid">
           <div className="form-group">
             <label>Chọn nhân viên</label>
             <select value={selectedStaffId} onChange={(event) => setSelectedStaffId(event.target.value)}>
@@ -227,17 +275,20 @@ function StaffLeaveManagement() {
         )}
 
         <div className="staff-leave-tools">
+          <button type="button" className="btn-secondary btn-small" onClick={() => applyPreset('08:00', '21:00')}>
+            Fulltime (8:00 - 21:00)
+          </button>
+          <button type="button" className="btn-secondary btn-small" onClick={() => applyPreset('08:00', '14:30')}>
+            Ca sáng (8:00 - 14:30)
+          </button>
+          <button type="button" className="btn-secondary btn-small" onClick={() => applyPreset('14:30', '21:00')}>
+            Ca chiều (14:30 - 21:00)
+          </button>
           <button type="button" className="btn-secondary btn-small" onClick={() => setAllEnabled(true)}>
             Làm cả tuần
           </button>
           <button type="button" className="btn-secondary btn-small" onClick={() => setAllEnabled(false)}>
             Nghỉ cả tuần
-          </button>
-          <button type="button" className="btn-secondary btn-small" onClick={() => applyPreset('09:00', '18:00')}>
-            Mẫu 09:00 - 18:00
-          </button>
-          <button type="button" className="btn-secondary btn-small" onClick={() => applyPreset('10:00', '20:00')}>
-            Mẫu 10:00 - 20:00
           </button>
         </div>
 
@@ -299,6 +350,57 @@ function StaffLeaveManagement() {
             {savingSchedule ? 'Đang lưu...' : 'Lưu lịch nghỉ'}
           </button>
         </div>
+        </>
+        )}
+
+        {activeTab === 'requests' && (
+          <div className="staff-leave-requests-section">
+            <h2>Danh sách đơn xin nghỉ phép</h2>
+            {loadingRequests ? (
+              <div className="loading">Đang tải danh sách...</div>
+            ) : leaveRequests.length === 0 ? (
+              <p>Chưa có yêu cầu nghỉ phép nào.</p>
+            ) : (
+              <table className="staff-leave-table">
+                <thead>
+                  <tr>
+                    <th>Nhân viên</th>
+                    <th>Từ ngày</th>
+                    <th>Đến ngày</th>
+                    <th>Lý do</th>
+                    <th>Ngày gửi</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaveRequests.map(req => (
+                    <tr key={req.id}>
+                      <td><strong>{req.staff_name}</strong></td>
+                      <td>{new Date(req.start_date).toLocaleDateString('vi-VN')}</td>
+                      <td>{new Date(req.end_date).toLocaleDateString('vi-VN')}</td>
+                      <td>{req.reason}</td>
+                      <td>{new Date(req.created_at).toLocaleDateString('vi-VN')}</td>
+                      <td>
+                        <span className={`status-badge ${req.status}`}>
+                          {req.status === 'pending' ? 'Chờ duyệt' : req.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}
+                        </span>
+                      </td>
+                      <td>
+                        {req.status === 'pending' && (
+                          <div className="action-buttons">
+                            <button className="btn-success btn-small" onClick={() => handleUpdateStatus(req.id, 'approved')}>Duyệt</button>
+                            <button className="btn-danger btn-small" onClick={() => handleUpdateStatus(req.id, 'rejected')}>Từ chối</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,28 @@
+const fs = require('fs');
+const path = require('path');
+
+const templatePath = path.resolve(__dirname, '..', '..', 'templates', 'email', 'voucher-notification.html');
+
+const readVoucherTemplate = () => {
+  try {
+    return fs.readFileSync(templatePath, 'utf8');
+  } catch (err) {
+    return '';
+  }
+};
+
+const renderTemplate = (template, data) => {
+  if (!template) {
+    return '';
+  }
+
+  return template
+    .replace(/{{#if\s+([a-zA-Z0-9_]+)}}([\s\S]*?){{\/if}}/g, (_, key, content) =>
+      data[key] ? content : ''
+    )
+    .replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_, key) => escapeHtml(data[key] ?? ''));
+};
+
 const formatCurrency = (value) => {
   if (!Number.isFinite(Number(value))) {
     return 'Không';
@@ -160,10 +185,38 @@ const buildVoucherEmailPayload = ({
     .filter(Boolean)
     .join('\n');
 
+  const daysRemaining = (() => {
+    const parsed = new Date(voucher.expiry_date);
+    if (Number.isNaN(parsed.getTime())) {
+      return '';
+    }
+
+    return Math.max(0, Math.ceil((parsed.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+  })();
+
+  const templateHtml = renderTemplate(readVoucherTemplate(), {
+    ...sourceMeta,
+    ...{
+      customerName,
+      voucherCode,
+      discountValue: discountLabel,
+      voucherDescription,
+      voucherSourceLabel: sourceMeta.badge,
+      voucherSourceMessage: sourceMeta.message,
+      issuedByName: sourceMeta.issuedByName,
+      voucherReason: sourceMeta.reason,
+      expiryDate,
+      minOrder,
+      maxDiscount,
+      daysRemaining,
+      shopLink: actionUrl
+    }
+  });
+
   return {
     source: sourceMeta.source,
     subject: sourceMeta.subject,
-    html,
+    html: templateHtml || html,
     text,
     templateData: {
       customerName,

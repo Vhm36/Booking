@@ -27,6 +27,14 @@ router.put(
   staffController.replaceWeeklyAvailability
 );
 
+// Leave requests (Staff)
+router.post('/leave-request', verifyToken, staffController.requestLeave);
+router.get('/my-leave-requests', verifyToken, staffController.getMyLeaveRequests);
+
+// Leave requests (Admin)
+router.get('/leave-requests', verifyToken, verifyAdmin, staffController.getAllLeaveRequests);
+router.put('/leave-requests/:id/status', verifyToken, verifyAdmin, staffController.updateLeaveRequestStatus);
+
 router.get('/', verifyToken, verifyAdmin, staffController.getAllStaff);
 router.post('/', verifyToken, verifyAdmin, staffController.createStaff);
 router.put('/:id', verifyToken, verifyAdmin, staffController.updateStaff);

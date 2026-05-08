@@ -120,13 +120,38 @@ const createAppointment = (appointmentData, callback) => {
     status,
     notes,
     total_amount,
+    original_amount,
+    voucher_discount,
+    voucher_codes,
+    cancellation_score,
+    cancellation_risk,
+    deposit_required,
+    deposit_amount,
     selected_services
   } = appointmentData;
 
   const query = `
     INSERT INTO appointments
-      (user_id, service_id, staff_id, appointment_date, appointment_time, end_time, status, notes, total_amount, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      (
+        user_id,
+        service_id,
+        staff_id,
+        appointment_date,
+        appointment_time,
+        end_time,
+        status,
+        notes,
+        total_amount,
+        original_amount,
+        voucher_discount,
+        voucher_codes,
+        cancellation_score,
+        cancellation_risk,
+        deposit_required,
+        deposit_amount,
+        created_at
+      )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
   `;
   const appointmentValues = [
     user_id,
@@ -137,7 +162,14 @@ const createAppointment = (appointmentData, callback) => {
     end_time || null,
     status || 'pending',
     notes || '',
-    total_amount
+    total_amount,
+    original_amount ?? total_amount,
+    voucher_discount || 0,
+    voucher_codes || null,
+    typeof cancellation_score === 'number' ? cancellation_score : null,
+    cancellation_risk || 'low',
+    deposit_required ? 1 : 0,
+    deposit_amount || 0
   ];
   const normalizedSelectedServices = Array.isArray(selected_services) ? selected_services : [];
 
@@ -362,6 +394,25 @@ const checkTimeConflict = (staff_id, appointment_date, requested_start_time, req
   });
 };
 
+const refreshCustomerCancellationCount = (userId, callback) => {
+  const query = `
+    UPDATE users u
+    SET cancellation_count = (
+      SELECT COUNT(*)
+      FROM appointments a
+      WHERE a.user_id = u.id
+        AND a.status = 'cancelled'
+    )
+    WHERE u.id = ?
+      AND u.role = 'customer'
+  `;
+
+  db.query(query, [userId], (err, result) => {
+    if (err) return callback(err);
+    callback(null, result);
+  });
+};
+
 module.exports = {
   createAppointment,
   getAllAppointments,
@@ -372,6 +423,7 @@ module.exports = {
   requestAppointmentCancellation,
   clearAppointmentCancellationRequest,
   cancelAppointment,
+  refreshCustomerCancellationCount,
   addStaffReview,
   checkTimeConflict
 };

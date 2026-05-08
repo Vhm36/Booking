@@ -2,19 +2,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 import customerService from '../../../services/customerService';
 import dashboardService from '../../../services/dashboardService';
 import authService from '../../../services/authService';
+import { exportToExcel } from '../../../utils/exportExcel';
 import './ManageCustomers.css';
 
 const getVipMetaFromSpent = (totalSpent = 0) => {
-  if (totalSpent >= 15000000) {
-    return { code: 'black', label: 'VIP Đen', icon: 'eclipse' };
+  if (totalSpent >= 40000000) {
+    return { code: 'vvvip', label: 'VVVIP', icon: 'eclipse' };
   }
-  if (totalSpent >= 7000000) {
-    return { code: 'gold', label: 'VIP Vàng', icon: 'crown' };
+  if (totalSpent >= 20000000) {
+    return { code: 'vvip', label: 'VVIP', icon: 'crown' };
+  }
+  if (totalSpent >= 10000000) {
+    return { code: 'gold', label: 'VIP Vàng', icon: 'star' };
+  }
+  if (totalSpent >= 5000000) {
+    return { code: 'silver', label: 'VIP Bạc', icon: 'shield' };
   }
   if (totalSpent >= 3000000) {
-    return { code: 'silver', label: 'VIP Báº¡c', icon: 'shield' };
-  }
-  if (totalSpent >= 1000000) {
     return { code: 'bronze', label: 'VIP Đồng', icon: 'ember' };
   }
   return { code: 'standard', label: 'Thành viên thường', icon: 'spark' };
@@ -37,8 +41,10 @@ const normalizeCustomers = (list = []) =>
       vip_tier_label: item.vip_tier_label || vipFallback.label,
       vip_tier_icon: item.vip_tier_icon || vipFallback.icon,
       behavior_role_code: item.behavior_role_code || 'standard',
-      behavior_role_label: item.behavior_role_label || 'Hành vi á»•n định',
-      behavior_tags: Array.isArray(item.behavior_tags) ? item.behavior_tags : []
+      behavior_role_label: item.behavior_role_label || 'Hành vi ổn định',
+      behavior_tags: Array.isArray(item.behavior_tags) ? item.behavior_tags : [],
+      customer_segment: item.customer_segment || 'New Customers',
+      rfm_score: item.rfm_score || ''
     };
   });
 
@@ -74,32 +80,48 @@ const getBehaviorToneClass = (tone) => `tone-${tone || 'slate'}`;
 
 const getVipThresholdLabel = (tierCode) => {
   switch (tierCode) {
-    case 'black': return 'Tá»« 15.000.000đ';
-    case 'gold': return 'Tá»« 7.000.000đ';
-    case 'silver': return 'Tá»« 3.000.000đ';
-    case 'bronze': return 'Tá»« 1.000.000đ';
-    default: return 'Dưới 1.000.000đ';
+    case 'vvvip': return 'Từ 40.000.000đ';
+    case 'vvip': return 'Từ 20.000.000đ';
+    case 'gold': return 'Từ 10.000.000đ';
+    case 'silver': return 'Từ 5.000.000đ';
+    case 'bronze': return 'Từ 3.000.000đ';
+    default: return 'Dưới 3.000.000đ';
   }
 };
 
 const getVipRankLabel = (tierCode) => {
   switch (tierCode) {
-    case 'black': return 'Háº¡ng S+';
-    case 'gold': return 'Háº¡ng S';
-    case 'silver': return 'Háº¡ng A';
-    case 'bronze': return 'Háº¡ng B';
-    default: return 'Háº¡ng C';
+    case 'vvvip': return 'Hạng SS';
+    case 'vvip': return 'Hạng S+';
+    case 'gold': return 'Hạng S';
+    case 'silver': return 'Hạng A';
+    case 'bronze': return 'Hạng B';
+    default: return 'Hạng C';
   }
 };
 
 const getCompactVipLabel = (tierCode, fallbackLabel) => {
   switch (tierCode) {
-    case 'black': return 'VIP Đen';
+    case 'vvvip': return 'VVVIP';
+    case 'vvip': return 'VVIP';
     case 'gold': return 'VIP Vàng';
-    case 'silver': return 'VIP Báº¡c';
+    case 'silver': return 'VIP Bạc';
     case 'bronze': return 'VIP Đồng';
     case 'standard': return 'Thường';
     default: return fallbackLabel || 'Thường';
+  }
+};
+
+const getRfmSegmentLabel = (segment) => {
+  switch (segment) {
+    case 'Champions': return 'Khách VIP (Kim Cương)';
+    case 'Loyal Customers': return 'Khách trung thành';
+    case 'Potential Loyalists': return 'Khách tiềm năng';
+    case 'At Risk': return 'Nguy cơ rời bỏ';
+    case 'Lost Customers': return 'Ngủ đông/Đã mất';
+    case 'New Customers': return 'Khách hàng mới';
+    case 'Need Attention': return 'Cần chăm sóc';
+    default: return segment || 'Chưa tính';
   }
 };
 
@@ -135,6 +157,22 @@ function ManageCustomers() {
     fetchBehaviorBot();
   }, []);
 
+  useEffect(() => {
+    let timeout;
+    if (pageFeedback.text) {
+      timeout = setTimeout(() => setPageFeedback(emptyFeedback), 3000);
+    }
+    return () => clearTimeout(timeout);
+  }, [pageFeedback.text]);
+
+  useEffect(() => {
+    let timeout;
+    if (editFeedback.text) {
+      timeout = setTimeout(() => setEditFeedback(emptyFeedback), 3000);
+    }
+    return () => clearTimeout(timeout);
+  }, [editFeedback.text]);
+
   const fetchCustomers = async () => {
     try {
       setLoading(true);
@@ -142,7 +180,7 @@ function ManageCustomers() {
       setCustomers(normalizeCustomers(response.data.data || []));
       setError('');
     } catch (err) {
-      setError('Không thá»ƒ táº£i danh sách khách hàng.');
+      setError('Không thể tải danh sách khách hàng.');
     } finally {
       setLoading(false);
     }
@@ -165,9 +203,9 @@ function ManageCustomers() {
 
     return customers.filter((customer) => {
       const searchBlob = normalizeSearchText(
-        `${customer.id} ${customer.name || ''} ${customer.email || ''} ${customer.phone || ''} ${
-          customer.behavior_role_label || ''
-        } ${customer.vip_tier_label || ''} ${customer.vip_tier_code || ''} ${(customer.behavior_tags || [])
+        `${customer.id} ${customer.name || ''} ${customer.email || ''} ${customer.phone || ''} ${customer.behavior_role_label || ''
+        } ${customer.vip_tier_label || ''} ${customer.vip_tier_code || ''} ${customer.customer_segment || ''} ${customer.rfm_score || ''
+        } ${(customer.behavior_tags || [])
           .map((tag) => tag.label)
           .join(' ')}`
       );
@@ -186,42 +224,50 @@ function ManageCustomers() {
       ['gold', 'black'].includes(customer.vip_tier_code)
     ).length;
     const vipBlack = customers.filter((customer) => customer.vip_tier_code === 'black').length;
+    const rfmAtRisk = customers.filter((customer) => customer.customer_segment === 'At Risk').length;
 
     return [
       {
         key: 'total',
-        label: 'Tá»•ng khách',
+        label: 'Tổng khách',
         value: customers.length,
-        note: 'Tá»•ng sá»‘ tài khoáº£n khách hàng hiá»‡n có',
+        note: 'Tổng tài khoản khách hàng hiện có',
         tone: 'total'
       },
       {
         key: 'booker',
         label: 'Đặt nhiều',
         value: frequentBookers,
-        note: 'Nhóm khách có táº§n suáº¥t đặt lá»‹ch cao',
+        note: 'Nhóm khách có tần suất đặt lịch cao',
         tone: 'booker'
       },
       {
         key: 'canceller',
-        label: 'Há»§y nhiá»u',
+        label: 'Hủy nhiều',
         value: frequentCancellers,
-        note: 'Nhóm khách cáº§n theo dõi tá»· lá»‡ há»§y',
+        note: 'Nhóm khách cần theo dõi tỷ lệ hủy',
         tone: 'canceller'
       },
       {
         key: 'vip-gold',
         label: 'VIP Vàng+',
         value: vipGoldOrHigher,
-        note: 'Khách có tá»•ng chi tiêu cao',
+        note: 'Khách có tổng chi tiêu cao',
         tone: 'vip'
       },
       {
         key: 'vip-black',
         label: 'VIP Đen',
         value: vipBlack,
-        note: 'Nhóm chi tiêu cao nháº¥t hiá»‡n táº¡i',
+        note: 'Nhóm chi tiêu cao nhất hiện tại',
         tone: 'black'
+      },
+      {
+        key: 'rfm-risk',
+        label: 'Nguy cơ rời bỏ',
+        value: rfmAtRisk,
+        note: 'Khách hàng cần kích hoạt lại bằng voucher',
+        tone: 'canceller'
       }
     ];
   }, [customers]);
@@ -252,7 +298,7 @@ function ManageCustomers() {
         is_active: true
       });
       setShowForm(false);
-      setPageFeedback({ type: 'success', text: 'Báº¡n đã thêm khách hàng má»›i.' });
+      setPageFeedback({ type: 'success', text: 'Bạn đã thêm khách hàng mới.' });
       fetchCustomers();
     } catch (err) {
       window.alert(err.response?.data?.message || 'Thêm khách hàng thất bại.');
@@ -311,12 +357,12 @@ function ManageCustomers() {
       const recipient = response.data?.data?.recipient || editingCustomer.email;
       setEditFeedback({
         type: 'success',
-        text: `Đã gá»­i email voucher tá»›i ${recipient}.`
+        text: `Đã gửi email voucher tới ${recipient}.`
       });
     } catch (err) {
       setEditFeedback({
         type: 'error',
-        text: err.response?.data?.message || 'Không thá»ƒ gá»­i email voucher lúc này.'
+        text: err.response?.data?.message || 'Không thể gửi email voucher lúc này.'
       });
     } finally {
       setSendingVoucherEmail(false);
@@ -329,7 +375,7 @@ function ManageCustomers() {
     if (!editData.name.trim() || !editData.email.trim()) {
       setEditFeedback({
         type: 'error',
-        text: 'Vui lòng nháº­p đầy đủ há» tên và email.'
+        text: 'Vui lòng nhập đầy đủ họ tên và email.'
       });
       return;
     }
@@ -369,8 +415,8 @@ function ManageCustomers() {
         type: 'success',
         text:
           typeof payload.password !== 'undefined'
-            ? 'Báº¡n đã lưu máº­t kháº©u má»›i.'
-            : 'Báº¡n đã lưu thông tin khách hàng.'
+            ? 'Bạn đã lưu mật khẩu mới.'
+            : 'Bạn đã lưu thông tin khách hàng.'
       });
     } catch (err) {
       setEditFeedback({
@@ -392,14 +438,14 @@ function ManageCustomers() {
       setDeleteError('');
       await customerService.deleteCustomer(editingCustomer.id);
       setCustomers((prev) => prev.filter((customer) => customer.id !== editingCustomer.id));
-      setPageFeedback({ type: 'success', text: 'Báº¡n đã xóa tài khoáº£n khách hàng.' });
+      setPageFeedback({ type: 'success', text: 'Bạn đã xóa tài khoản khách hàng.' });
       setEditingCustomer(null);
       setEditData(emptyEditData);
       setEditFeedback(emptyFeedback);
       setShowDeleteConfirm(false);
     } catch (err) {
       setDeleteError(
-        err.response?.data?.message || 'Không thá»ƒ xóa tài khoáº£n này lúc này. Vui lòng thá»­ láº¡i.'
+        err.response?.data?.message || 'Không thể xóa tài khoản này lúc này. Vui lòng thử lại.'
       );
     } finally {
       setDeletingCustomer(false);
@@ -417,8 +463,8 @@ function ManageCustomers() {
           <p className="customers-hero-kicker">{isCashierView ? 'Thu ngân' : isStaffView ? 'Nhân viên' : 'Admin'}</p>
           <h1>{isStaffView ? 'Quản lý khách hàng tại quầy' : 'Quản lý khách hàng'}</h1>
           <p className="customers-page-note">
-            Theo dõi tài khoáº£n khách hàng, lá»‹ch sá»­ đặt lá»‹ch, vai trò hành vi và háº¡ng VIP ngay
-            trên cùng má»™t giao diá»‡n để phân tích khách đặt nhiá»u, há»§y nhiá»u và nhóm chi tiêu cao.
+            Theo dõi tài khoản khách hàng, lịch sử đặt lịch, vai trò hành vi và hạng VIP ngay
+            trên cùng một giao diện để phân tích khách đặt nhiều, hủy nhiều và nhóm chi tiêu cao.
           </p>
         </div>
 
@@ -441,6 +487,39 @@ function ManageCustomers() {
             <span className="customers-search-count">
               {filteredCustomers.length}/{customers.length} khách hàng
             </span>
+            <button
+              className="btn-export-excel"
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10);
+                exportToExcel({
+                  fileName: `khach-hang_${today}`,
+                  sheets: [
+                    {
+                      name: 'Khách hàng',
+                      columns: [
+                        { key: 'id', header: 'ID', width: 8 },
+                        { key: 'name', header: 'Họ tên', width: 22 },
+                        { key: 'email', header: 'Email', width: 28 },
+                        { key: 'phone', header: 'SĐT', width: 14 },
+                        { key: 'vip_tier_label', header: 'Hạng VIP', width: 14 },
+                        { key: 'customer_segment', header: 'Phân khúc', width: 18, transform: (v) => getRfmSegmentLabel(v) },
+                        { key: 'rfm_score', header: 'Điểm RFM', width: 12 },
+                        { key: 'behavior_role_label', header: 'Hành vi', width: 20 },
+                        { key: 'total_spent', header: 'Tổng chi (VNĐ)', width: 18, transform: (v) => Number(v || 0) },
+                        { key: 'total_appointments', header: 'Tổng đặt', width: 10, transform: (v) => Number(v || 0) },
+                        { key: 'completed_appointments', header: 'Hoàn tất', width: 10, transform: (v) => Number(v || 0) },
+                        { key: 'cancelled_appointments', header: 'Hủy', width: 8, transform: (v) => Number(v || 0) },
+                        { key: 'cancellation_rate', header: 'Tỷ lệ hủy (%)', width: 12, transform: (v) => Number(v || 0) },
+                        { key: 'is_active', header: 'Trạng thái', width: 12, transform: (v) => v ? 'Hoạt động' : 'Tạm khóa' }
+                      ],
+                      rows: filteredCustomers
+                    }
+                  ]
+                });
+              }}
+            >
+              📥 Xuất Excel
+            </button>
           </div>
         </div>
       </section>
@@ -466,9 +545,9 @@ function ManageCustomers() {
             <h3>Theo dõi & phân tích hành vi khách hàng</h3>
           </div>
           <div className="customer-bot-summary">
-            <span>Tá»•ng khách: {behaviorBot.summary?.total_customers || 0}</span>
+            <span>Tổng khách: {behaviorBot.summary?.total_customers || 0}</span>
             <span>Đặt nhiều: {behaviorBot.summary?.frequent_bookers || 0}</span>
-            <span>Há»§y nhiá»u: {behaviorBot.summary?.frequent_cancellers || 0}</span>
+            <span>Hủy nhiều: {behaviorBot.summary?.frequent_cancellers || 0}</span>
             <span>VIP vàng/đen: {behaviorBot.summary?.vip_gold_or_black || 0}</span>
           </div>
           <div className="customer-bot-recommendations">
@@ -481,7 +560,7 @@ function ManageCustomers() {
 
       {showForm && (
         <div className="customer-form-card">
-          <h3>Thêm khách hàng má»›i</h3>
+          <h3>Thêm khách hàng mới</h3>
           <form onSubmit={handleCreate}>
             <div className="form-group">
               <label>Họ tên</label>
@@ -505,7 +584,7 @@ function ManageCustomers() {
               </div>
 
               <div className="form-group">
-                <label>Máº­t kháº©u</label>
+                <label>Mật khẩu</label>
                 <input
                   type="password"
                   value={formData.password}
@@ -517,7 +596,7 @@ function ManageCustomers() {
 
             <div className="form-row">
               <div className="form-group">
-                <label>Sá»‘ điện thoáº¡i</label>
+                <label>Số điện thoại</label>
                 <input
                   type="text"
                   value={formData.phone}
@@ -536,7 +615,7 @@ function ManageCustomers() {
                     }))
                   }
                 >
-                  <option value="1">Đang hoáº¡t động</option>
+                  <option value="1">Đang hoạt động</option>
                   <option value="0">Tạm khóa</option>
                 </select>
               </div>
@@ -553,7 +632,7 @@ function ManageCustomers() {
         <div className="customer-table-header">
           <div>
             <p className="customer-table-kicker">Danh sách tài khoản</p>
-            <h2>Khách hàng hiá»‡n có</h2>
+            <h2>Khách hàng hiện có</h2>
           </div>
         </div>
 
@@ -564,9 +643,10 @@ function ManageCustomers() {
                 <th>ID</th>
                 <th>Khách hàng</th>
                 <th>Hành vi</th>
+                <th>Phân khúc</th>
                 <th>VIP</th>
-                <th>Tá»•ng chi</th>
-                <th>Chá»‰ sá»‘</th>
+                <th>Tổng chi</th>
+                <th>Tổng đặt lịch</th>
                 <th>Trạng thái</th>
                 <th>Hành động</th>
               </tr>
@@ -574,7 +654,7 @@ function ManageCustomers() {
             <tbody>
               {filteredCustomers.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="empty-state">
+                  <td colSpan="9" className="empty-state">
                     Chưa có khách hàng phù hợp.
                   </td>
                 </tr>
@@ -602,14 +682,19 @@ function ManageCustomers() {
                     </div>
                   </td>
                   <td>
+                    <div className="customer-rfm-stack">
+                      <span 
+                        className={`customer-rfm-badge segment-${normalizeSearchText(customer.customer_segment).replace(/\s+/g, '-')}`}
+                        title={customer.customer_segment}
+                      >
+                        {getRfmSegmentLabel(customer.customer_segment)}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
                     <div className={`customer-vip-badge customer-vip-badge--table compact vip-${customer.vip_tier_code}`}>
-                      <span
-                        className={`customer-vip-icon icon-${customer.vip_tier_icon}`}
-                        aria-hidden="true"
-                      />
                       <div className="customer-vip-copy">
                         <strong>{getCompactVipLabel(customer.vip_tier_code, customer.vip_tier_label)}</strong>
-                        <small>{getVipRankLabel(customer.vip_tier_code)}</small>
                       </div>
                     </div>
                   </td>
@@ -618,22 +703,22 @@ function ManageCustomers() {
                   </td>
                   <td>
                     <div className="customer-metrics">
-                      <span>{customer.total_appointments} lá»‹ch â€¢ {customer.completed_appointments} hoàn táº¥t</span>
-                      <span>{customer.cancelled_appointments} há»§y â€¢ {customer.cancellation_rate}% tá»· lá»‡ há»§y</span>
+                      <span>{customer.total_appointments} lịch • {customer.completed_appointments} hoàn tất</span>
+                      <span>{customer.cancelled_appointments} hủy  {customer.cancellation_rate}% tỷ lệ hủy</span>
                     </div>
                   </td>
                   <td>
                     <span className={`customer-status ${customer.is_active ? 'active' : 'inactive'}`}>
                       <span className="customer-status-dot" aria-hidden="true" />
                       <span className="customer-status-label">
-                        {customer.is_active ? 'Hoáº¡t động' : 'Táº¡m khóa'}
+                        {customer.is_active ? 'Hoạt động' : 'Tạm khóa'}
                       </span>
                     </span>
                   </td>
                   <td>
                     <div className="customer-actions">
                       <button className="btn-secondary btn-small" onClick={() => startEdit(customer)}>
-                        Sá»­a
+                        Sửa
                       </button>
                     </div>
                   </td>
@@ -670,10 +755,6 @@ function ManageCustomers() {
 
             <div className="customer-edit-insights">
               <div className={`customer-vip-badge customer-vip-badge--modal compact vip-${editingCustomer.vip_tier_code}`}>
-                <span
-                  className={`customer-vip-icon icon-${editingCustomer.vip_tier_icon}`}
-                  aria-hidden="true"
-                />
                 <div className="customer-vip-copy">
                   <strong>{editingCustomer.vip_tier_label}</strong>
                   <small>{getVipThresholdLabel(editingCustomer.vip_tier_code)}</small>
@@ -714,7 +795,7 @@ function ManageCustomers() {
                 </div>
 
                 <div className="form-group">
-                  <label>Sá»‘ điện thoáº¡i</label>
+                  <label>Số điện thoại</label>
                   <input
                     type="text"
                     value={editData.phone}
@@ -723,7 +804,7 @@ function ManageCustomers() {
                 </div>
 
                 <div className="form-group">
-                  <label>Máº­t kháº©u má»›i</label>
+                  <label>Mật khẩu mới</label>
                   <input
                     type="password"
                     value={editData.password}
@@ -739,7 +820,7 @@ function ManageCustomers() {
                   value={editData.is_active ? '1' : '0'}
                   onChange={(event) => updateEditField('is_active', event.target.value === '1')}
                 >
-                  <option value="1">Đang hoáº¡t động</option>
+                  <option value="1">Đang hoạt động</option>
                   <option value="0">Tạm khóa</option>
                 </select>
               </div>
@@ -792,12 +873,12 @@ function ManageCustomers() {
           {showDeleteConfirm && (
             <div className="customer-confirm-overlay" onClick={closeDeleteConfirm}>
               <div className="customer-confirm-card" onClick={(event) => event.stopPropagation()}>
-                <p className="customer-confirm-title">Báº¡n có cháº¯c muá»‘n xóa tài khoáº£n này?</p>
+                <p className="customer-confirm-title">Bạn có chắc muốn xóa tài khoản này?</p>
                 <p className="customer-confirm-text">
-                  Tài khoáº£n cá»§a {editingCustomer.name || 'khách hàng'} sáº½ bá»‹ xóa khá»i danh sách.
+                  Tài khoản của {editingCustomer.name || 'khách hàng'} sẽ bị xóa vĩnh viễn.
                 </p>
                 <p className="customer-confirm-note">
-                  Nhá»¯ng khách hàng đã có lá»‹ch háº¹n sáº½ không thá»ƒ xóa và nên dùng tráº¡ng thái táº¡m khóa.
+                  Những khách hàng không có lịch hẹn hoặc giao dịch có thể xóa được
                 </p>
 
                 {deleteError && <div className="customer-confirm-error">{deleteError}</div>}
@@ -809,7 +890,7 @@ function ManageCustomers() {
                     onClick={handleDeleteCustomer}
                     disabled={deletingCustomer}
                   >
-                    {deletingCustomer ? 'Đang xóa...' : 'Có'}
+                    {deletingCustomer ? 'Đang xóa...' : 'Xóa'}
                   </button>
                   <button
                     type="button"

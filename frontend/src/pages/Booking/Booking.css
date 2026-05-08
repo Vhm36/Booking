@@ -667,6 +667,21 @@
   text-align: right;
 }
 
+.summary-row.discount strong {
+  color: #dc2626;
+}
+
+.summary-row.total {
+  border-color: rgba(15, 118, 110, 0.26);
+  background: linear-gradient(135deg, #effcf8 0%, #e4f8f3 100%);
+}
+
+.summary-row.total span,
+.summary-row.total strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
 /* ─── Summary Services Card ─── */
 
 .summary-services-card {
@@ -733,7 +748,111 @@
   font-weight: 700;
 }
 
+.voucher-picker-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e4ecf4;
+  background: linear-gradient(180deg, #fffdf6 0%, #ffffff 100%);
+}
+
+.voucher-picker-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.voucher-picker-head strong {
+  color: #10233d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.voucher-picker-head span {
+  color: #9a6700;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.voucher-picker-panel select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #d8e5ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #334155;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.voucher-note {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.voucher-note.success {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.voucher-note.error {
+  color: #dc2626;
+  font-weight: 700;
+}
+
 /* ─── Submit Button ─── */
+
+.cancellation-risk-panel {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.cancellation-risk-panel.risk-medium {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.cancellation-risk-panel.risk-high {
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.cancellation-risk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cancellation-risk-head strong {
+  color: #10233d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.cancellation-risk-head span {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.risk-high .cancellation-risk-head span {
+  color: #dc2626;
+}
+
+.cancellation-risk-panel p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+}
 
 .booking-summary .btn-primary {
   margin-top: 6px;

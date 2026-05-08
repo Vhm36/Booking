@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import HeaderNotifications from './HeaderNotifications';
 import './Header.css';
 
 const HEADER_SCROLL_THRESHOLD = 24;
@@ -87,8 +88,11 @@ function Header({ user, onLogout }) {
           { to: '/admin/services', label: 'Dịch vụ' },
           { to: '/admin/staff', label: 'Nhân viên' },
           { to: '/admin/customers', label: 'Khách hàng' },
+          { to: '/admin/vouchers', label: 'Voucher' },
           { to: '/admin/appointments', label: 'Lịch hẹn' },
-          { to: '/admin/analytics', label: 'Phân tích' }
+          { to: '/admin/schedule', label: 'Lịch NV' },
+          { to: '/admin/analytics', label: 'Phân tích' },
+          { to: '/profile', label: 'Hồ sơ' }
         ]
       };
     }
@@ -101,14 +105,18 @@ function Header({ user, onLogout }) {
           label: 'Thu ngân',
           links: [
             { to: '/staff/dashboard', label: 'Quản lý lịch hẹn' },
-            { to: '/staff/customers', label: 'Khách hàng' }
+            { to: '/staff/customers', label: 'Khách hàng' },
+            { to: '/profile', label: 'Hồ sơ' }
           ]
         };
       }
 
       return {
         label: 'Nhân viên dịch vụ',
-        links: [{ to: '/staff/dashboard', label: 'Lịch làm việc' }]
+        links: [
+          { to: '/staff/dashboard', label: 'Lịch làm việc' },
+          { to: '/profile', label: 'Hồ sơ' }
+        ]
       };
     }
 
@@ -116,6 +124,7 @@ function Header({ user, onLogout }) {
       label: 'Tài khoản',
       links: [
         { to: '/my-appointments', label: 'Lịch của tôi' },
+        { to: '/my-vouchers', label: 'Voucher' },
         { to: '/profile', label: 'Hồ sơ' }
       ]
     };
@@ -156,7 +165,7 @@ function Header({ user, onLogout }) {
         <div className="header-container">
           <div className="header-brand-row">
             <Link to="/" className="logo" aria-label="Trang chủ BeautyBook" onClick={closeMenus}>
-              <span className="logo-mark">BB</span>
+              <img src="/icons/logo_1.jpg" alt="BeautyBook Logo" className="logo-img" />
               <span className="logo-text">
                 <strong>BeautyBook</strong>
                 <small>Đặt lịch nhanh trong vài giây</small>
@@ -220,10 +229,24 @@ function Header({ user, onLogout }) {
             <div className="header-actions">
               {user ? (
                 <>
-                  <div className="user-menu">
-                    <span className="user-name">{user.name}</span>
-                    <small>{getRoleLabel()}</small>
-                  </div>
+                  <HeaderNotifications user={user} navigate={navigate} onNavigate={closeMenus} />
+                  <Link to="/profile" className="user-menu" onClick={closeMenus}>
+                    {user.avatar ? (
+                      <img
+                        src={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${user.avatar}`}
+                        alt={user.name}
+                        className="user-avatar-small"
+                      />
+                    ) : (
+                      <span className="user-avatar-placeholder">
+                        {(user.name || 'U').charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <div className="user-menu-info">
+                      <span className="user-name">{user.name}</span>
+                      <small>{getRoleLabel()}</small>
+                    </div>
+                  </Link>
                   <button type="button" onClick={() => setIsLogoutConfirmOpen(true)} className="btn-logout">
                     Đăng xuất
                   </button>

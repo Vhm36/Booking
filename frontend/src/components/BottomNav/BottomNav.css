@@ -1,0 +1,113 @@
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px) saturate(1.6);
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    border-top: 1px solid var(--line, #d9e2ef);
+    box-shadow: 0 -4px 24px rgba(18, 34, 59, 0.06);
+  }
+
+  .bottom-nav__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: 6px 4px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.22s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    position: relative;
+  }
+
+  .bottom-nav__item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) scaleX(0);
+    width: 28px;
+    height: 3px;
+    border-radius: 0 0 6px 6px;
+    background: var(--brand, #0f766e);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .bottom-nav__item--active::before {
+    transform: translateX(-50%) scaleX(1);
+  }
+
+  .bottom-nav__icon {
+    min-width: 22px;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-muted, #51607a);
+    transition: transform 0.2s ease;
+  }
+
+  .bottom-nav__item--active .bottom-nav__icon {
+    color: var(--brand, #0f766e);
+    transform: scale(1.15);
+  }
+
+  .bottom-nav__label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted, #51607a);
+    letter-spacing: 0.01em;
+    transition: color 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 64px;
+  }
+
+  .bottom-nav__item--active .bottom-nav__label {
+    color: var(--brand, #0f766e);
+    font-weight: 700;
+  }
+
+  .bottom-nav__item--primary .bottom-nav__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-top: -18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand, #0f766e) 0%, #0b5f58 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(15, 118, 110, 0.28);
+    font-size: 18px;
+  }
+
+  .bottom-nav__item--primary .bottom-nav__label {
+    margin-top: -2px;
+  }
+
+  /* Add padding to body so content doesn't hide behind bottom nav */
+  body.has-bottom-nav .app {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+}

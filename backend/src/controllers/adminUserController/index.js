@@ -1,4 +1,4 @@
-const bcrypt = require('bcryptjs');
+﻿const bcrypt = require('bcryptjs');
 const adminUserModel = require('../../models/adminUserModel');
 const userModel = require('../../models/userModel');
 
@@ -16,7 +16,7 @@ const parseActiveValue = (value) => {
 exports.getAllAdmins = (req, res) => {
   adminUserModel.getAllAdmins((err, admins) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Loi server', error: err });
+      return res.status(500).json({ success: false, message: 'Lỗi server', error: err });
     }
 
     return res.status(200).json({ success: true, data: admins });
@@ -48,23 +48,28 @@ exports.createAdmin = (req, res) => {
   if (activeValue === null) {
     return res.status(400).json({
       success: false,
-      message: 'is_active khong hop le'
+      message: 'is_active không hợp lệ'
     });
   }
 
-  userModel.getUserByEmail(normalizedEmail, (err, existingUser) => {
+  userModel.getUserByEmail(normalizedEmail, async (err, existingUser) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Loi server', error: err });
+      return res.status(500).json({ success: false, message: 'Lỗi server', error: err });
     }
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Email da ton tai'
+        message: 'Email đã tồn tại'
       });
     }
 
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    let hashedPassword = '';
+    try {
+      hashedPassword = await bcrypt.hash(password, 10);
+    } catch (hashErr) {
+      return res.status(500).json({ success: false, message: 'Lỗi server', error: hashErr });
+    }
 
     return adminUserModel.createAdmin(
       {
@@ -76,12 +81,12 @@ exports.createAdmin = (req, res) => {
       },
       (createErr, result) => {
         if (createErr) {
-          return res.status(500).json({ success: false, message: 'Loi server', error: createErr });
+          return res.status(500).json({ success: false, message: 'Lỗi server', error: createErr });
         }
 
         return res.status(201).json({
           success: true,
-          message: 'Tao tai khoan admin thanh cong',
+          message: 'Tạo tài khoản admin thành công',
           adminId: result.insertId
         });
       }
@@ -108,17 +113,17 @@ exports.updateAdmin = (req, res) => {
 
   adminUserModel.getAdminById(id, (err, admin) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Loi server', error: err });
+      return res.status(500).json({ success: false, message: 'Lỗi server', error: err });
     }
 
     if (!admin) {
       return res.status(404).json({
         success: false,
-        message: 'Tai khoan admin khong ton tai'
+        message: 'Tài khoản admin không tồn tại'
       });
     }
 
-    const finalizeUpdate = () => {
+    const finalizeUpdate = async () => {
       const payload = {};
 
       if (typeof name !== 'undefined') payload.name = name.trim();
@@ -140,7 +145,11 @@ exports.updateAdmin = (req, res) => {
           });
         }
 
-        payload.password = bcrypt.hashSync(password, 10);
+        try {
+          payload.password = await bcrypt.hash(password, 10);
+        } catch (hashErr) {
+          return res.status(500).json({ success: false, message: 'Lỗi server', error: hashErr });
+        }
       }
 
       if (typeof is_active !== 'undefined') {
@@ -148,7 +157,7 @@ exports.updateAdmin = (req, res) => {
         if (activeValue === null) {
           return res.status(400).json({
             success: false,
-            message: 'is_active khong hop le'
+            message: 'is_active không hợp lệ'
           });
         }
 
@@ -164,15 +173,15 @@ exports.updateAdmin = (req, res) => {
 
       return adminUserModel.updateAdmin(id, payload, (updateErr) => {
         if (updateErr) {
-          return res.status(500).json({ success: false, message: 'Loi server', error: updateErr });
+          return res.status(500).json({ success: false, message: 'Lỗi server', error: updateErr });
         }
 
         return res.status(200).json({
           success: true,
           message:
             typeof password !== 'undefined'
-              ? 'Cap nhat admin va mat khau thanh cong'
-              : 'Cap nhat admin thanh cong'
+              ? 'Cập nhật admin va mat khau thành công'
+              : 'Cập nhật admin thành công'
         });
       });
     };
@@ -180,13 +189,13 @@ exports.updateAdmin = (req, res) => {
     if (typeof email !== 'undefined' && email.trim().toLowerCase() !== admin.email) {
       return userModel.getUserByEmail(email.trim().toLowerCase(), (emailErr, existingUser) => {
         if (emailErr) {
-          return res.status(500).json({ success: false, message: 'Loi server', error: emailErr });
+          return res.status(500).json({ success: false, message: 'Lỗi server', error: emailErr });
         }
 
         if (existingUser && Number(existingUser.id) !== Number(id)) {
           return res.status(400).json({
             success: false,
-            message: 'Email da ton tai'
+            message: 'Email đã tồn tại'
           });
         }
 

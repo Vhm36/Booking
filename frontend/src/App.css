@@ -251,3 +251,112 @@ button {
     padding: 11px 12px;
   }
 }
+
+/* ============================================ */
+/* Export Excel Button                          */
+/* ============================================ */
+
+.btn-export-excel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: 1.5px solid #0f766e;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.btn-export-excel:hover {
+  background: linear-gradient(135deg, #0f766e 0%, #0b5f58 100%);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.25);
+}
+
+.btn-export-excel:active {
+  transform: translateY(0);
+}
+
+.analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+/* ============================================ */
+/* PWA & Mobile-first Enhancements              */
+/* ============================================ */
+
+/* Touch targets minimum 44px for mobile accessibility */
+@media (max-width: 768px) {
+  button,
+  a[role="button"],
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-success {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 18px;
+    font-size: 15px;
+  }
+
+  /* Safe area for bottom nav */
+  body.has-bottom-nav .app {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.has-bottom-nav .main-content {
+    padding-bottom: 8px;
+  }
+
+  /* Hide footer on mobile when bottom nav is active */
+  body.has-bottom-nav footer {
+    display: none;
+  }
+
+  /* Larger form controls on mobile */
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    min-height: 44px;
+    font-size: 16px;
+    padding: 12px 14px;
+  }
+
+  /* Prevent zoom on iOS when focusing inputs */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* PWA standalone mode adjustments */
+@media (display-mode: standalone) {
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: contain;
+  }
+
+  body .app {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+

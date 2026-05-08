@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "start:dev": "nodemon src/server.js",
+    "start:dev": "nodemon --watch src --ext js,json --ignore uploads --ignore node_modules src/server.js",
     "test:smtp": "node tools/test-smtp.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -23,9 +23,12 @@
     "express-validator": "^7.3.1",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
     "mysql": "^2.18.1",
     "mysql2": "^3.20.0",
-    "nodemailer": "^8.0.5"
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.5",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

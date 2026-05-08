@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import staffService from '../../../services/staffService';
+import * as XLSX from 'xlsx';
 import './ManageStaff.css';
 
 const WEEKDAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
@@ -63,6 +64,11 @@ function ManageStaff() {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [tableSearch, setTableSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  
+  const fileInputRef = useRef(null);
+  const [importing, setImporting] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -122,19 +128,27 @@ function ManageStaff() {
   };
 
   const filteredStaffList = useMemo(() => {
+    let list = staffList;
+
+    if (activeTab === 'cashier') {
+      list = list.filter(staff => staff.role_name?.toLowerCase().includes('thu ngân'));
+    } else if (activeTab === 'service') {
+      list = list.filter(staff => !staff.role_name?.toLowerCase().includes('thu ngân') && !staff.role_name?.toLowerCase().includes('admin'));
+    }
+
     const normalizedKeyword = normalizeSearchText(tableSearch);
 
     if (!normalizedKeyword) {
-      return staffList;
+      return list;
     }
 
-    return staffList.filter((staff) => {
+    return list.filter((staff) => {
       const searchBlob = normalizeSearchText(
         `${staff.id} ${staff.name || ''} ${staff.email || ''} ${staff.phone || ''} ${staff.role_name || ''}`
       );
       return searchBlob.includes(normalizedKeyword);
     });
-  }, [staffList, tableSearch]);
+  }, [staffList, tableSearch, activeTab]);
 
   const updateEditField = (field, value) => {
     setEditFeedback(emptyFeedback);
@@ -171,6 +185,68 @@ function ManageStaff() {
     } catch (err) {
       alert(err.response?.data?.message || 'Tạo nhân viên thất bại.');
     }
+  };
+
+  const handleImportExcel = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const row of jsonData) {
+          try {
+            let roleId = staffRoles[0]?.id;
+            const rNameRaw = row['Vai trò'] || row.role_name || row['Role'] || '';
+            if (rNameRaw) {
+              const rName = rNameRaw.toString().toLowerCase();
+              const matchedRole = staffRoles.find(r => r.role_name.toLowerCase().includes(rName) || rName.includes(r.role_name.toLowerCase()));
+              if (matchedRole) roleId = matchedRole.id;
+            }
+
+            const name = (row['Họ tên'] || row.name || row['Name'] || '').trim();
+            const email = (row['Email'] || row.email || '').trim();
+            const phone = String(row['Số điện thoại'] || row.phone || row['SĐT'] || '').trim();
+            const password = String(row['Mật khẩu'] || row.password || '123456');
+
+            if (name && email) {
+              await staffService.createStaff(
+                name,
+                email,
+                password,
+                phone,
+                Number(roleId),
+                true
+              );
+              successCount++;
+            } else {
+              failCount++;
+            }
+          } catch (err) {
+            failCount++;
+          }
+        }
+        alert(`Nhập thành công: ${successCount} nhân viên.\nThất bại/Bỏ qua: ${failCount} dòng.`);
+        fetchStaff();
+      } catch (error) {
+        console.error(error);
+        alert('Lỗi đọc file Excel. Vui lòng kiểm tra định dạng file.');
+      } finally {
+        setImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const startEdit = (staff) => {
@@ -357,6 +433,21 @@ function ManageStaff() {
 
         <div className="staff-toolbar">
           <div className="staff-toolbar-actions">
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              onChange={handleImportExcel}
+            />
+            <button
+              className="btn-secondary staff-toolbar-button"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+            >
+              {importing ? 'Đang nhập...' : '📥 Nhập từ Excel'}
+            </button>
             <button
               className="btn-secondary staff-toolbar-button"
               type="button"
@@ -475,7 +566,29 @@ function ManageStaff() {
         <div className="staff-table-header">
           <div>
             <p className="staff-table-kicker">Danh sách nhân sự</p>
-            <h2>Nhân viên đang quản lý</h2>
+            <div className="staff-table-header-title-row">
+              <h2>Nhân viên đang quản lý</h2>
+              <div className="staff-tabs">
+                <button 
+                  className={`staff-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('all')}
+                >
+                  Tất cả
+                </button>
+                <button 
+                  className={`staff-tab-btn ${activeTab === 'service' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('service')}
+                >
+                  NV Dịch vụ
+                </button>
+                <button 
+                  className={`staff-tab-btn ${activeTab === 'cashier' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('cashier')}
+                >
+                  Thu ngân
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -487,7 +600,6 @@ function ManageStaff() {
                 <th>Họ tên</th>
                 <th>Email</th>
                 <th>Điện thoại</th>
-                <th>Mật khẩu</th>
                 <th>Số lịch</th>
                 <th>Doanh thu tháng</th>
                 <th>Hoa hồng 10%</th>
@@ -499,7 +611,7 @@ function ManageStaff() {
             <tbody>
               {filteredStaffList.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="empty-cell">
+                  <td colSpan="10" className="empty-cell">
                     Không tìm thấy nhân viên phù hợp.
                   </td>
                 </tr>
@@ -511,9 +623,6 @@ function ManageStaff() {
                   <td>{staff.name}</td>
                   <td>{staff.email}</td>
                   <td>{staff.phone || '-'}</td>
-                  <td>
-                    <span className="password-placeholder">Không hiển thị</span>
-                  </td>
                   <td>{staff.total_appointments || 0}</td>
                   <td>{formatVnd(staff.monthly_revenue || 0)}</td>
                   <td>{formatVnd(staff.monthly_commission || 0)}</td>
@@ -647,7 +756,7 @@ function ManageStaff() {
               </div>
 
               {editFeedback.text && (
-                <div className={`staff-edit-feedback ${editFeedback.type}`}>{editFeedback.text}</div>
+               <div className={`staff-edit-feedback ${editFeedback.type}`}>{editFeedback.text}</div>
               )}
 
               <div className="staff-edit-actions">

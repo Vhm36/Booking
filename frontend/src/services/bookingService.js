@@ -1,7 +1,7 @@
 import api from './api';
 
 const bookingService = {
-  createBooking: (selectedServiceIds, staff_id, appointment_date, appointment_time, notes) => {
+  createBooking: (selectedServiceIds, staff_id, appointment_date, appointment_time, notes, voucher_code = '') => {
     const normalizedServiceIds = Array.isArray(selectedServiceIds)
       ? selectedServiceIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
       : [];
@@ -12,11 +12,18 @@ const bookingService = {
       staff_id: staff_id || undefined,
       appointment_date,
       appointment_time,
-      notes
+      notes,
+      voucher_code: voucher_code || undefined
     });
   },
 
   getMyBookings: () => api.get('/bookings/my-bookings'),
+
+  getCancellationScore: (appointment_date, appointment_time) =>
+    api.post('/bookings/cancellation-score', {
+      appointment_date,
+      appointment_time
+    }),
 
   getAllBookings: () => api.get('/bookings'),
 

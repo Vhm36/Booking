@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import serviceService from '../../../services/serviceService';
 import { resolveServiceImageUrl } from '../../../utils/serviceImage';
 import './ManageServices.css';
@@ -6,7 +6,7 @@ import './ManageServices.css';
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?auto=format&fit=crop&w=500&q=80';
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/jfif'];
 
 const EMPTY_FORM = {
   name: '',
@@ -40,6 +40,18 @@ function ManageServices() {
   const [imageInputKey, setImageInputKey] = useState(Date.now());
   const [categoryFormData, setCategoryFormData] = useState({ category_name: '' });
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [successMessage, setSuccessMessage] = useState('');
+  const successTimerRef = useRef(null);
+
+  const showSuccess = useCallback((msg) => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    setSuccessMessage(msg);
+    successTimerRef.current = setTimeout(() => setSuccessMessage(''), 2000);
+  }, []);
+
+  useEffect(() => () => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+  }, []);
 
   useEffect(() => {
     fetchServices();
@@ -149,8 +161,10 @@ function ManageServices() {
     try {
       if (editingServiceId) {
         await serviceService.updateService(editingServiceId, payload);
+        showSuccess('Cập nhật dịch vụ thành công!');
       } else {
         await serviceService.createService(payload);
+        showSuccess('Tạo dịch vụ thành công!');
       }
 
       resetForm();
@@ -194,6 +208,7 @@ function ManageServices() {
         resetForm();
       }
       setActionError('');
+      showSuccess('Xóa dịch vụ thành công!');
     } catch (err) {
       setActionError(err.response?.data?.message || 'Xóa dịch vụ thất bại.');
     } finally {
@@ -226,6 +241,7 @@ function ManageServices() {
       await serviceService.createCategory({ category_name: categoryFormData.category_name.trim() });
       resetCategoryForm();
       setActionError('');
+      showSuccess('Tạo danh mục thành công!');
       // Refresh services to update dropdown
       fetchServices();
     } catch (err) {
@@ -244,6 +260,14 @@ function ManageServices() {
 
   return (
     <div className="manage-services">
+      {successMessage && (
+        <div className="success-toast-overlay">
+          <div className="success-toast">
+            <span className="success-toast-icon">✓</span>
+            <span className="success-toast-text">{successMessage}</span>
+          </div>
+        </div>
+      )}
       <section className="services-hero">
         <div className="services-hero-copy">
           <p className="services-hero-kicker">Admin</p>
@@ -373,7 +397,7 @@ function ManageServices() {
                 <input
                   key={imageInputKey}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  accept="image/png,image/jpeg,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif,.jfif"
                   onChange={handleImageChange}
                 />
                 <small className="field-hint">Chọn file từ máy tính, tối đa 5MB.</small>

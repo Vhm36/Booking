@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import chatService from '../../services/chatService';
 import authService from '../../services/authService';
 import './ChatBot.css';
@@ -47,6 +47,17 @@ const suggestionLabelFallbacks = {
   'cham soc da cap am': 'Chăm sóc da cấp ẩm'
 };
 
+const TOOL_LABELS = {
+  check_availability: { icon: '📅', label: 'Đang kiểm tra lịch trống...' },
+  get_service_details: { icon: '✨', label: 'Đang tìm thông tin dịch vụ...' },
+  create_booking: { icon: '📝', label: 'Đang tạo lịch hẹn...' },
+  get_my_appointments: { icon: '📋', label: 'Đang tải lịch hẹn...' },
+  cancel_booking: { icon: '❌', label: 'Đang xử lý yêu cầu hủy...' },
+  get_promotions: { icon: '🎁', label: 'Đang tìm khuyến mãi...' },
+  get_staff_info: { icon: '👩‍💼', label: 'Đang tìm thông tin nhân viên...' },
+  get_business_hours: { icon: '🕒', label: 'Đang tải giờ làm việc...' }
+};
+
 const normalizeSuggestionKey = (value = '') =>
   String(value)
     .replace(/\u0110/g, 'D')
@@ -78,6 +89,210 @@ const sanitizeSuggestionTitle = (suggestion) => {
   return rawTitle;
 };
 
+// =============================================================================
+// Lightweight Markdown Renderer (no external dependencies)
+// =============================================================================
+
+const renderMarkdown = (text) => {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Check for table start
+    if (line.includes('|') && i + 1 < lines.length && lines[i + 1]?.match(/^\s*\|[\s-:|]+\|/)) {
+      const tableLines = [line];
+      let j = i + 1;
+      while (j < lines.length && lines[j].includes('|')) {
+        tableLines.push(lines[j]);
+        j++;
+      }
+
+      if (tableLines.length >= 3) {
+        const headerCells = tableLines[0].split('|').map(c => c.trim()).filter(Boolean);
+        const bodyRows = tableLines.slice(2).map(row =>
+          row.split('|').map(c => c.trim()).filter(Boolean)
+        );
+
+        elements.push(
+          <div className="chatbot-md-table-wrap" key={`tbl-${i}`}>
+            <table className="chatbot-md-table">
+              <thead>
+                <tr>
+                  {headerCells.map((cell, ci) => (
+                    <th key={ci}>{renderInline(cell)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((row, ri) => (
+                  <tr key={ri}>
+                    {row.map((cell, ci) => (
+                      <td key={ci}>{renderInline(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        i = j;
+        continue;
+      }
+    }
+
+    // Unordered list
+    if (line.match(/^\s*[-*]\s+/)) {
+      const listItems = [];
+      let j = i;
+      while (j < lines.length && lines[j].match(/^\s*[-*]\s+/)) {
+        listItems.push(lines[j].replace(/^\s*[-*]\s+/, ''));
+        j++;
+      }
+      elements.push(
+        <ul className="chatbot-md-list" key={`ul-${i}`}>
+          {listItems.map((item, li) => (
+            <li key={li}>{renderInline(item)}</li>
+          ))}
+        </ul>
+      );
+      i = j;
+      continue;
+    }
+
+    // Empty line
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+
+    // Normal paragraph
+    elements.push(
+      <p className="chatbot-md-p" key={`p-${i}`}>
+        {renderInline(line)}
+      </p>
+    );
+    i++;
+  }
+
+  return elements;
+};
+
+const renderInline = (text) => {
+  if (!text) return null;
+
+  // Process inline markdown: **bold**, *italic*, `code`, emoji
+  const parts = [];
+  let remaining = text;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    // Bold: **text**
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    if (boldMatch && boldMatch.index !== undefined) {
+      if (boldMatch.index > 0) {
+        parts.push(<span key={key++}>{remaining.slice(0, boldMatch.index)}</span>);
+      }
+      parts.push(<strong key={key++}>{boldMatch[1]}</strong>);
+      remaining = remaining.slice(boldMatch.index + boldMatch[0].length);
+      continue;
+    }
+
+    // Inline code: `text`
+    const codeMatch = remaining.match(/`(.+?)`/);
+    if (codeMatch && codeMatch.index !== undefined) {
+      if (codeMatch.index > 0) {
+        parts.push(<span key={key++}>{remaining.slice(0, codeMatch.index)}</span>);
+      }
+      parts.push(<code className="chatbot-md-code" key={key++}>{codeMatch[1]}</code>);
+      remaining = remaining.slice(codeMatch.index + codeMatch[0].length);
+      continue;
+    }
+
+    // No more markdown — emit rest
+    parts.push(<span key={key++}>{remaining}</span>);
+    break;
+  }
+
+  return parts;
+};
+
+// =============================================================================
+// Tool Execution Indicator
+// =============================================================================
+
+const ToolIndicator = ({ toolName }) => {
+  const info = TOOL_LABELS[toolName] || { icon: '🔧', label: 'Đang xử lý...' };
+  return (
+    <div className="chatbot-tool-indicator">
+      <span className="chatbot-tool-icon">{info.icon}</span>
+      <span className="chatbot-tool-label">{info.label}</span>
+      <span className="chatbot-tool-dots">
+        <span></span><span></span><span></span>
+      </span>
+    </div>
+  );
+};
+
+// =============================================================================
+// Quick Action Buttons (after bot response)
+// =============================================================================
+
+const QuickActions = ({ toolsUsed, onAction }) => {
+  const actions = useMemo(() => {
+    if (!toolsUsed || toolsUsed.length === 0) return [];
+
+    const result = [];
+    for (const tool of toolsUsed) {
+      if (tool.name === 'get_service_details' && tool.success) {
+        result.push({ label: '📅 Đặt lịch ngay', message: 'Mình muốn đặt lịch' });
+        result.push({ label: '💰 Xem khuyến mãi', message: 'Có khuyến mãi gì không?' });
+      }
+      if (tool.name === 'check_availability' && tool.success) {
+        result.push({ label: '📝 Đặt lịch ngay', message: 'Mình muốn đặt lịch' });
+      }
+      if (tool.name === 'get_my_appointments' && tool.success) {
+        result.push({ label: '❌ Hủy lịch', message: 'Mình muốn hủy lịch' });
+      }
+      if (tool.name === 'create_booking' && tool.success) {
+        result.push({ label: '📋 Xem lịch hẹn', message: 'Xem lịch hẹn của mình' });
+      }
+    }
+
+    // Deduplicate
+    const seen = new Set();
+    return result.filter(a => {
+      if (seen.has(a.label)) return false;
+      seen.add(a.label);
+      return true;
+    }).slice(0, 3);
+  }, [toolsUsed]);
+
+  if (actions.length === 0) return null;
+
+  return (
+    <div className="chatbot-quick-actions">
+      {actions.map((action, idx) => (
+        <button
+          key={idx}
+          className="chatbot-quick-action-btn"
+          onClick={() => onAction(action.message)}
+        >
+          {action.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// =============================================================================
+// Main ChatBot Component
+// =============================================================================
+
 function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
   const [conversationId, setConversationId] = useState(null);
@@ -88,6 +303,7 @@ function ChatBot() {
   const [suggestions, setSuggestions] = useState([]);
   const [faqResults, setFaqResults] = useState([]);
   const [unreadCount] = useState(0);
+  const [activeToolName, setActiveToolName] = useState(null);
   const messagesEndRef = useRef(null);
   const isAuthenticated = authService.getToken();
 
@@ -113,7 +329,7 @@ function ChatBot() {
             id: 0,
             sender_type: 'bot',
             message_text:
-              'Xin chào! Mình là trợ lý ảo của salon. Mình có thể giúp bạn về dịch vụ, giá, lịch hẹn hoặc khuyến mãi.',
+              'Xin chào! 👋 Mình là trợ lý AI của **BeautyBook Salon**.\n\nMình có thể giúp bạn:\n- ✨ Tìm dịch vụ & xem giá\n- 📅 Kiểm tra lịch trống & đặt lịch\n- 📋 Xem/hủy lịch hẹn\n- 🎁 Xem khuyến mãi\n- 🕒 Giờ làm việc\n\nBạn cần hỗ trợ gì?',
             created_at: new Date().toISOString()
           }
         ]);
@@ -139,7 +355,7 @@ function ChatBot() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, activeToolName]);
 
   const sendChatMessage = async (rawMessage) => {
     const userMessage = String(rawMessage || '').trim();
@@ -150,6 +366,7 @@ function ChatBot() {
 
     setInputValue('');
     setLoading(true);
+    setActiveToolName(null);
 
     setMessages((prev) => [
       ...prev,
@@ -163,18 +380,24 @@ function ChatBot() {
 
     try {
       const response = await chatService.chatWithBot(conversationId, userMessage);
+      const botResponse = response.data.botResponse;
+
+      setActiveToolName(null);
 
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           sender_type: 'bot',
-          message_text: response.data.botResponse.text,
+          message_text: botResponse.text,
+          bookingData: botResponse.bookingData || null,
+          toolsUsed: botResponse.toolsUsed || [],
+          source: botResponse.source || 'rule',
           created_at: new Date().toISOString()
         }
       ]);
 
-      if (response.data.botResponse.escalated) {
+      if (botResponse.escalated) {
         setMessages((prev) => [
           ...prev,
           {
@@ -188,6 +411,7 @@ function ChatBot() {
       }
     } catch (err) {
       console.error('[SEND_MESSAGE_ERROR]', err);
+      setActiveToolName(null);
       setMessages((prev) => [
         ...prev,
         {
@@ -224,7 +448,7 @@ function ChatBot() {
           {
             id: Date.now(),
             sender_type: 'bot',
-            message_text: `Dưới đây là các câu hỏi thường gặp về "${suggestion.title}":`,
+            message_text: `Dưới đây là các câu hỏi thường gặp về "**${suggestion.title}**":`,
             created_at: new Date().toISOString()
           }
         ]);
@@ -256,9 +480,56 @@ function ChatBot() {
     setFaqResults([]);
   };
 
+  const handleQuickAction = (message) => {
+    sendChatMessage(message);
+  };
+
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatCurrency = (value) =>
+    Number(value || 0).toLocaleString('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0
+    });
+
+  const renderBookingCard = (bookingData) => {
+    if (!bookingData) {
+      return null;
+    }
+
+    return (
+      <div className="chatbot-booking-card">
+        <div className="chatbot-booking-card-head">
+          <strong>Booking #{bookingData.appointment_id}</strong>
+          <span>{bookingData.deposit_required ? 'Cần cọc' : 'Chờ xác nhận'}</span>
+        </div>
+        <dl>
+          <div>
+            <dt>Dịch vụ</dt>
+            <dd>{bookingData.service}</dd>
+          </div>
+          <div>
+            <dt>Thời gian</dt>
+            <dd>{bookingData.date} {bookingData.time}</dd>
+          </div>
+          <div>
+            <dt>Nhân viên</dt>
+            <dd>{bookingData.staff || 'Tự động'}</dd>
+          </div>
+          <div>
+            <dt>Tạm tính</dt>
+            <dd>{formatCurrency(bookingData.price)}</dd>
+          </div>
+        </dl>
+        {bookingData.deposit_required && (
+          <p>AI yêu cầu cọc {formatCurrency(bookingData.deposit_amount)} để giữ chỗ.</p>
+        )}
+      </div>
+    );
   };
 
   const renderSuggestionIcon = (iconKey) => {
@@ -272,6 +543,18 @@ function ChatBot() {
         {icon}
       </span>
     );
+  };
+
+  const renderSourceBadge = (source) => {
+    if (!source || source === 'rule' || source === 'fallback') return null;
+    const badges = {
+      'ai-agent': { label: 'AI Agent', cls: 'agent' },
+      'ai': { label: 'AI', cls: 'ai' },
+      'faq': { label: 'FAQ', cls: 'faq' }
+    };
+    const badge = badges[source];
+    if (!badge) return null;
+    return <span className={`chatbot-source-badge chatbot-source-${badge.cls}`}>{badge.label}</span>;
   };
 
   if (!isAuthenticated) {
@@ -302,8 +585,8 @@ function ChatBot() {
                 <ChatbotRobotIcon className="chatbot-header-icon" />
               </span>
               <div>
-                <h3>Hỗ trợ khách hàng</h3>
-                <small>Trực tuyến</small>
+                <h3>AI Trợ lý BeautyBook</h3>
+                <small>🟢 Trực tuyến — MCP AI Agent</small>
               </div>
             </div>
             <button
@@ -320,8 +603,20 @@ function ChatBot() {
             {messages.map((message) => (
               <div key={message.id} className={`chatbot-message ${message.sender_type}`}>
                 <div>
-                  <div className="chatbot-message-bubble">{message.message_text}</div>
-                  <div className="chatbot-message-time">{formatTime(message.created_at)}</div>
+                  <div className="chatbot-message-bubble">
+                    {message.sender_type === 'bot'
+                      ? renderMarkdown(message.message_text)
+                      : message.message_text
+                    }
+                  </div>
+                  {renderBookingCard(message.bookingData)}
+                  {message.sender_type === 'bot' && message.toolsUsed && message.toolsUsed.length > 0 && (
+                    <QuickActions toolsUsed={message.toolsUsed} onAction={handleQuickAction} />
+                  )}
+                  <div className="chatbot-message-meta">
+                    <span className="chatbot-message-time">{formatTime(message.created_at)}</span>
+                    {message.sender_type === 'bot' && renderSourceBadge(message.source)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -329,11 +624,15 @@ function ChatBot() {
             {loading && (
               <div className="chatbot-message bot">
                 <div className="chatbot-message-bubble">
-                  <div className="chatbot-loading">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
+                  {activeToolName ? (
+                    <ToolIndicator toolName={activeToolName} />
+                  ) : (
+                    <div className="chatbot-loading">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -381,7 +680,7 @@ function ChatBot() {
             <input
               type="text"
               className="chatbot-input"
-              placeholder="Nhập tin nhắn..."
+              placeholder="Nhập tin nhắn... (VD: giá cắt tóc, đặt lịch)"
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value)}
               disabled={loading || isInitializing || !conversationId}

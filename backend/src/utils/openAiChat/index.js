@@ -1,5 +1,7 @@
-const OPENAI_API_URL = 'https://api.openai.com/v1/responses';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+const { getToolsForOpenAI, executeTool } = require('../toolRegistry');
 
 const isOpenAIEnabled = () => Boolean(process.env.OPENAI_API_KEY);
 
@@ -44,7 +46,7 @@ const buildKnowledgeSummary = ({ services = [], faqs = [], suggestions = [] }) =
 
 const buildRecentMessageSummary = (recentMessages = []) =>
   recentMessages
-    .slice(-6)
+    .slice(-8)
     .map((message) => {
       const speaker =
         message.sender_type === 'customer'
@@ -57,46 +59,87 @@ const buildRecentMessageSummary = (recentMessages = []) =>
     })
     .join('\n');
 
-const extractResponseText = (payload) => {
-  if (typeof payload?.output_text === 'string' && payload.output_text.trim()) {
-    return payload.output_text.trim();
-  }
+// =============================================================================
+// Enhanced System Prompt — MCP Pattern
+// =============================================================================
 
-  const outputItems = Array.isArray(payload?.output) ? payload.output : [];
-  const textParts = [];
+const SYSTEM_PROMPT = `Bạn là trợ lý chat AI thông minh của salon làm đẹp BeautyBook — được tích hợp với hệ thống đặt lịch qua Function Calling.
 
-  outputItems.forEach((item) => {
-    if (item?.type !== 'message' || !Array.isArray(item.content)) {
-      return;
-    }
+NGUYÊN TẮC HOẠT ĐỘNG (MCP Pattern):
+1. Phân tích câu hỏi của khách hàng
+2. Chọn tool phù hợp trong danh sách có sẵn
+3. Gọi tool với tham số chính xác
+4. Phân tích kết quả trả về và trả lời bằng tiếng Việt có dấu
 
-    item.content.forEach((contentItem) => {
-      if (contentItem?.type === 'output_text' && typeof contentItem.text === 'string') {
-        textParts.push(contentItem.text.trim());
-      }
-    });
-  });
+CÁC TOOL CÓ SẴN:
+- check_availability: Kiểm tra lịch trống vào ngày/giờ cụ thể
+- get_service_details: Tìm thông tin dịch vụ (giá, thời gian, mô tả)
+- create_booking: Tạo lịch hẹn mới (CHỈ khi khách đã xác nhận đủ thông tin)
+- get_my_appointments: Xem lịch hẹn sắp tới của khách
+- cancel_booking: Gửi yêu cầu hủy lịch hẹn
+- get_promotions: Xem voucher/khuyến mãi đang có
+- get_staff_info: Thông tin nhân viên dịch vụ
+- get_business_hours: Giờ làm việc của salon
 
-  return textParts.join('\n').trim();
-};
+QUY TẮC BẢO MẬT:
+- LUÔN sử dụng tools được cung cấp, KHÔNG tự tạo dữ liệu
+- KHÔNG bịa giá, dịch vụ, khuyến mãi không có trong dữ liệu
+- Với create_booking: BẮT BUỘC hỏi xác nhận trước khi gọi
+- Với cancel_booking: Hỏi rõ mã lịch hẹn và xác nhận
 
-const generateSalonAIReply = async ({ messageText, recentMessages = [], services = [], faqs = [], suggestions = [] }) => {
+QUY TẮC TRẢ LỜI:
+- Trả lời bằng tiếng Việt có dấu, ngắn gọn, thân thiện
+- Nếu khách nhắn không dấu, vẫn trả lời có dấu
+- Ưu tiên dữ liệu từ salon, không bịa chính sách
+
+QUY TẮC ĐỊNH DẠNG (CỰC KỲ QUAN TRỌNG):
+⚠️ BẮT BUỘC: Sử dụng Markdown để format. Mỗi dòng bảng phải xuống hàng riêng!
+
+✅ Khi hiển thị danh sách dịch vụ, dùng bảng:
+| Dịch vụ | Giá | Thời gian |
+|---------|-----|-----------|
+| Cắt tóc | 100.000 VNĐ | 30 phút |
+
+✅ Khi hiển thị lịch hẹn, dùng bảng:
+| Mã | Dịch vụ | Ngày | Giờ | Trạng thái |
+|----|---------|------|-----|------------|
+| #1 | Cắt tóc | 2025-01-01 | 10:00 | Chờ xác nhận |
+
+✅ Khi tạo booking thành công:
+📅 **Đặt lịch thành công!**
+- **Mã lịch hẹn:** #ID
+- **Dịch vụ:** Tên
+- **Thời gian:** Ngày + Giờ
+- **Nhân viên:** Tên
+- **Tạm tính:** Giá
+
+✅ Format chung:
+- Dùng **bold** cho thông tin quan trọng
+- Dùng emoji phù hợp: 📅 lịch hẹn, 💰 giá, ⏱ thời gian, ✨ dịch vụ, 🎁 khuyến mãi
+- Kết thúc bằng gợi ý hành động tiếp theo khi phù hợp
+
+QUAN TRỌNG: Trong mỗi phản hồi, bạn PHẢI thêm một dòng cuối cùng với format:
+[SENTIMENT: positive|neutral|negative|complaint]
+Dựa trên cảm xúc/thái độ của khách hàng trong tin nhắn.`;
+
+// =============================================================================
+// Main AI Reply — MCP Pattern with Function Calling + Sentiment
+// =============================================================================
+
+const generateSalonAIReply = async ({
+  messageText,
+  recentMessages = [],
+  services = [],
+  faqs = [],
+  suggestions = [],
+  userId = null,
+  toolExecutor = null
+}) => {
   if (!isOpenAIEnabled()) {
     return null;
   }
 
-  const instructions = [
-    'Bạn là trợ lý chat của salon làm đẹp BeautyBook.',
-    'Luôn trả lời bằng tiếng Việt có dấu, ngắn gọn, thân thiện và thực dụng.',
-    'Nếu khách nhắn không dấu, bạn vẫn phải trả lời lại bằng tiếng Việt có dấu tự nhiên.',
-    'Ưu tiên tuyệt đối thông tin trong dữ liệu salon được cung cấp.',
-    'Nếu câu hỏi liên quan đến giá, thời gian, dịch vụ, lịch hẹn thì phải bám sát dữ liệu.',
-    'Ưu tiên tự giải thích và hỏi làm rõ khi cần, không chuyển nhân viên quá sớm.',
-    'Chỉ đề nghị gặp nhân viên khi khách yêu cầu rõ ràng, hoặc khi câu hỏi vượt quá dữ liệu hiện có và cần hỗ trợ chuyên sâu.',
-    'Không được tự ý tạo ra chính sách, giá, khuyến mãi, thông tin liên hệ không có trong dữ liệu.'
-  ].join(' ');
-
-  const input = [
+  const contextMessage = [
     'Ngữ cảnh salon:',
     buildKnowledgeSummary({ services, faqs, suggestions }),
     '',
@@ -108,29 +151,122 @@ const generateSalonAIReply = async ({ messageText, recentMessages = [], services
     .filter(Boolean)
     .join('\n');
 
-  const response = await fetch(OPENAI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      instructions,
-      input
-    })
-  });
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: contextMessage }
+  ];
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+  // Get tools from registry
+  const tools = getToolsForOpenAI();
+  const useTools = toolExecutor && tools.length > 0;
+
+  try {
+    let response = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages,
+        tools: useTools ? tools : undefined,
+        tool_choice: useTools ? 'auto' : undefined,
+        temperature: 0.7,
+        max_tokens: 800
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+    }
+
+    let data = await response.json();
+    let choice = data.choices?.[0];
+    let toolsUsed = [];
+
+    // Handle tool calls (Function Calling — MCP Pattern)
+    if (choice?.finish_reason === 'tool_calls' && choice.message?.tool_calls && toolExecutor) {
+      const toolCalls = choice.message.tool_calls;
+      const toolMessages = [choice.message]; // assistant message with tool_calls
+
+      for (const toolCall of toolCalls) {
+        const fnName = toolCall.function.name;
+        let fnArgs = {};
+        try {
+          fnArgs = JSON.parse(toolCall.function.arguments);
+        } catch (e) {
+          fnArgs = {};
+        }
+
+        console.log(`[AI Agent] 🔧 Calling function: ${fnName}`, fnArgs);
+
+        let fnResult;
+        try {
+          fnResult = await toolExecutor(fnName, fnArgs, userId);
+        } catch (fnErr) {
+          fnResult = { error: fnErr.message };
+        }
+
+        toolsUsed.push({
+          name: fnName,
+          args: fnArgs,
+          success: !fnResult?.error
+        });
+
+        toolMessages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(fnResult)
+        });
+      }
+
+      // Second call with tool results
+      const secondResponse = await fetch(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          messages: [...messages, ...toolMessages],
+          temperature: 0.7,
+          max_tokens: 800
+        })
+      });
+
+      if (secondResponse.ok) {
+        data = await secondResponse.json();
+        choice = data.choices?.[0];
+      }
+    }
+
+    const rawText = choice?.message?.content || '';
+
+    // Extract sentiment from response
+    const sentimentMatch = rawText.match(/\[SENTIMENT:\s*(positive|neutral|negative|complaint)\]/i);
+    const sentiment = sentimentMatch ? sentimentMatch[1].toLowerCase() : 'neutral';
+
+    // Clean text (remove sentiment tag)
+    const cleanText = rawText.replace(/\[SENTIMENT:\s*(positive|neutral|negative|complaint)\]/gi, '').trim();
+
+    return {
+      text: cleanText || null,
+      sentiment,
+      escalated: sentiment === 'complaint',
+      functionCalled: toolsUsed.length > 0,
+      toolsUsed
+    };
+  } catch (err) {
+    console.error('[OpenAI Error]', err.message);
+    throw err;
   }
-
-  const payload = await response.json();
-  return extractResponseText(payload) || null;
 };
 
 module.exports = {
   isOpenAIEnabled,
-  generateSalonAIReply
+  generateSalonAIReply,
+  TOOLS: getToolsForOpenAI()
 };

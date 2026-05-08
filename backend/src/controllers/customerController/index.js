@@ -57,7 +57,7 @@ exports.createCustomer = (req, res) => {
     return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' });
   }
 
-  userModel.getUserByEmail(email, (err, existingUser) => {
+  userModel.getUserByEmail(email, async (err, existingUser) => {
     if (err) {
       return res.status(500).json({ message: 'Lỗi server', error: err });
     }
@@ -73,7 +73,12 @@ exports.createCustomer = (req, res) => {
       return res.status(400).json({ message: 'is_active không hợp lệ' });
     }
 
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    let hashedPassword = '';
+    try {
+      hashedPassword = await bcrypt.hash(password, 10);
+    } catch (hashErr) {
+      return res.status(500).json({ message: 'Lá»—i server', error: hashErr });
+    }
 
     return customerModel.createCustomer(
       {
@@ -121,7 +126,7 @@ exports.updateCustomer = (req, res) => {
       return res.status(404).json({ message: 'Khách hàng không tồn tại' });
     }
 
-    const finalizeUpdate = () => {
+    const finalizeUpdate = async () => {
       const payload = {};
 
       if (typeof name !== 'undefined') payload.name = name.trim();
@@ -137,7 +142,11 @@ exports.updateCustomer = (req, res) => {
           return res.status(400).json({ message: 'Mật khẩu mới phải ít nhất 6 ký tự' });
         }
 
-        payload.password = bcrypt.hashSync(password, 10);
+        try {
+          payload.password = await bcrypt.hash(password, 10);
+        } catch (hashErr) {
+          return res.status(500).json({ message: 'Lá»—i server', error: hashErr });
+        }
       }
 
       if (typeof is_active !== 'undefined') {

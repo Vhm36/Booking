@@ -14,6 +14,15 @@ const staffRoutes = require('./routes/staffRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const voucherRoutes = require('./routes/voucherRoutes');
+
+// Cron Jobs
+const { startReminderJob } = require('./jobs/appointmentReminderJob');
+const { startRFMJob } = require('./jobs/rfmClassificationJob');
+
+// Smart Services
+const cancellationScoreService = require('./services/cancellationScoreService');
+const rfmService = require('./services/rfmService');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -87,12 +96,62 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/vouchers', voucherRoutes);
 app.use('/api/admin-users', adminUserRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API đang hoạt động', status: 'ok' });
 });
+
+// Smart Booking APIs
+const { verifyToken, verifyAdmin } = require('./middleware/authMiddleware');
+
+// Cancellation Score — Check before booking
+app.post('/api/cancellation-score', verifyToken, async (req, res) => {
+  try {
+    const { appointmentDate, appointmentTime } = req.body;
+    const result = await cancellationScoreService.calculateScore(
+      req.user.id,
+      appointmentDate,
+      appointmentTime
+    );
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('[CANCELLATION_SCORE_ERROR]', err);
+    return res.status(500).json({ success: false, message: 'Không thể tính điểm rủi ro' });
+  }
+});
+
+// RFM — Manual trigger (admin)
+app.post('/api/admin/rfm/run', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const result = await rfmService.runFullAnalysis();
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('[RFM_RUN_ERROR]', err);
+    return res.status(500).json({ success: false, message: 'Không thể chạy phân tích RFM' });
+  }
+});
+
+// RFM — Get segment stats (admin)
+app.get('/api/admin/rfm/stats', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const stats = await rfmService.getSegmentStats();
+    return res.json({ success: true, data: stats });
+  } catch (err) {
+    console.error('[RFM_STATS_ERROR]', err);
+    return res.status(500).json({ success: false, message: 'Không thể lấy thống kê RFM' });
+  }
+});
+
+// Start Cron Jobs
+try {
+  startReminderJob();
+  startRFMJob();
+} catch (cronErr) {
+  console.error('[CRON_INIT_ERROR]', cronErr.message);
+}
 
 app.use((req, res) => {
   res.status(404).json({

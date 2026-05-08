@@ -162,6 +162,12 @@ const getAllCustomers = (callback) => {
       u.email,
       u.phone,
       u.is_active,
+      u.customer_segment,
+      u.rfm_score,
+      u.rfm_recency_score,
+      u.rfm_frequency_score,
+      u.rfm_monetary_score,
+      u.rfm_updated_at,
       u.created_at,
       COUNT(a.id) AS total_appointments,
       SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed_appointments,
@@ -171,7 +177,19 @@ const getAllCustomers = (callback) => {
     LEFT JOIN appointments a
       ON a.user_id = u.id
     WHERE u.role = 'customer'
-    GROUP BY u.id, u.name, u.email, u.phone, u.is_active, u.created_at
+    GROUP BY
+      u.id,
+      u.name,
+      u.email,
+      u.phone,
+      u.is_active,
+      u.customer_segment,
+      u.rfm_score,
+      u.rfm_recency_score,
+      u.rfm_frequency_score,
+      u.rfm_monetary_score,
+      u.rfm_updated_at,
+      u.created_at
     ORDER BY u.created_at DESC
   `;
 

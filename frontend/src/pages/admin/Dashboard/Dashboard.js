@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import dashboardService from '../../../services/dashboardService';
+import connectDashboardRealtime from '../../../services/dashboardRealtimeService';
 import './Dashboard.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
@@ -23,14 +24,64 @@ function Dashboard() {
   const [revenueByMonth, setRevenueByMonth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [realtimeStatus, setRealtimeStatus] = useState('connecting');
+  const [lastRealtimeEvent, setLastRealtimeEvent] = useState(null);
+  const realtimeStatusRef = useRef('connecting');
+  const refreshTimerRef = useRef(null);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
+  useEffect(() => {
+    let socket = null;
+    let cancelled = false;
+
+    connectDashboardRealtime({
+      onStatus: (status) => {
+        realtimeStatusRef.current = status;
+        setRealtimeStatus(status);
+      },
+      onUpdate: (payload) => {
+        setLastRealtimeEvent(payload);
+        window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = window.setTimeout(() => {
+          fetchDashboardData({ silent: true });
+        }, 250);
+      }
+    })
+      .then((connectedSocket) => {
+        if (cancelled) {
+          connectedSocket.disconnect();
+          return;
+        }
+        socket = connectedSocket;
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRealtimeStatus('fallback');
+        }
+      });
+
+    const fallbackInterval = window.setInterval(() => {
+      if (realtimeStatusRef.current !== 'connected') {
+        fetchDashboardData({ silent: true });
+      }
+    }, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimerRef.current);
+      window.clearInterval(fallbackInterval);
+      socket?.disconnect();
+    };
+  }, []);
+
+  const fetchDashboardData = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const [summaryRes, bookingsRes, servicesRes, revenueRes] = await Promise.all([
         dashboardService.getSummary(),
         dashboardService.getBookingsByMonth(),
@@ -47,7 +98,9 @@ function Dashboard() {
       setError('Không thể tải dữ liệu dashboard.');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -153,6 +206,11 @@ function Dashboard() {
         <div>
           <p className="dashboard-kicker">Admin Center</p>
           <h1>Dashboard điều hành</h1>
+          <div className={`dashboard-realtime-status status-${realtimeStatus}`}>
+            <span aria-hidden="true" />
+            {realtimeStatus === 'connected' ? 'Realtime dang bat' : 'Dang dung fallback polling'}
+            {lastRealtimeEvent?.type ? <small>{lastRealtimeEvent.type}</small> : null}
+          </div>
           <p className="dashboard-subtitle">
             Theo dõi nhanh vận hành salon theo thời gian thực, tập trung vào booking, doanh thu và
             hiệu suất dịch vụ.

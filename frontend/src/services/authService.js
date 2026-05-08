@@ -25,6 +25,13 @@ const authService = {
     });
   },
 
+  zaloLogin: (code, codeVerifier) => {
+    return api.post('/auth/zalo-login', {
+      code,
+      codeVerifier
+    });
+  },
+
   forgotPassword: (email) => {
     return api.post('/auth/forgot-password', {
       email
@@ -49,6 +56,15 @@ const authService = {
       name,
       email,
       phone
+    });
+  },
+
+  // Upload avatar
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return api.post('/auth/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
 

@@ -46,6 +46,16 @@
   line-height: 1.7;
 }
 
+.staff-leave-rule {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .staff-leave-head-actions {
   display: flex;
   align-items: flex-start;
@@ -319,4 +329,77 @@
   .staff-leave-stat-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* TABS CSS */
+.staff-leave-tabs {
+  display: flex;
+  gap: 12px;
+  border-bottom: 2px solid #edf2f7;
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.btn-tab {
+  background: transparent;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  color: #64748b;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-tab:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.btn-tab.active {
+  background: #0f766e;
+  color: white;
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.2);
+}
+
+.staff-leave-requests-section {
+  display: grid;
+  gap: 16px;
+}
+
+.staff-leave-requests-section h2 {
+  font-size: 18px;
+  color: #10233d;
+  margin: 0;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.status-badge.approved {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-badge.rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
 }

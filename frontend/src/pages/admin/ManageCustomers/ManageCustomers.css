@@ -12,13 +12,13 @@
 
 .customers-hero {
   display: grid;
-  gap: 14px;
-  margin-bottom: 18px;
-  padding: 20px;
-  border-radius: 28px;
-  border: 1px solid #f2d7e7;
-  background: radial-gradient(circle at top left, #fffaff 0%, #fff5fb 44%, #fdf2f8 100%);
-  box-shadow: 0 16px 34px rgba(190, 24, 93, 0.08);
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .customers-hero-copy {
@@ -28,8 +28,8 @@
 
 .customers-hero-kicker {
   margin: 0;
-  color: #be185d;
-  font-size: 12px;
+  color: #0f766e;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -38,8 +38,8 @@
 .customers-page-note {
   margin: 0;
   max-width: 760px;
-  color: #6b4b64;
-  font-size: 14px;
+  color: #64748b;
+  font-size: 13px;
   line-height: 1.7;
 }
 
@@ -68,45 +68,45 @@
 
 .customer-insight-card {
   display: grid;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 10px 22px rgba(190, 24, 93, 0.06);
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
 }
 
 .customer-insight-card.tone-total {
-  background: linear-gradient(180deg, #ffffff 0%, #fdf2f8 100%);
-  border-color: #f5d0e6;
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 
 .customer-insight-card.tone-booker {
-  background: linear-gradient(180deg, #fff7fb 0%, #ffe4f2 100%);
-  border-color: #fbcfe8;
+  background: #f0fdfa;
+  border-color: #ccfbf1;
 }
 
 .customer-insight-card.tone-canceller {
-  background: linear-gradient(180deg, #fff7fd 0%, #fce7f3 100%);
-  border-color: #f9c3df;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 .customer-insight-card.tone-vip {
-  background: linear-gradient(180deg, #fff8ef 0%, #ffeac9 100%);
-  border-color: #f5d39b;
+  background: #fffbeb;
+  border-color: #fde68a;
 }
 
 .customer-insight-card.tone-black {
-  background: linear-gradient(180deg, #1f2430 0%, #0f172a 100%);
-  border-color: #3b4458;
+  background: #1e293b;
+  border-color: #334155;
 }
 
 .customer-insight-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #8b5b7d;
+  color: #64748b;
 }
 
 .customer-insight-card.tone-black .customer-insight-label,
@@ -126,9 +126,9 @@
 
 .customer-insight-note {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.5;
-  color: #8f6b84;
+  color: #94a3b8;
 }
 
 .customer-bot-panel {
@@ -291,10 +291,10 @@
 
 .customer-table-shell {
   padding: 14px;
-  border-radius: 22px;
-  border: 1px solid #f3d8e8;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 247, 252, 0.98) 100%);
-  box-shadow: 0 14px 28px rgba(190, 24, 93, 0.07);
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .customer-table-header {
@@ -337,28 +337,27 @@
 }
 
 .customer-table thead {
-  background: linear-gradient(180deg, #fff7fc 0%, #fdeef7 100%);
+  background: #f8fafc;
 }
 
 .customer-table th {
-  padding: 12px 12px;
+  padding: 10px 12px;
   text-align: left;
   font-weight: 700;
-  color: #6e3f60;
-  border-bottom: 1px solid #f3d8e8;
+  color: #334155;
+  border-bottom: 1px solid #e2e8f0;
   font-size: 12px;
-  letter-spacing: 0.01em;
 }
 
 .customer-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid #f8eaf2;
+  border-bottom: 1px solid #f1f5f9;
   vertical-align: top;
   overflow-wrap: anywhere;
 }
 
 .customer-table tbody tr:hover {
-  background-color: #fff8fc;
+  background-color: #f8fafc;
 }
 
 .customer-table tbody tr:last-child td {
@@ -377,7 +376,7 @@
 }
 
 .customer-name-cell small {
-  color: #8c6f82;
+  color: #94a3b8;
   font-size: 11px;
   line-height: 1.5;
 }
@@ -437,12 +436,45 @@
   border-color: #dbe5f0;
 }
 
+.customer-rfm-stack {
+  display: grid;
+  gap: 5px;
+  min-width: 120px;
+}
+
+.customer-rfm-badge {
+  width: fit-content;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #075985;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 9px;
+}
+
+.customer-rfm-badge.segment-at-risk,
+.customer-rfm-badge.segment-lost-customers {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.customer-rfm-badge.segment-champions,
+.customer-rfm-badge.segment-loyal-customers {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.customer-rfm-stack small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .customer-vip-badge {
   min-width: 0;
   width: auto;
   max-width: 100%;
-  display: inline-grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  display: inline-flex;
   gap: 8px;
   align-items: center;
   padding: 7px 10px;
@@ -460,7 +492,10 @@
 }
 
 .customer-vip-badge--table {
+  min-width: 90px;
   max-width: 144px;
+  justify-content: center;
+  text-align: center;
 }
 
 .customer-vip-badge--modal {
@@ -488,7 +523,12 @@
   background: linear-gradient(180deg, #fff8dc 0%, #fde68a 100%);
 }
 
-.customer-vip-badge.vip-black {
+.customer-vip-badge.vip-vvip {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #fef3c7 0%, #fcd34d 100%);
+}
+
+.customer-vip-badge.vip-vvvip {
   border-color: #434c5f;
   background: linear-gradient(180deg, #202534 0%, #0f172a 100%);
 }
@@ -497,6 +537,8 @@
   display: grid;
   gap: 2px;
   min-width: 0;
+  text-align: center;
+  width: 100%;
 }
 
 .customer-vip-copy strong {
@@ -541,11 +583,11 @@
   padding: 1px 6px;
 }
 
-.customer-vip-badge.vip-black .customer-vip-copy strong {
+.customer-vip-badge.vip-vvvip .customer-vip-copy strong {
   color: #ffffff;
 }
 
-.customer-vip-badge.vip-black .customer-vip-copy small {
+.customer-vip-badge.vip-vvvip .customer-vip-copy small {
   color: #ffe8f3;
   border-color: rgba(255, 232, 243, 0.5);
   background: rgba(255, 232, 243, 0.12);
@@ -570,7 +612,7 @@
   transform: scale(0.92);
 }
 
-.customer-vip-badge.vip-black .customer-vip-icon {
+.customer-vip-badge.vip-vvvip .customer-vip-icon {
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -682,7 +724,7 @@
 }
 
 .customer-metrics span {
-  color: #8c6f82;
+  color: #94a3b8;
   font-size: 11px;
   line-height: 1.35;
 }

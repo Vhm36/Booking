@@ -7,50 +7,17 @@ function PasswordToggleIcon({ visible }) {
   if (visible) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M3 3l18 18"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-        <path
-          d="M10.6 10.7a2 2 0 0 0 2.7 2.7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-        <path
-          d="M9.9 5.1A10.9 10.9 0 0 1 12 4.9c5.2 0 9 3.6 10 7.1a11.8 11.8 0 0 1-3.5 4.8"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M6.7 6.8A12 12 0 0 0 2 12c1 3.4 4.8 7 10 7a10.7 10.7 0 0 0 4-.8"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <path d="M3 3l18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M9.9 5.1A10.9 10.9 0 0 1 12 4.9c5.2 0 9 3.6 10 7.1a11.8 11.8 0 0 1-3.5 4.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6.7 6.8A12 12 0 0 0 2 12c1 3.4 4.8 7 10 7a10.7 10.7 0 0 0 4-.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
 
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   );
@@ -66,16 +33,30 @@ function getLoginErrorMessage(error) {
   if (status === 429) {
     return 'Bạn đã đăng nhập sai quá nhiều lần. Hãy thử lại sau 15 phút hoặc khởi động lại backend để xóa chặn tạm thời.';
   }
-
   if (status === 401) {
     return 'Email hoặc mật khẩu không đúng.';
   }
-
   if (status === 400) {
     return data?.message || 'Vui lòng nhập đầy đủ email và mật khẩu.';
   }
-
   return data?.message || 'Đăng nhập thất bại.';
+}
+
+// ─── PKCE helpers cho Zalo OAuth ─────────────────────────────
+function generateCodeVerifier() {
+  const array = new Uint8Array(32);
+  window.crypto.getRandomValues(array);
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function generateCodeChallenge(codeVerifier) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 function Login({ onLogin }) {
@@ -88,6 +69,8 @@ function Login({ onLogin }) {
   const googleButtonRef = useRef(null);
   const navigate = useNavigate();
   const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+  const zaloAppId = process.env.REACT_APP_ZALO_APP_ID || '';
+  const zaloCallbackUrl = process.env.REACT_APP_ZALO_CALLBACK_URL || '';
 
   useEffect(() => {
     if (!googleClientId) {
@@ -192,6 +175,25 @@ function Login({ onLogin }) {
     }
   };
 
+  const handleZaloLogin = async () => {
+    if (!zaloAppId || !zaloCallbackUrl) return;
+
+    try {
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+      // Lưu code_verifier vào sessionStorage để dùng khi callback
+      sessionStorage.setItem('zalo_code_verifier', codeVerifier);
+
+      const zaloAuthUrl = `https://oauth.zaloapp.com/v4/permission?app_id=${zaloAppId}&redirect_uri=${encodeURIComponent(zaloCallbackUrl)}&code_challenge=${codeChallenge}&state=zalo_login`;
+
+      window.location.href = zaloAuthUrl;
+    } catch (err) {
+      console.error('[ZALO_PKCE_ERROR]', err);
+      setError('Không thể khởi tạo đăng nhập Zalo.');
+    }
+  };
+
   return (
     <div className="auth-container">
       <div className="auth-card">
@@ -240,14 +242,32 @@ function Login({ onLogin }) {
           <Link to="/forgot-password">Quên mật khẩu?</Link>
         </p>
 
-        {googleClientId ? (
-          <div className="google-login-block">
-            <div className="google-login-divider">hoặc</div>
-            <div ref={googleButtonRef} className="google-login-button" />
-            {!googleReady && <p className="auth-link">Đang tải đăng nhập Google...</p>}
+        {(googleClientId || zaloAppId) && (
+          <div className="social-login-block">
+            <div className="social-login-divider">hoặc</div>
+
+            {googleClientId && (
+              <div className="google-login-block">
+                <div ref={googleButtonRef} className="google-login-button" />
+                {!googleReady && <p className="auth-link">Đang tải đăng nhập Google...</p>}
+              </div>
+            )}
+
+            {zaloAppId && zaloCallbackUrl && (
+              <button
+                type="button"
+                className="zalo-login-button"
+                onClick={handleZaloLogin}
+                disabled={loading}
+              >
+                <svg className="zalo-icon" viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+                  <circle cx="24" cy="24" r="24" fill="#0068FF"/>
+                  <path d="M12.5 17.8h8.8v1.5H14.7l6.5 9.2v1.7h-8.7v-1.5h6.4l-6.4-9.2v-1.7zm10.3 5.1c0-3.5 2.1-5.4 4.7-5.4 2.6 0 4.7 1.9 4.7 5.4 0 3.5-2.1 5.5-4.7 5.5-2.6 0-4.7-2-4.7-5.5zm1.7 0c0 2.5 1.2 4 3 4s3-1.5 3-4c0-2.4-1.2-3.9-3-3.9s-3 1.5-3 3.9z" fill="#fff"/>
+                </svg>
+                Đăng nhập bằng Zalo
+              </button>
+            )}
           </div>
-        ) : (
-          <p className="auth-link">Thiếu cấu hình `REACT_APP_GOOGLE_CLIENT_ID` để bật đăng nhập Google.</p>
         )}
 
         <p className="auth-link">

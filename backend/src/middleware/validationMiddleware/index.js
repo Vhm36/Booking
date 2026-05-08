@@ -71,6 +71,16 @@ const validateGoogleLogin = [
   handleValidationErrors
 ];
 
+const validateZaloLogin = [
+  body('code')
+    .trim()
+    .notEmpty().withMessage('Thiếu mã xác thực Zalo'),
+  body('codeVerifier')
+    .trim()
+    .notEmpty().withMessage('Thiếu code verifier'),
+  handleValidationErrors
+];
+
 const validateUpdateProfile = [
   body('name')
     .optional()
@@ -140,6 +150,7 @@ const validateCreateAppointment = [
   body('service_id')
     .isInt({ min: 1 }).withMessage('ID dịch vụ không hợp lệ'),
   body('staff_id')
+    .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('ID nhân viên không hợp lệ'),
   body('appointment_date')
     .isISO8601().withMessage('Ngày hẹn phải định dạng YYYY-MM-DD')
@@ -297,6 +308,7 @@ module.exports = {
   validateForgotPassword,
   validateResetPassword,
   validateGoogleLogin,
+  validateZaloLogin,
   validateUpdateProfile,
   validateCreateService,
   validateUpdateService,

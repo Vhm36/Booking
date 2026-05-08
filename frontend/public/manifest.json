@@ -1,0 +1,27 @@
+{
+  "short_name": "BeautyBook",
+  "name": "BeautyBook - Đặt Lịch Làm Đẹp",
+  "description": "Hệ thống đặt lịch dịch vụ làm đẹp thông minh, tích hợp AI",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f766e",
+  "background_color": "#f8fafc",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["beauty", "lifestyle", "health"],
+  "lang": "vi",
+  "dir": "ltr"
+}

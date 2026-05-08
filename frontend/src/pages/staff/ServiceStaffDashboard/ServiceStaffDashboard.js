@@ -104,10 +104,21 @@ function ServiceStaffDashboard() {
     end_date: '',
     reason: ''
   });
+  const [myLeaveRequests, setMyLeaveRequests] = useState([]);
 
   useEffect(() => {
     fetchMyAppointments();
+    fetchMyLeaveRequests();
   }, []);
+
+  const fetchMyLeaveRequests = async () => {
+    try {
+      const response = await staffService.getMyLeaveRequests();
+      setMyLeaveRequests(response.data?.data || []);
+    } catch (err) {
+      console.error('Lỗi khi tải lịch sử nghỉ phép:', err);
+    }
+  };
 
   const fetchMyAppointments = async () => {
     try {
@@ -298,8 +309,10 @@ function ServiceStaffDashboard() {
       window.alert('Gửi yêu cầu nghỉ phép thành công! Chờ admin xác nhận.');
       setShowLeaveRequestModal(false);
       setLeaveRequest({ start_date: '', end_date: '', reason: '' });
+      fetchMyLeaveRequests();
     } catch (err) {
-      window.alert(err.response?.data?.message || 'Gửi yêu cầu nghỉ phép thất bại.');
+      const msg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu.';
+      window.alert(msg);
     }
   };
 
@@ -503,6 +516,44 @@ function ServiceStaffDashboard() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="dashboard-section staff-leave-history">
+        <h2 className="section-title">Lịch sử xin nghỉ phép</h2>
+        {myLeaveRequests.length === 0 ? (
+          <div className="empty-state">
+            <p>Bạn chưa gửi yêu cầu nghỉ phép nào.</p>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Từ ngày</th>
+                  <th>Đến ngày</th>
+                  <th>Lý do</th>
+                  <th>Ngày gửi</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myLeaveRequests.map(req => (
+                  <tr key={req.id}>
+                    <td>{new Date(req.start_date).toLocaleDateString('vi-VN')}</td>
+                    <td>{new Date(req.end_date).toLocaleDateString('vi-VN')}</td>
+                    <td>{req.reason}</td>
+                    <td>{new Date(req.created_at).toLocaleDateString('vi-VN')}</td>
+                    <td>
+                      <span className={`status-badge ${req.status}`}>
+                        {req.status === 'pending' ? 'Chờ duyệt' : req.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {cancelDialogConfig && (
