@@ -193,7 +193,7 @@ VALUES
 -- Insert default chat suggestions
 INSERT IGNORE INTO chat_suggestions (category, title, description, icon, action_type, action_data, priority)
 VALUES
-  ('service', 'C?t t?c nam', 'D?ch v? c?t t?c chuy?n nghi?p cho nam gi?i', 'scissors', 'service', JSON_OBJECT('service_id', 1), 10),
+  ('service', 'Cắt tóc nam', 'Dịch vụ cắt tóc chuyên nghiệp cho nam giới', 'scissors', 'service', JSON_OBJECT('service_id', 1), 10),
   ('service', 'Nhuộm tóc', 'Nhuộm tóc với các màu sắc hiện đại', 'palette', 'service', JSON_OBJECT('service_id', 2), 9),
   ('booking', 'Đặt lịch nhanh', 'Đặt lịch hẹn với nhân viên yêu thích', 'calendar', 'booking', JSON_OBJECT('action', 'quick_booking'), 8),
   ('faq', 'Giờ làm việc', 'Xem giờ làm việc của salon', 'clock', 'faq', JSON_OBJECT('faq_id', 1), 7),
@@ -203,7 +203,7 @@ VALUES
 INSERT IGNORE INTO chat_faq (question, answer, category, keywords)
 VALUES
   ('Salon mở cửa lúc mấy giờ?', 'Thứ 2 đến Thứ 6: 08:00-21:30. Thứ 7 và Chủ nhật: 07:00-23:00. Ca làm được chia sáng/tối theo lịch nhân viên.', 'Giờ làm việc', 'giờ mở cửa, thời gian, lịch'),
-  ('L?m sao ?? ??t l?ch h?n?', 'B?n c? th? ??t l?ch h?n tr?c ti?p tr?n ?ng d?ng ho?c g?i ?i?n tho?i cho salon.', '??t l?ch', '??t l?ch, h?n, booking'),
+  ('Làm sao để đặt lịch hẹn?', 'Bạn có thể đặt lịch hẹn trực tiếp trên ứng dụng hoặc gọi điện thoại cho salon.', 'Đặt lịch', 'đặt lịch, hẹn, booking'),
   ('Có chính sách hoàn tiền không?', 'Chúng tôi có chính sách hoàn tiền 100% nếu bạn không hài lòng với dịch vụ.', 'Thanh toán', 'hoàn tiền, refund, tiền'),
   ('Nhân viên có kinh nghiệm không?', 'Tất cả nhân viên của chúng tôi đều có chứng chỉ và kinh nghiệm từ 3 năm trở lên.', 'Nhân viên', 'kinh nghiệm, nhân viên, chuyên môn'),
   ('Có dịch vụ gì mới?', 'Chúng tôi vừa thêm dịch vụ chăm sóc da mặt cao cấp và massage đầu thư giãn.', 'Dịch vụ', 'dịch vụ mới, mới, cập nhật');
@@ -220,58 +220,58 @@ VALUES
 -- Additional FAQ and bot training data for better default coverage
 INSERT INTO chat_faq (question, answer, category, keywords)
 SELECT
-  'Salon co nhan khach vang lai khong?',
-  'Salon van nhan khach vang lai neu con cho trong, nhung dat lich truoc se de chon nhan vien va khung gio dep hon.',
-  'Dat lich',
-  'vang lai, khong hen truoc, walk in, dat lich'
+  'Salon có nhận khách vãng lai không?',
+  'Salon vẫn nhận khách vãng lai nếu còn chỗ trống, nhưng đặt lịch trước sẽ dễ chọn nhân viên và khung giờ đẹp hơn.',
+  'Đặt lịch',
+  'vãng lai, không hẹn trước, walk in, đặt lịch'
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_faq WHERE question = 'Salon co nhan khach vang lai khong?'
+  SELECT 1 FROM chat_faq WHERE question IN ('Salon co nhan khach vang lai khong?', 'Salon có nhận khách vãng lai không?')
 );
 
 INSERT INTO chat_faq (question, answer, category, keywords)
 SELECT
-  'Toi co the doi lich hoac huy lich khong?',
-  'Ban co the vao muc lich hen de doi gio hoac huy lich. Neu lich sap den gio, ban nen thao tac som de salon sap xep nhan vien tot hon.',
-  'Dat lich',
-  'doi lich, huy lich, doi gio, reschedule, cancel'
+  'Tôi có thể đổi lịch hoặc hủy lịch không?',
+  'Bạn có thể vào mục lịch hẹn để đổi giờ hoặc hủy lịch. Nếu lịch đã gần đến giờ, bạn nên thao tác sớm để salon sắp xếp nhân viên tốt hơn.',
+  'Đặt lịch',
+  'đổi lịch, hủy lịch, đổi giờ, reschedule, cancel'
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_faq WHERE question = 'Toi co the doi lich hoac huy lich khong?'
+  SELECT 1 FROM chat_faq WHERE question IN ('Toi co the doi lich hoac huy lich khong?', 'Tôi có thể đổi lịch hoặc hủy lịch không?')
 );
 
 INSERT INTO chat_faq (question, answer, category, keywords)
 SELECT
-  'Salon co nhan thanh toan online khong?',
-  'Salon ho tro thanh toan online qua cong thanh toan tren he thong, dong thoi ban van co the chon thanh toan tai salon neu muon.',
-  'Thanh toan',
-  'thanh toan online, chuyen khoan, momo, vnpay, tien mat'
+  'Salon có nhận thanh toán online không?',
+  'Salon hỗ trợ thanh toán online qua cổng thanh toán trên hệ thống, đồng thời bạn vẫn có thể chọn thanh toán tại salon nếu muốn.',
+  'Thanh toán',
+  'thanh toán online, chuyển khoản, momo, vnpay, tiền mặt'
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_faq WHERE question = 'Salon co nhan thanh toan online khong?'
+  SELECT 1 FROM chat_faq WHERE question IN ('Salon co nhan thanh toan online khong?', 'Salon có nhận thanh toán online không?')
 );
 
 INSERT INTO chat_faq (question, answer, category, keywords)
 SELECT
-  'Toi nen den som truoc gio hen bao lau?',
-  'Ban nen den som khoang 5 den 10 phut de check-in, xac nhan dich vu va duoc tu van nhanh neu can.',
-  'Dat lich',
-  'den som, check in, truoc gio hen, bao lau'
+  'Tôi nên đến sớm trước giờ hẹn bao lâu?',
+  'Bạn nên đến sớm khoảng 5 đến 10 phút để check-in, xác nhận dịch vụ và được tư vấn nhanh nếu cần.',
+  'Đặt lịch',
+  'đến sớm, check in, trước giờ hẹn, bao lâu'
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_faq WHERE question = 'Toi nen den som truoc gio hen bao lau?'
+  SELECT 1 FROM chat_faq WHERE question IN ('Toi nen den som truoc gio hen bao lau?', 'Tôi nên đến sớm trước giờ hẹn bao lâu?')
 );
 
 INSERT INTO chat_faq (question, answer, category, keywords)
 SELECT
-  'Salon co uu dai cho khach hang than thiet khong?',
-  'Salon co cac uu dai theo chuong trinh va hang muc khach hang. Ban co the xem thong bao khuyen mai hoac hoi bot de duoc goi y nhanh.',
-  'Khuyen mai',
-  'vip, khach hang than thiet, uu dai, khuyen mai, giam gia'
+  'Salon có ưu đãi cho khách hàng thân thiết không?',
+  'Salon có các ưu đãi theo chương trình và hạng mức khách hàng. Bạn có thể xem thông báo khuyến mãi hoặc hỏi bot để được gợi ý nhanh.',
+  'Khuyến mãi',
+  'vip, khách hàng thân thiết, ưu đãi, khuyến mãi, giảm giá'
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_faq WHERE question = 'Salon co uu dai cho khach hang than thiet khong?'
+  SELECT 1 FROM chat_faq WHERE question IN ('Salon co uu dai cho khach hang than thiet khong?', 'Salon có ưu đãi cho khách hàng thân thiết không?')
 );
 
 INSERT INTO chat_bot_responses (trigger_keyword, response_text, response_type, confidence_score)
 SELECT
   'huy lich|doi lich|reschedule|cancel',
-  'Ban co the vao phan lich hen de doi gio hoac huy lich. Neu can, toi cung co the chuyen yeu cau sang nhan vien ho tro.',
+  'Bạn có thể vào phần lịch hẹn để đổi giờ hoặc hủy lịch. Nếu cần, mình cũng có thể chuyển yêu cầu sang nhân viên hỗ trợ.',
   'text',
   0.93
 WHERE NOT EXISTS (
@@ -281,7 +281,7 @@ WHERE NOT EXISTS (
 INSERT INTO chat_bot_responses (trigger_keyword, response_text, response_type, confidence_score)
 SELECT
   'khuyen mai|uu dai|giam gia|combo',
-  'Toi co the goi y cac uu dai dang hien co, hoac neu ban noi ro dich vu quan tam toi se uu tien goi y phu hop hon.',
+  'Mình có thể gợi ý các ưu đãi đang hiện có, hoặc nếu bạn nói rõ dịch vụ quan tâm thì mình sẽ ưu tiên gợi ý phù hợp hơn.',
   'suggestion',
   0.91
 WHERE NOT EXISTS (
@@ -291,7 +291,7 @@ WHERE NOT EXISTS (
 INSERT INTO chat_bot_responses (trigger_keyword, response_text, response_type, confidence_score)
 SELECT
   'thanh toan|momo|vnpay|chuyen khoan|tien mat',
-  'Salon ho tro thanh toan online va thanh toan tai salon. Neu ban muon, toi co the huong dan cach dat lich va thanh toan nhanh.',
+  'Salon hỗ trợ thanh toán online và thanh toán tại salon. Nếu bạn muốn, mình có thể hướng dẫn cách đặt lịch và thanh toán nhanh.',
   'text',
   0.92
 WHERE NOT EXISTS (
@@ -301,7 +301,7 @@ WHERE NOT EXISTS (
 INSERT INTO chat_bot_responses (trigger_keyword, response_text, response_type, confidence_score)
 SELECT
   'tu van|goi y|chon dich vu',
-  'Ban chi can noi nhu cau nhu cat toc, nhuom, cham soc da hay massage, toi se goi y dich vu phu hop va muc gia tham khao.',
+  'Bạn chỉ cần nói nhu cầu như cắt tóc, nhuộm, chăm sóc da hay massage, mình sẽ gợi ý dịch vụ phù hợp và mức giá tham khảo.',
   'suggestion',
   0.89
 WHERE NOT EXISTS (
@@ -311,7 +311,7 @@ WHERE NOT EXISTS (
 INSERT INTO chat_bot_responses (trigger_keyword, response_text, response_type, confidence_score)
 SELECT
   'nguoi that|nhan vien that|ho tro truc tiep',
-  'Toi se chuyen cuoc tro chuyen sang nhan vien ho tro de ban duoc tu van chi tiet hon.',
+  'Mình sẽ chuyển cuộc trò chuyện sang nhân viên hỗ trợ để bạn được tư vấn chi tiết hơn.',
   'escalate',
   0.98
 WHERE NOT EXISTS (
@@ -321,50 +321,65 @@ WHERE NOT EXISTS (
 INSERT INTO chat_suggestions (category, title, description, icon, action_type, action_data, priority)
 SELECT
   'service',
-  'Cham soc da cap am',
-  'Goi y cho khach muon lam dep nhe nhang va thu gian',
+  'Chăm sóc da cấp ẩm',
+  'Gợi ý cho khách muốn làm đẹp nhẹ nhàng và thư giãn',
   'sparkles',
   'service',
   JSON_OBJECT('service_id', 8),
   8
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_suggestions WHERE category = 'service' AND title = 'Cham soc da cap am'
+  SELECT 1 FROM chat_suggestions WHERE category = 'service' AND title IN ('Cham soc da cap am', 'Chăm sóc da cấp ẩm')
 );
 
 INSERT INTO chat_suggestions (category, title, description, icon, action_type, action_data, priority)
 SELECT
   'service',
-  'Massage thu gian',
-  'Dich vu phu hop khi ban muon giam met moi sau ngay dai',
+  'Massage thư giãn',
+  'Dịch vụ phù hợp khi bạn muốn giảm mệt mỏi sau ngày dài',
   'hand',
   'service',
   JSON_OBJECT('service_id', 9),
   8
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_suggestions WHERE category = 'service' AND title = 'Massage thu gian'
+  SELECT 1 FROM chat_suggestions WHERE category = 'service' AND title IN ('Massage thu gian', 'Massage thư giãn')
 );
 
 INSERT INTO chat_suggestions (category, title, description, icon, action_type, action_data, priority)
 SELECT
   'contact',
-  'Gap nhan vien tu van',
-  'Chuyen cuoc tro chuyen cho nhan vien khi ban can tu van sau hon',
+  'Gặp nhân viên tư vấn',
+  'Chuyển cuộc trò chuyện cho nhân viên khi bạn cần tư vấn sâu hơn',
   'headset',
   'contact',
   JSON_OBJECT('action', 'handoff'),
   9
 WHERE NOT EXISTS (
-  SELECT 1 FROM chat_suggestions WHERE category = 'contact' AND title = 'Gap nhan vien tu van'
+  SELECT 1 FROM chat_suggestions WHERE category = 'contact' AND title IN ('Gap nhan vien tu van', 'Gặp nhân viên tư vấn')
 );
 
 -- Normalize seeded chatbot content to Vietnamese with accents
+UPDATE chat_suggestions
+SET
+  title = 'Cắt tóc nam',
+  description = 'Dịch vụ cắt tóc chuyên nghiệp cho nam giới'
+WHERE title IN ('C?t t?c nam', 'Cắt tóc nam')
+   OR description = 'D?ch v? c?t t?c chuy?n nghi?p cho nam gi?i';
+
+UPDATE chat_faq
+SET
+  question = 'Làm sao để đặt lịch hẹn?',
+  answer = 'Bạn có thể đặt lịch hẹn trực tiếp trên ứng dụng hoặc gọi điện thoại cho salon.',
+  category = 'Đặt lịch',
+  keywords = 'đặt lịch, hẹn, booking'
+WHERE question IN ('L?m sao ?? ??t l?ch h?n?', 'Làm sao để đặt lịch hẹn?');
+
 UPDATE chat_faq
 SET
   question = 'Salon có nhận khách vãng lai không?',
   answer = 'Salon vẫn nhận khách vãng lai nếu còn chỗ trống, nhưng đặt lịch trước sẽ dễ chọn nhân viên và khung giờ đẹp hơn.',
   category = 'Đặt lịch',
   keywords = 'vãng lai, không hẹn trước, walk in, đặt lịch'
-WHERE question = 'Salon co nhan khach vang lai khong?';
+WHERE question IN ('Salon co nhan khach vang lai khong?', 'Salon có nhận khách vãng lai không?');
 
 UPDATE chat_faq
 SET
@@ -372,7 +387,7 @@ SET
   answer = 'Bạn có thể vào mục lịch hẹn để đổi giờ hoặc hủy lịch. Nếu lịch đã gần đến giờ, bạn nên thao tác sớm để salon sắp xếp nhân viên tốt hơn.',
   category = 'Đặt lịch',
   keywords = 'đổi lịch, hủy lịch, đổi giờ, reschedule, cancel'
-WHERE question = 'Toi co the doi lich hoac huy lich khong?';
+WHERE question IN ('Toi co the doi lich hoac huy lich khong?', 'Tôi có thể đổi lịch hoặc hủy lịch không?');
 
 UPDATE chat_faq
 SET
@@ -380,7 +395,7 @@ SET
   answer = 'Salon hỗ trợ thanh toán online qua cổng thanh toán trên hệ thống, đồng thời bạn vẫn có thể chọn thanh toán tại salon nếu muốn.',
   category = 'Thanh toán',
   keywords = 'thanh toán online, chuyển khoản, momo, vnpay, tiền mặt'
-WHERE question = 'Salon co nhan thanh toan online khong?';
+WHERE question IN ('Salon co nhan thanh toan online khong?', 'Salon có nhận thanh toán online không?');
 
 UPDATE chat_faq
 SET
@@ -388,7 +403,7 @@ SET
   answer = 'Bạn nên đến sớm khoảng 5 đến 10 phút để check-in, xác nhận dịch vụ và được tư vấn nhanh nếu cần.',
   category = 'Đặt lịch',
   keywords = 'đến sớm, check in, trước giờ hẹn, bao lâu'
-WHERE question = 'Toi nen den som truoc gio hen bao lau?';
+WHERE question IN ('Toi nen den som truoc gio hen bao lau?', 'Tôi nên đến sớm trước giờ hẹn bao lâu?');
 
 UPDATE chat_faq
 SET
@@ -396,7 +411,7 @@ SET
   answer = 'Salon có các ưu đãi theo chương trình và hạng mức khách hàng. Bạn có thể xem thông báo khuyến mãi hoặc hỏi bot để được gợi ý nhanh.',
   category = 'Khuyến mãi',
   keywords = 'vip, khách hàng thân thiết, ưu đãi, khuyến mãi, giảm giá'
-WHERE question = 'Salon co uu dai cho khach hang than thiet khong?';
+WHERE question IN ('Salon co uu dai cho khach hang than thiet khong?', 'Salon có ưu đãi cho khách hàng thân thiết không?');
 
 UPDATE chat_bot_responses
 SET response_text = 'Bạn có thể vào phần lịch hẹn để đổi giờ hoặc hủy lịch. Nếu cần, mình cũng có thể chuyển yêu cầu sang nhân viên hỗ trợ.'
@@ -422,19 +437,19 @@ UPDATE chat_suggestions
 SET
   title = 'Chăm sóc da cấp ẩm',
   description = 'Gợi ý cho khách muốn làm đẹp nhẹ nhàng và thư giãn'
-WHERE title = 'Cham soc da cap am';
+WHERE title IN ('Cham soc da cap am', 'Chăm sóc da cấp ẩm');
 
 UPDATE chat_suggestions
 SET
   title = 'Massage thư giãn',
   description = 'Dịch vụ phù hợp khi bạn muốn giảm mệt mỏi sau ngày dài'
-WHERE title = 'Massage thu gian';
+WHERE title IN ('Massage thu gian', 'Massage thư giãn');
 
 UPDATE chat_suggestions
 SET
   title = 'Gặp nhân viên tư vấn',
   description = 'Chuyển cuộc trò chuyện cho nhân viên khi bạn cần tư vấn sâu hơn'
-WHERE title = 'Gap nhan vien tu van';
+WHERE title IN ('Gap nhan vien tu van', 'Gặp nhân viên tư vấn');
 
 -- ============================================================================
 -- PART 4: Verify Foreign Keys

@@ -30,9 +30,34 @@ const validateRegister = [
     .isLength({ min: 6 }).withMessage('Mật khẩu phải ít nhất 6 ký tự')
     .matches(/^(?=.*[a-zA-Z])(?=.*\d)/).withMessage('Mật khẩu phải chứa chữ và số'),
   body('phone')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .trim()
     .matches(/^[0-9]{10,11}$/).withMessage('Số điện thoại không hợp lệ'),
+  body('date_of_birth')
+    .trim()
+    .notEmpty().withMessage('Ngày sinh không được để trống')
+    .isISO8601({ strict: true }).withMessage('Ngày sinh phải định dạng YYYY-MM-DD')
+    .custom((value) => {
+      const birthDate = new Date(value);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (birthDate >= today) {
+        throw new Error('Ngày sinh phải nhỏ hơn ngày hiện tại');
+      }
+
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age -= 1;
+      }
+
+      if (age < 13 || age > 100) {
+        throw new Error('Tuổi đăng ký phải từ 13 đến 100');
+      }
+
+      return true;
+    }),
   handleValidationErrors
 ];
 
@@ -92,9 +117,38 @@ const validateUpdateProfile = [
     .isEmail().withMessage('Email không hợp lệ')
     .normalizeEmail(),
   body('phone')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .trim()
     .matches(/^[0-9]{10,11}$/).withMessage('Số điện thoại không hợp lệ'),
+  body('date_of_birth')
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isISO8601({ strict: true }).withMessage('Ngày sinh phải định dạng YYYY-MM-DD')
+    .custom((value) => {
+      const birthDate = new Date(value);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (birthDate >= today) {
+        throw new Error('Ngày sinh phải nhỏ hơn ngày hiện tại');
+      }
+
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age -= 1;
+      }
+
+      if (age < 13 || age > 100) {
+        throw new Error('Tuổi phải từ 13 đến 100');
+      }
+
+      return true;
+    }),
+  body('gender')
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isIn(['male', 'female', 'other']).withMessage('Giới tính không hợp lệ'),
   handleValidationErrors
 ];
 
@@ -115,6 +169,10 @@ const validateCreateService = [
   body('category')
     .trim()
     .notEmpty().withMessage('Danh mục không được để trống'),
+  body('service_code')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('Mã dịch vụ không được vượt quá 50 ký tự'),
   handleValidationErrors
 ];
 
@@ -136,6 +194,10 @@ const validateUpdateService = [
   body('category')
     .optional()
     .trim(),
+  body('service_code')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('Mã dịch vụ không được vượt quá 50 ký tự'),
   handleValidationErrors
 ];
 
@@ -154,7 +216,7 @@ const getBusinessWindowForDate = (dateValue) => {
   const [year, month, day] = String(dateValue || '').split('-').map(Number);
 
   if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return { start: '08:00', end: '21:30', label: '08:00 đến 21:30' };
+    return { start: '08:00', end: '21:00', label: '08:00 đến 21:00' };
   }
 
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -163,7 +225,7 @@ const getBusinessWindowForDate = (dateValue) => {
 
   return isWeekend
     ? { start: '07:00', end: '23:00', label: '07:00 đến 23:00' }
-    : { start: '08:00', end: '21:30', label: '08:00 đến 21:30' };
+    : { start: '08:00', end: '21:00', label: '08:00 đến 21:00' };
 };
 
 // Appointment Validations 

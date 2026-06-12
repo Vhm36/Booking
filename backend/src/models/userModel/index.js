@@ -2,10 +2,13 @@ const db = require('../../config/db');
 
 // Táº¡o user má»›i
 const createUser = (userData, callback) => {
-  const { name, email, password, phone, role } = userData;
-  const query = 'INSERT INTO users (name, email, password, phone, role, created_at) VALUES (?, ?, ?, ?, ?, NOW())';
+  const { name, email, password, phone, role, date_of_birth } = userData;
+  const query = `
+    INSERT INTO users (name, email, password, phone, date_of_birth, role, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, NOW())
+  `;
 
-  db.query(query, [name, email, password, phone, role || 'customer'], (err, result) => {
+  db.query(query, [name, email, password, phone, date_of_birth || null, role || 'customer'], (err, result) => {
     if (err) return callback(err);
     callback(null, result);
   });
@@ -53,7 +56,7 @@ const getUserByZaloId = (zaloId, callback) => {
 
 // Láº¥y user theo ID
 const getUserById = (id, callback) => {
-  const query = 'SELECT id, name, email, phone, avatar, role, created_at FROM users WHERE id = ?';
+  const query = 'SELECT id, name, email, phone, date_of_birth, gender, avatar, role, created_at FROM users WHERE id = ?';
   db.query(query, [id], (err, results) => {
     if (err) return callback(err);
     callback(null, results[0]);
@@ -62,7 +65,7 @@ const getUserById = (id, callback) => {
 
 // Láº¥y táº¥t cáº£ users
 const getAllUsers = (callback) => {
-  const query = 'SELECT id, name, email, phone, role, created_at FROM users';
+  const query = 'SELECT id, name, email, phone, date_of_birth, gender, role, created_at FROM users';
   db.query(query, (err, results) => {
     if (err) return callback(err);
     callback(null, results);
@@ -70,6 +73,32 @@ const getAllUsers = (callback) => {
 };
 
 // Cáº­p nháº­t máº­t kháº©u user
+const getMonthlyLoyaltyStats = (id, callback) => {
+  const query = `
+    SELECT
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
+      SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count
+    FROM appointments
+    WHERE user_id = ?
+      AND appointment_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND appointment_date < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+  `;
+
+  db.query(query, [id], (err, results) => {
+    if (err) return callback(err);
+
+    const row = results[0] || {};
+    const completedCount = Number(row.completed_count || 0);
+    const cancelledCount = Number(row.cancelled_count || 0);
+
+    callback(null, {
+      loyalty_points: completedCount * 5 - cancelledCount * 10,
+      loyalty_completed_count: completedCount,
+      loyalty_cancelled_count: cancelledCount
+    });
+  });
+};
+
 const updateUserPassword = (id, hashedPassword, callback) => {
   const query = 'UPDATE users SET password = ? WHERE id = ?';
 
@@ -81,16 +110,23 @@ const updateUserPassword = (id, hashedPassword, callback) => {
 
 // Cáº­p nháº­t user
 const updateUser = (id, userData, callback) => {
-  const { name, email, phone, avatar } = userData;
-  if (avatar !== undefined) {
-    const query = 'UPDATE users SET name = ?, email = ?, phone = ?, avatar = ? WHERE id = ?';
-    return db.query(query, [name, email, phone, avatar, id], (err, result) => {
-      if (err) return callback(err);
-      callback(null, result);
-    });
+  const allowedFields = ['name', 'email', 'phone', 'date_of_birth', 'gender', 'avatar'];
+  const fields = [];
+  const values = [];
+
+  allowedFields.forEach((field) => {
+    if (typeof userData[field] !== 'undefined') {
+      fields.push(`${field} = ?`);
+      values.push(userData[field]);
+    }
+  });
+
+  if (fields.length === 0) {
+    return callback(null, { affectedRows: 0 });
   }
-  const query = 'UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?';
-  db.query(query, [name, email, phone, id], (err, result) => {
+
+  const query = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+  db.query(query, [...values, id], (err, result) => {
     if (err) return callback(err);
     callback(null, result);
   });
@@ -121,6 +157,7 @@ module.exports = {
   getUserByZaloId,
   getUserById,
   getAllUsers,
+  getMonthlyLoyaltyStats,
   updateUserPassword,
   updateUser,
   updateUserAvatar,

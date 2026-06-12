@@ -2,6 +2,11 @@ const cron = require('node-cron');
 const rfmService = require('../services/rfmService');
 const db = require('../config/db');
 
+const pad2 = (value) => String(value).padStart(2, '0');
+
+const getLocalDateCode = (date = new Date()) =>
+  `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`;
+
 const query = (sql, params = []) =>
   new Promise((resolve, reject) => {
     db.query(sql, params, (err, results) => {
@@ -78,7 +83,7 @@ const createReengagementVouchers = async () => {
 
     console.log(`[RFM Job] Creating re-engagement vouchers for ${atRiskCustomers.length} At Risk customers`);
 
-    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const today = getLocalDateCode();
     const voucherId = await createSystemVoucher({
       code: `COMEBACK${today}`,
       discountPercent: 25,
@@ -86,13 +91,13 @@ const createReengagementVouchers = async () => {
       maxDiscountAmount: 200000,
       customerType: 'both',
       maxUsageGlobal: atRiskCustomers.length,
-      description: 'Voucher chao mung tro lai - Giam 25%',
+      description: 'Voucher chào mừng trở lại - Giảm 25%',
       validDays: 7
     });
 
     for (const customer of atRiskCustomers) {
       try {
-        await assignSystemVoucher(voucherId, customer.id, 'At Risk re-engagement');
+        await assignSystemVoucher(voucherId, customer.id, 'Ưu đãi chào mừng khách quay lại');
       } catch (assignErr) {
         // Ignore duplicate assignment errors.
       }
@@ -109,7 +114,7 @@ const createVipVouchers = async () => {
     const champions = await rfmService.getChampionCustomers();
     if (champions.length === 0) return;
 
-    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const today = getLocalDateCode();
     const voucherId = await createSystemVoucher({
       code: `VIP${today}`,
       discountPercent: 15,
@@ -117,13 +122,13 @@ const createVipVouchers = async () => {
       maxDiscountAmount: 300000,
       customerType: 'vip',
       maxUsageGlobal: champions.length,
-      description: 'Voucher VIP danh rieng cho khach hang than thiet - Giam 15%',
+      description: 'Voucher VIP dành riêng cho khách hàng thân thiết - Giảm 15%',
       validDays: 14
     });
 
     for (const customer of champions) {
       try {
-        await assignSystemVoucher(voucherId, customer.id, 'Champion/VIP reward');
+        await assignSystemVoucher(voucherId, customer.id, 'Thưởng khách hàng VIP thân thiết');
       } catch (assignErr) {
         // Ignore duplicate assignment errors.
       }

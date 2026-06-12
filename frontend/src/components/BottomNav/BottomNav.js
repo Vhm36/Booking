@@ -20,11 +20,13 @@ const ADMIN_NAV_ITEMS = [
 
 const STAFF_NAV_ITEMS = [
   { path: '/staff/dashboard', icon: 'LV', label: 'Lịch' },
+  { path: '/staff/shifts', icon: 'CL', label: 'Ca làm' },
   { path: '/profile', icon: 'TK', label: 'Tài khoản' }
 ];
 
 const CASHIER_NAV_ITEMS = [
   { path: '/staff/dashboard', icon: 'LH', label: 'Lịch' },
+  { path: '/staff/shifts', icon: 'CL', label: 'Ca làm' },
   { path: '/profile', icon: 'TK', label: 'Tài khoản' }
 ];
 

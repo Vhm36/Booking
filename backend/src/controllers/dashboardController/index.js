@@ -1,15 +1,22 @@
 const db = require('../../config/db');
 const customerModel = require('../../models/customerModel');
+const decClusteringService = require('../../services/decClusteringService');
 
-const queryAsync = (sql, params = []) =>
-  new Promise((resolve, reject) => {
+const queryAsync = async (sql, params = []) => {
+  if (db.ready) {
+    await db.ready;
+  }
+
+  return new Promise((resolve, reject) => {
     db.query(sql, params, (err, results) => {
       if (err) return reject(err);
       resolve(results);
     });
   });
+};
 
 const pad2 = (value) => String(value).padStart(2, '0');
+const AUTOMATION_HISTORY_START_DATE = '2024-01-01';
 
 const toDateKey = (date) =>
   `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
@@ -204,6 +211,44 @@ const scoreFavoriteServices = (services = []) => {
     .sort((a, b) => b.favorite_score - a.favorite_score);
 };
 
+const SEGMENT_LABELS = {
+  Champions: 'Khách VIP',
+  'Loyal Customers': 'Khách trung thành',
+  'Potential Loyalists': 'Khách tiềm năng',
+  'Need Attention': 'Cần chú ý',
+  'At Risk': 'Nguy cơ rời bỏ'
+};
+
+const SEGMENT_ORDER = [
+  'Champions',
+  'Loyal Customers',
+  'Potential Loyalists',
+  'Need Attention',
+  'At Risk'
+];
+
+const buildSegmentBreakdown = (rows = []) => {
+  const bySegment = new Map(
+    rows.map((row) => [row.segment || 'Unclassified', Number(row.count || 0)])
+  );
+
+  const knownSegments = SEGMENT_ORDER.map((segment) => ({
+    segment,
+    label: SEGMENT_LABELS[segment],
+    count: bySegment.get(segment) || 0
+  }));
+
+  const unknownSegments = rows
+    .filter((row) => !SEGMENT_ORDER.includes(row.segment))
+    .map((row) => ({
+      segment: row.segment || 'Unclassified',
+      label: 'Chưa phân loại',
+      count: Number(row.count || 0)
+    }));
+
+  return [...knownSegments, ...unknownSegments];
+};
+
 // Lấy tóm tắt dashboard
 exports.getSummary = (req, res) => {
   const queries = [
@@ -258,6 +303,7 @@ exports.getSummary = (req, res) => {
 // Tổng hợp dashboard theo ngày/tháng/năm
 exports.getOverview = async (req, res) => {
   const periodInfo = parseDashboardPeriod(req.query);
+  const automationEndDate = toDateKey(new Date());
 
   const summaryQuery = `
     SELECT
@@ -284,13 +330,42 @@ exports.getOverview = async (req, res) => {
     SELECT
       s.id,
       s.name,
-      COUNT(a.id) AS booking_count,
-      SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
-      COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.total_amount ELSE 0 END), 0) AS revenue
-    FROM appointments a
-    JOIN services s ON a.service_id = s.id
-    WHERE a.appointment_date BETWEEN ? AND ?
-      AND a.status != 'cancelled'
+      COUNT(service_usage.appointment_id) AS booking_count,
+      SUM(CASE WHEN service_usage.status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
+      COALESCE(
+        SUM(CASE WHEN service_usage.status = 'completed' THEN service_usage.service_amount ELSE 0 END),
+        0
+      ) AS revenue
+    FROM (
+      SELECT
+        aps.service_id,
+        a.id AS appointment_id,
+        a.status,
+        COALESCE(aps.price_snapshot, svc.price, 0) AS service_amount
+      FROM appointments a
+      JOIN appointment_services aps ON aps.appointment_id = a.id
+      JOIN services svc ON svc.id = aps.service_id
+      WHERE a.appointment_date BETWEEN ? AND ?
+        AND a.status != 'cancelled'
+
+      UNION ALL
+
+      SELECT
+        a.service_id,
+        a.id AS appointment_id,
+        a.status,
+        a.total_amount AS service_amount
+      FROM appointments a
+      WHERE a.appointment_date BETWEEN ? AND ?
+        AND a.status != 'cancelled'
+        AND a.service_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM appointment_services aps
+          WHERE aps.appointment_id = a.id
+        )
+    ) service_usage
+    JOIN services s ON s.id = service_usage.service_id
     GROUP BY s.id, s.name
     ORDER BY booking_count DESC, revenue DESC
     LIMIT 10
@@ -315,15 +390,67 @@ exports.getOverview = async (req, res) => {
     LIMIT 8
   `;
 
+  const segmentStatsQuery = `
+    SELECT
+      COALESCE(customer_segment, 'Unclassified') AS segment,
+      COUNT(*) AS count
+    FROM users
+    WHERE role = 'customer' AND is_active = 1
+    GROUP BY COALESCE(customer_segment, 'Unclassified')
+  `;
+
+  const voucherAutomationQuery = `
+    SELECT
+      COUNT(*) AS assigned_total,
+      SUM(CASE WHEN va.source = 'system' THEN 1 ELSE 0 END) AS system_assigned,
+      SUM(CASE WHEN va.source = 'system' AND v.code LIKE 'COMEBACK%' THEN 1 ELSE 0 END) AS comeback_assigned,
+      SUM(CASE WHEN va.source = 'system' AND v.code LIKE 'VIP%' THEN 1 ELSE 0 END) AS vip_assigned,
+      SUM(CASE WHEN va.source = 'system' AND va.usage_count > 0 THEN 1 ELSE 0 END) AS system_used,
+      COALESCE(SUM(CASE WHEN va.source = 'system' THEN va.total_discount_applied ELSE 0 END), 0) AS system_discount_total
+    FROM voucher_assignments va
+    JOIN vouchers v ON v.id = va.voucher_id
+    WHERE DATE(va.assigned_date) BETWEEN ? AND ?
+  `;
+
+  const activeSystemVouchersQuery = `
+    SELECT COUNT(DISTINCT v.id) AS active_system_vouchers
+    FROM vouchers v
+    JOIN voucher_assignments va ON va.voucher_id = v.id
+    WHERE va.source = 'system'
+      AND v.status = 'active'
+      AND v.expiry_date > NOW()
+  `;
+
+  const lastAnalysisQuery = `
+    SELECT MAX(rfm_updated_at) AS last_analysis_at
+    FROM users
+    WHERE role = 'customer' AND is_active = 1
+  `;
+
   try {
-    const [summaryRows, previousSummaryRows, trendRows, statusRows, serviceRows, recentBookings] =
+    const [
+      summaryRows,
+      previousSummaryRows,
+      trendRows,
+      statusRows,
+      serviceRows,
+      recentBookings,
+      segmentRows,
+      voucherAutomationRows,
+      activeSystemVoucherRows,
+      lastAnalysisRows
+    ] =
       await Promise.all([
         queryAsync(summaryQuery, [periodInfo.startDate, periodInfo.endDate]),
         queryAsync(summaryQuery, [periodInfo.previousStartDate, periodInfo.previousEndDate]),
         queryAsync(buildTrendQuery(periodInfo.period), [periodInfo.startDate, periodInfo.endDate]),
         queryAsync(statusQuery, [periodInfo.startDate, periodInfo.endDate]),
-        queryAsync(serviceQuery, [periodInfo.startDate, periodInfo.endDate]),
-        queryAsync(recentBookingsQuery, [periodInfo.startDate, periodInfo.endDate])
+        queryAsync(serviceQuery, [periodInfo.startDate, periodInfo.endDate, periodInfo.startDate, periodInfo.endDate]),
+        queryAsync(recentBookingsQuery, [periodInfo.startDate, periodInfo.endDate]),
+        queryAsync(segmentStatsQuery),
+        queryAsync(voucherAutomationQuery, [AUTOMATION_HISTORY_START_DATE, automationEndDate]),
+        queryAsync(activeSystemVouchersQuery),
+        queryAsync(lastAnalysisQuery)
       ]);
 
     const summary = summaryRows[0] || {};
@@ -335,6 +462,10 @@ exports.getOverview = async (req, res) => {
       percent: totalStatus > 0 ? Number(((Number(row.count || 0) / totalStatus) * 100).toFixed(1)) : 0
     }));
     const favoriteServices = scoreFavoriteServices(serviceRows || []);
+    const segmentBreakdown = buildSegmentBreakdown(segmentRows || []);
+    const voucherAutomation = voucherAutomationRows[0] || {};
+    const activeSystemVouchers = activeSystemVoucherRows[0] || {};
+    const lastAnalysis = lastAnalysisRows[0] || {};
 
     return res.status(200).json({
       success: true,
@@ -362,11 +493,29 @@ exports.getOverview = async (req, res) => {
         status_breakdown: statusBreakdown,
         favorite_services: favoriteServices,
         favorite_formula:
-          'Điểm ưa thích = 55% lượt đặt + 25% lượt hoàn thành + 20% doanh thu chuẩn hóa trong kỳ.',
+          'Điểm yêu thích = 55% lượt đặt + 25% lượt hoàn thành + 20% doanh thu chuẩn hóa trong kỳ.',
         recent_bookings: (recentBookings || []).map((row) => ({
           ...row,
           total_amount: Number(row.total_amount || 0)
-        }))
+        })),
+        automation: {
+          generated_at: new Date().toISOString(),
+          start_date: AUTOMATION_HISTORY_START_DATE,
+          end_date: automationEndDate,
+          period_label: `01/01/2024 - ${new Date(`${automationEndDate}T00:00:00`).toLocaleDateString('vi-VN')}`,
+          last_analysis_at: lastAnalysis.last_analysis_at || null,
+          processed_customers: segmentBreakdown.reduce((sum, row) => sum + Number(row.count || 0), 0),
+          segment_breakdown: segmentBreakdown,
+          voucher_stats: {
+            assigned_total: Number(voucherAutomation.assigned_total || 0),
+            system_assigned: Number(voucherAutomation.system_assigned || 0),
+            comeback_assigned: Number(voucherAutomation.comeback_assigned || 0),
+            vip_assigned: Number(voucherAutomation.vip_assigned || 0),
+            system_used: Number(voucherAutomation.system_used || 0),
+            system_discount_total: Number(voucherAutomation.system_discount_total || 0),
+            active_system_vouchers: Number(activeSystemVouchers.active_system_vouchers || 0)
+          }
+        }
       }
     });
   } catch (err) {
@@ -541,6 +690,34 @@ exports.getCustomerBehaviorBot = (req, res) => {
 };
 
 // Doanh thu + hoa hồng 10% theo nhân viên/tháng
+// Phân cụm DEC hành vi khách hàng
+exports.getDecClustering = async (req, res) => {
+  const requestedLimit = Number(req.query.limit);
+  const limitPerCluster =
+    Number.isInteger(requestedLimit) && requestedLimit > 0 && requestedLimit <= 100
+      ? requestedLimit
+      : 20;
+
+  try {
+    const report = await decClusteringService.getDecClusteringReport({
+      limitPerCluster,
+      period_type: req.query.period_type || req.query.periodType,
+      year: req.query.year,
+      month: req.query.month,
+      date: req.query.date || req.query.day,
+      week: req.query.week
+    });
+    return res.status(200).json({ success: true, data: report });
+  } catch (err) {
+    console.error('[DEC_CLUSTERING_REPORT_ERROR]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể tải dữ liệu phân cụm DEC',
+      error: err
+    });
+  }
+};
+
 exports.getStaffCommissionByMonth = (req, res) => {
   const month = Number(req.query.month || new Date().getMonth() + 1);
   const year = Number(req.query.year || new Date().getFullYear());

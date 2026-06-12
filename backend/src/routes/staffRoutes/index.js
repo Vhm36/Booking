@@ -14,6 +14,7 @@ router.get('/roles', verifyToken, verifyAdmin, staffController.getAllStaffRoles)
 router.post('/roles', verifyToken, verifyAdmin, staffController.createStaffRole);
 router.get('/me/weekly-availability', verifyToken, staffController.getMyWeeklyAvailability);
 router.put('/me/weekly-availability', verifyToken, staffController.replaceMyWeeklyAvailability);
+router.post('/me/start-work', verifyToken, staffController.startWork);
 router.get(
   '/:id/weekly-availability',
   verifyToken,

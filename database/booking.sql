@@ -1,20 +1,21 @@
 CREATE DATABASE IF NOT EXISTS booking_system;
 USE booking_system;
 
--- Bang users: luu thong tin nguoi dung (khach hang, nhan vien, quan tri vien)
+-- Bảng users: lưu thông tin người dùng (khách hàng, nhân viên, quản trị viên)
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   phone VARCHAR(20),
+  date_of_birth DATE NULL,
   role ENUM('customer', 'admin', 'staff') DEFAULT 'customer',
   staff_role_id INT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Bang services: luu thong tin ve cac dich vu salon cung cap
+-- Bảng services: lưu thông tin về các dịch vụ salon cung cấp
 CREATE TABLE services (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -23,10 +24,11 @@ CREATE TABLE services (
   description TEXT,
   category VARCHAR(100),
   status ENUM('active', 'inactive') DEFAULT 'active',
+  service_code VARCHAR(50) UNIQUE DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Bang appointments: luu thong tin lich hen
+-- Bảng appointments: lưu thông tin lịch hẹn
 CREATE TABLE appointments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -49,7 +51,7 @@ CREATE TABLE appointments (
   FOREIGN KEY (staff_id) REFERENCES users(id)
 );
 
--- Bang appointment_services: luu danh sach dich vu va snapshot gia/thoi luong cho moi lich hen
+-- Bảng appointment_services: lưu danh sách dịch vụ và snapshot giá/thời lượng cho mỗi lịch hẹn
 CREATE TABLE appointment_services (
   id INT AUTO_INCREMENT PRIMARY KEY,
   appointment_id INT NOT NULL,
@@ -63,7 +65,7 @@ CREATE TABLE appointment_services (
   FOREIGN KEY (service_id) REFERENCES services(id)
 );
 
--- Bang payments: luu thong tin thanh toan cua lich hen
+-- Bảng payments: lưu thông tin thanh toán của lịch hẹn
 CREATE TABLE payments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   appointment_id INT NOT NULL,

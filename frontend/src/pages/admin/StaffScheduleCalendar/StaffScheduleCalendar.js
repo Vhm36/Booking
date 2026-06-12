@@ -35,6 +35,18 @@ const formatDateISO = (date) => {
   return `${y}-${m}-${day}`;
 };
 
+const getPeriodRange = (date, viewMode) => {
+  if (viewMode === 'week') {
+    return {
+      date_from: formatDateISO(startOfWeek(date, { weekStartsOn: 1 })),
+      date_to: formatDateISO(endOfWeek(date, { weekStartsOn: 1 }))
+    };
+  }
+
+  const dateValue = formatDateISO(date);
+  return { date_from: dateValue, date_to: dateValue };
+};
+
 const formatDateDisplay = (date, viewMode) => {
   const d = new Date(date);
   if (viewMode === 'day') {
@@ -116,7 +128,7 @@ const AppointmentBlock = ({ appointment, color, onClick }) => {
         top: `${topPx}px`,
         height: `${heightPx}px`,
         background: color.bg,
-        borderLeftColor: color.border,
+        borderColor: color.border,
         color: color.text
       }}
       onClick={() => onClick(appointment)}
@@ -267,8 +279,9 @@ function StaffScheduleCalendar() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      const period = getPeriodRange(selectedDate, viewMode);
       const [appointmentsRes, staffRes] = await Promise.all([
-        bookingService.getAllBookings(),
+        bookingService.getAllBookings({ ...period, limit: 1000 }),
         staffService.getBookableStaff()
       ]);
 
@@ -284,7 +297,7 @@ function StaffScheduleCalendar() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDate, viewMode]);
 
   useEffect(() => {
     fetchData();
@@ -439,7 +452,7 @@ function StaffScheduleCalendar() {
 
   return (
     <div className="staff-schedule-calendar">
-      {/* ── Toolbar — Dark Boulevard bar ── */}
+      {/* ── Toolbar — teal system bar ── */}
       <div className="sc-toolbar">
         <div className="sc-toolbar-left">
           <div className="sc-view-modes">

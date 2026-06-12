@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import './RoleSidebar.css';
 
@@ -121,25 +121,37 @@ const getNavItems = (user) => {
     ];
   }
 
-  if (user?.role === 'staff' && normalizeRoleName(user.staff_role_name) === 'thu ngan') {
+  if (
+    user?.role === 'staff' &&
+    ['thu ngan', 'quan ly'].includes(normalizeRoleName(user.staff_role_name))
+  ) {
     return [
       { to: '/staff/dashboard', label: 'Lịch hẹn', icon: 'calendar' },
+      { to: '/staff/shifts', label: 'Ca làm', icon: 'leave' },
       { to: '/profile', label: 'Cài đặt', icon: 'profile' }
     ];
   }
 
   return [
     { to: '/staff/dashboard', label: 'Lịch làm việc', icon: 'calendar' },
+    { to: '/staff/shifts', label: 'Ca làm', icon: 'leave' },
     { to: '/profile', label: 'Cài đặt', icon: 'profile' }
   ];
 };
 
-function RoleSidebar({ user, onLogout }) {
+function RoleSidebar({ user, onLogout, presenceStatus = 'offline' }) {
   const navigate = useNavigate();
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const navItems = useMemo(() => getNavItems(user), [user]);
   const userInitial = (user?.name || 'B').charAt(0).toUpperCase();
+  const isUserOnline = presenceStatus === 'online';
 
   const handleLogout = () => {
+    setIsLogoutConfirmOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutConfirmOpen(false);
     onLogout();
     navigate('/');
   };
@@ -149,6 +161,7 @@ function RoleSidebar({ user, onLogout }) {
   }
 
   return (
+    <>
     <aside className="role-sidebar" aria-label="Điều hướng quản trị và nhân viên">
       <NavLink to="/" className="role-sidebar__brand" aria-label="Trang chủ BeautyBook">
         <span className="role-sidebar__logo-wrap">
@@ -165,6 +178,7 @@ function RoleSidebar({ user, onLogout }) {
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.end}
             className={({ isActive }) =>
               `role-sidebar__link${isActive ? ' role-sidebar__link--active' : ''}`
             }
@@ -177,11 +191,18 @@ function RoleSidebar({ user, onLogout }) {
 
       <div className="role-sidebar__account">
         <NavLink to="/profile" className="role-sidebar__user">
-          {user.avatar ? (
-            <img src={`${API_URL}${user.avatar}`} alt={user.name} className="role-sidebar__avatar" />
-          ) : (
-            <span className="role-sidebar__avatar-placeholder">{userInitial}</span>
-          )}
+          <span className="role-sidebar__avatar-wrap">
+            {user.avatar ? (
+              <img src={`${API_URL}${user.avatar}`} alt={user.name} className="role-sidebar__avatar" />
+            ) : (
+              <span className="role-sidebar__avatar-placeholder">{userInitial}</span>
+            )}
+            <span
+              className={`role-sidebar__presence-dot ${isUserOnline ? 'is-online' : 'is-offline'}`}
+              title={isUserOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+              aria-label={isUserOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+            />
+          </span>
           <span className="role-sidebar__user-copy">
             <strong>{user.name || 'BeautyBook'}</strong>
             <small>{getRoleLabel(user)}</small>
@@ -194,6 +215,37 @@ function RoleSidebar({ user, onLogout }) {
         </button>
       </div>
     </aside>
+
+    {isLogoutConfirmOpen && (
+      <div
+        className="role-sidebar__logout-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="role-sidebar-logout-title"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setIsLogoutConfirmOpen(false);
+          }
+        }}
+      >
+        <div className="role-sidebar__logout-modal">
+          <div>
+            <p className="role-sidebar__logout-kicker">Xác nhận</p>
+            <h2 id="role-sidebar-logout-title">Bạn có muốn đăng xuất?</h2>
+            <span>Phiên làm việc hiện tại sẽ kết thúc và bạn sẽ quay về trang chủ.</span>
+          </div>
+          <div className="role-sidebar__logout-actions">
+            <button type="button" className="role-sidebar__logout-cancel" onClick={() => setIsLogoutConfirmOpen(false)}>
+              Ở lại
+            </button>
+            <button type="button" className="role-sidebar__logout-confirm" onClick={confirmLogout}>
+              Đăng xuất
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

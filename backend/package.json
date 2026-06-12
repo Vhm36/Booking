@@ -7,7 +7,11 @@
     "start": "node src/server.js",
     "start:dev": "nodemon --watch src --ext js,json --ignore uploads --ignore node_modules src/server.js",
     "test:smtp": "node tools/test-smtp.js",
+    "seed:dec": "node tools/seed-dec-customers.js",
+    "seed:beauty": "node tools/seed-beauty-demo-data.js",
+    "seed:large": "node tools/seed-large-dataset.js",
     "migrate": "node tools/run-migration.js",
+    "migrate:birthday": "node scripts/ensureBirthdayAutomationSchema.js",
     "migrate:vouchers": "node tools/run-migration.js migration_consolidate_voucher_tables.sql",
     "test": "jest --detectOpenHandles --forceExit"
   },

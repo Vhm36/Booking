@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import authService from '../../services/authService';
 import bookingService from '../../services/bookingService';
@@ -15,18 +15,6 @@ const WEEKEND_QUICK_SLOTS = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00
 const visiblePaymentMethodSet = new Set(['cash', 'banking', 'vietqr', 'vnpay']);
 const manualPaymentMethodSet = new Set(['cash', 'banking']);
 const onlinePaymentMethodSet = new Set(['vietqr', 'vnpay']);
-
-const getStaffRequestError = (err, fallbackMessage) => {
-  if (err.response?.status === 401) {
-    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục đặt lịch.';
-  }
-
-  if (err.response?.status === 403) {
-    return 'Tài khoản hiện tại không có quyền xem danh sách nhân viên.';
-  }
-
-  return fallbackMessage;
-};
 
 const toShortTimeString = (value) => {
   const raw = String(value || '').trim();
@@ -55,7 +43,7 @@ const getBusinessWindowForDate = (dateValue) => {
   const [year, month, day] = String(dateValue || '').split('-').map(Number);
 
   if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return { start: '08:00', end: '21:30', isWeekend: false };
+    return { start: '08:00', end: '21:00', isWeekend: false };
   }
 
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -64,7 +52,7 @@ const getBusinessWindowForDate = (dateValue) => {
 
   return isWeekend
     ? { start: '07:00', end: '23:00', isWeekend: true }
-    : { start: '08:00', end: '21:30', isWeekend: false };
+    : { start: '08:00', end: '21:00', isWeekend: false };
 };
 
 const isTimeInBusinessWindow = (dateValue, timeValue) => {
@@ -243,35 +231,9 @@ const formatPaymentMethodLabel = (paymentMethod) => {
   return 'Thanh toán tại tiệm';
 };
 
-const generateDateOptions = (daysCount = 14) => {
-  const options = [];
-  const today = new Date();
-  const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-
-  for (let i = 0; i < daysCount; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const localDate = `${year}-${month}-${day}`;
-    
-    const dayName = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getDay()];
-    const dateLabel = `${day}/${month}`;
-    
-    options.push({
-      value: localDate,
-      dayName,
-      dateLabel
-    });
-  }
-  return options;
-};
-
 function Booking() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
-  const dateInputRef = useRef(null);
 
   const [allServices, setAllServices] = useState([]);
   const [serviceCategoriesFromDb, setServiceCategoriesFromDb] = useState([]);
@@ -288,7 +250,6 @@ function Booking() {
   const [loadingStaffList, setLoadingStaffList] = useState(true);
   const [loadingStaffAvailability, setLoadingStaffAvailability] = useState(false);
   const [loadingBusySlots, setLoadingBusySlots] = useState(false);
-  const [staffError, setStaffError] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -378,7 +339,6 @@ function Booking() {
         if (!cancelled) {
           setAllStaff([]);
           setAvailableStaffIds(new Set());
-          setStaffError('Vui lòng đăng nhập lại để chọn nhân viên phụ trách.');
           setLoadingStaffList(false);
         }
         return;
@@ -392,13 +352,11 @@ function Booking() {
         if (!cancelled) {
           setAllStaff(nextStaff);
           setAvailableStaffIds(new Set(nextStaff.map((staff) => String(staff.id))));
-          setStaffError('');
         }
       } catch (err) {
         if (!cancelled) {
           setAllStaff([]);
           setAvailableStaffIds(new Set());
-          setStaffError(getStaffRequestError(err, 'Không thể tải danh sách nhân viên.'));
         }
       } finally {
         if (!cancelled) {
@@ -587,7 +545,6 @@ function Booking() {
       }
 
       setLoadingStaffAvailability(true);
-      setStaffError('');
 
       try {
         const response = await staffService.getAvailableStaff(
@@ -608,19 +565,12 @@ function Booking() {
               return prev;
             }
 
-            if (allStaff.some((staff) => String(staff.id) === String(prev))) {
-              setStaffError(
-                'Nhân viên này đã kín lịch trong khung giờ này. Vui lòng đổi giờ hoặc đổi nhân viên.'
-              );
-            }
-
             return prev;
           });
         }
       } catch (err) {
         if (!cancelled) {
           setAvailableStaffIds(new Set());
-          setStaffError(getStaffRequestError(err, 'Không thể kiểm tra lịch trống của nhân viên.'));
         }
       } finally {
         if (!cancelled) {
@@ -731,11 +681,6 @@ function Booking() {
     const selected = allStaff.find((staff) => String(staff.id) === String(selectedStaffId));
     return selected ? selected.name : '';
   }, [selectedStaffId, allStaff]);
-
-  const availableStaffCount = useMemo(
-    () => staffOptions.filter((staff) => staff.isAvailable).length,
-    [staffOptions]
-  );
 
   const selectedSlotRangeLabel = useMemo(() => {
     if (!appointmentTime) {
@@ -1078,7 +1023,7 @@ function Booking() {
     }
 
     if (depositRequired && !onlinePaymentMethodSet.has(paymentMethod)) {
-      setError('Lich nay can thanh toan coc online do AI danh gia rui ro huy cao.');
+      setError('Lịch này cần thanh toán cọc online do AI đánh giá rủi ro hủy cao.');
       return;
     }
 
@@ -1523,10 +1468,10 @@ function Booking() {
               </div>
               {depositRequired ? (
                 <p>
-                  Lich nay can coc {formatVnd(estimatedDepositAmount)} qua thanh toan online de giu cho.
+                  Lịch này cần cọc {formatVnd(estimatedDepositAmount)} qua thanh toán online để giữ chỗ.
                 </p>
               ) : (
-                <p>Rui ro huy lich thap, co the thanh toan linh hoat tai salon.</p>
+                <p>Rủi ro hủy lịch thấp, có thể thanh toán linh hoạt tại salon.</p>
               )}
             </div>
           )}

@@ -97,6 +97,10 @@ db.ready = ready;
 
 db.on("error", (err) => {
   logConnectionDiagnostics(err, "runtime");
+  if (err.fatal) {
+    console.error("Fatal database error encountered, exiting process to trigger auto-restart...");
+    process.exit(1);
+  }
 });
 
 module.exports = db;

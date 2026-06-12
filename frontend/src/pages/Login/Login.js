@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import authService from '../../services/authService';
 import '../Auth/Auth.css';
 
@@ -55,13 +55,6 @@ function getLoginErrorMessage(error) {
   return data?.message || 'Đăng nhập thất bại.';
 }
 
-const normalizeRoleName = (value = '') =>
-  String(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-
 const getPostLoginPath = (user) => {
   if (user.role === 'admin') {
     return '/admin/dashboard';
@@ -103,6 +96,8 @@ function Login({ onLogin }) {
   const [countdown, setCountdown] = useState('');
   const googleButtonRef = useRef(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect');
   const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
   const zaloAppId = process.env.REACT_APP_ZALO_APP_ID || '';
   const zaloCallbackUrl = process.env.REACT_APP_ZALO_CALLBACK_URL || '';
@@ -155,7 +150,11 @@ function Login({ onLogin }) {
         authService.setUser(user);
         onLogin(user);
 
-        navigate(getPostLoginPath(user));
+        if (redirectPath && user.role === 'customer') {
+          navigate(redirectPath);
+        } else {
+          navigate(getPostLoginPath(user));
+        }
       } catch (err) {
         setError(err?.response?.data?.message || 'Đăng nhập Google thất bại.');
       } finally {
@@ -198,7 +197,7 @@ function Login({ onLogin }) {
     return () => {
       cancelled = true;
     };
-  }, [googleClientId, navigate, onLogin]);
+  }, [googleClientId, navigate, onLogin, redirectPath]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -215,7 +214,11 @@ function Login({ onLogin }) {
       authService.setUser(user, rememberMe);
       onLogin(user);
 
-      navigate(getPostLoginPath(user));
+      if (redirectPath && user.role === 'customer') {
+        navigate(redirectPath);
+      } else {
+        navigate(getPostLoginPath(user));
+      }
     } catch (err) {
       if (err.response?.status === 429) {
         const retryAfterSeconds = err.response.data?.retryAfterSeconds || 15 * 60;
@@ -236,6 +239,9 @@ function Login({ onLogin }) {
 
       // Lưu code_verifier vào sessionStorage để dùng khi callback
       sessionStorage.setItem('zalo_code_verifier', codeVerifier);
+      if (redirectPath) {
+        sessionStorage.setItem('login_redirect', redirectPath);
+      }
 
       const zaloAuthUrl = `https://oauth.zaloapp.com/v4/permission?app_id=${zaloAppId}&redirect_uri=${encodeURIComponent(zaloCallbackUrl)}&code_challenge=${codeChallenge}&state=zalo_login`;
 

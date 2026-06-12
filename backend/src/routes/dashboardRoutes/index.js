@@ -30,6 +30,7 @@ router.get('/revenue-by-month', dashboardController.getRevenueByMonth);
 // Lấy tỷ lệ hủy lịch
 router.get('/cancellation-rate', dashboardController.getCancellationRate);
 router.get('/customer-behavior-bot', dashboardController.getCustomerBehaviorBot);
+router.get('/dec-clustering', dashboardController.getDecClustering);
 router.get('/staff-commission-by-month', dashboardController.getStaffCommissionByMonth);
 
 module.exports = router;

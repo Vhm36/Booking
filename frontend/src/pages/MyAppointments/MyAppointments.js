@@ -3,6 +3,8 @@ import bookingService from '../../services/bookingService';
 import paymentService from '../../services/paymentService';
 import './MyAppointments.css';
 
+const APPOINTMENTS_PER_PAGE = 2;
+
 const hasCancellationRequest = (appointment) =>
   Number(appointment?.cancellation_requested) === 1 && appointment?.status !== 'cancelled';
 
@@ -12,6 +14,15 @@ const isAwaitingStaffConfirmation = (appointment) =>
 const getStatusBadge = (appointment) => {
   if (hasCancellationRequest(appointment)) {
     return { label: 'Chờ xác nhận hủy', class: 'badge-cancel-request' };
+  }
+
+  if (
+    appointment?.status !== 'pending' &&
+    appointment?.status !== 'cancelled' &&
+    appointment?.payment_status &&
+    appointment.payment_status !== 'paid'
+  ) {
+    return { label: 'Chờ thanh toán', class: 'badge-payment-pending' };
   }
 
   const statusMap = {
@@ -98,6 +109,80 @@ const formatPaymentMethodLabel = (paymentMethod) => {
   return '-';
 };
 
+const parseServiceNames = (appointment) => {
+  if (Array.isArray(appointment?.selected_services)) {
+    return appointment.selected_services
+      .map((service) => service?.name || service?.service_name)
+      .filter(Boolean);
+  }
+
+  return String(appointment?.service_name || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+};
+
+const getAppointmentSortValue = (appointment) => {
+  const date = appointment?.appointment_date ? String(appointment.appointment_date).slice(0, 10) : '';
+  const time = appointment?.appointment_time || '00:00';
+  return new Date(`${date}T${String(time).slice(0, 5) || '00:00'}:00`).getTime() || 0;
+};
+
+const getBookingGroupKey = (appointment) =>
+  appointment?.booking_id ||
+  appointment?.appointment_group_id ||
+  appointment?.group_id ||
+  appointment?.id ||
+  `${appointment?.appointment_date || ''}-${appointment?.appointment_time || ''}-${appointment?.staff_id || appointment?.staff_name || ''}`;
+
+const buildBookingCards = (rows = []) => {
+  const grouped = new Map();
+
+  rows.forEach((appointment) => {
+    const key = getBookingGroupKey(appointment);
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key).push(appointment);
+  });
+
+  return [...grouped.values()]
+    .map((items) => {
+      const base = items[0] || {};
+      const services = [
+        ...new Set(
+          items.flatMap((appointment) => parseServiceNames(appointment))
+        )
+      ];
+      const totalAmount =
+        Number(base.payment_amount || 0) ||
+        Number(base.total_amount || 0) ||
+        Number(base.service_price || 0) ||
+        items.reduce((sum, appointment) => sum + Number(appointment.service_price || 0), 0);
+
+      return {
+        ...base,
+        services: services.length > 0 ? services : [base.service_name || 'Dịch vụ'],
+        service_count: Number(base.service_count || services.length || 1),
+        booking_total_amount: totalAmount,
+        booking_items: items
+      };
+    })
+    .sort((a, b) => getAppointmentSortValue(a) - getAppointmentSortValue(b));
+};
+
+const formatBookingDateLabel = (appointment) => {
+  if (!appointment?.appointment_date) return 'Chưa có ngày';
+
+  const date = new Date(appointment.appointment_date);
+  return new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date);
+};
+
 function MyAppointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +192,16 @@ function MyAppointments() {
   const [submittingReviewId, setSubmittingReviewId] = useState(null);
   const [processingCancelId, setProcessingCancelId] = useState(null);
   const [processingPaymentId, setProcessingPaymentId] = useState(null);
+  const [appointmentPage, setAppointmentPage] = useState(1);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.body.classList.add('my-appointments-scroll-lock');
+
+    return () => {
+      document.body.classList.remove('my-appointments-scroll-lock');
+    };
+  }, []);
 
   useEffect(() => {
     fetchAppointments();
@@ -157,17 +252,49 @@ function MyAppointments() {
     }
   };
 
+  const bookingCards = useMemo(() => buildBookingCards(appointments), [appointments]);
+
   const stats = useMemo(
     () => ({
-      total: appointments.length,
-      pending: appointments.filter((item) => isAwaitingStaffConfirmation(item)).length,
-      confirmed: appointments.filter((item) => item.status === 'confirmed').length,
-      completed: appointments.filter((item) => item.status === 'completed').length,
-      cancellationRequested: appointments.filter((item) => hasCancellationRequest(item)).length,
-      unpaid: appointments.filter((item) => canPayOnline(item)).length
+      total: bookingCards.length,
+      pending: bookingCards.filter((item) => isAwaitingStaffConfirmation(item)).length,
+      confirmed: bookingCards.filter((item) => item.status === 'confirmed').length,
+      completed: bookingCards.filter((item) => item.status === 'completed').length,
+      cancellationRequested: bookingCards.filter((item) => hasCancellationRequest(item)).length,
+      unpaid: bookingCards.filter((item) => canPayOnline(item)).length
     }),
-    [appointments]
+    [bookingCards]
   );
+
+  const filteredAppointments = useMemo(
+    () =>
+      bookingCards.filter((appointment) => {
+        if (filter === 'all') return true;
+        if (filter === 'cancellation_requested') return hasCancellationRequest(appointment);
+        if (filter === 'pending') return isAwaitingStaffConfirmation(appointment);
+        if (filter === 'unpaid') return canPayOnline(appointment);
+        return appointment.status === filter;
+      }),
+    [bookingCards, filter]
+  );
+
+  const appointmentPageCount = Math.max(1, Math.ceil(filteredAppointments.length / APPOINTMENTS_PER_PAGE));
+  const safeAppointmentPage = Math.min(appointmentPage, appointmentPageCount);
+  const appointmentStartIndex = (safeAppointmentPage - 1) * APPOINTMENTS_PER_PAGE;
+  const appointmentEndIndex = Math.min(appointmentStartIndex + APPOINTMENTS_PER_PAGE, filteredAppointments.length);
+  const paginatedAppointments = filteredAppointments.slice(appointmentStartIndex, appointmentEndIndex);
+  const appointmentPageNumbers = Array.from({ length: appointmentPageCount }, (_, index) => index + 1).filter(
+    (page) => page === 1 || page === appointmentPageCount || Math.abs(page - safeAppointmentPage) <= 1
+  );
+
+  useEffect(() => {
+    setAppointmentPage((prev) => Math.min(prev, appointmentPageCount));
+  }, [appointmentPageCount]);
+
+  const changeFilter = (nextFilter) => {
+    setFilter(nextFilter);
+    setAppointmentPage(1);
+  };
 
   const requestCancel = async (appointmentId) => {
     const confirmed = window.confirm('Bạn chắc chắn muốn hủy lịch hẹn này?');
@@ -269,14 +396,6 @@ function MyAppointments() {
     window.open(`/payment-bill/${paymentId}`, '_blank', 'noopener,noreferrer');
   };
 
-  const filteredAppointments = appointments.filter((appointment) => {
-    if (filter === 'all') return true;
-    if (filter === 'cancellation_requested') return hasCancellationRequest(appointment);
-    if (filter === 'pending') return isAwaitingStaffConfirmation(appointment);
-    if (filter === 'unpaid') return canPayOnline(appointment);
-    return appointment.status === filter;
-  });
-
   if (loading) {
     return <div className="loading">Đang tải lịch hẹn...</div>;
   }
@@ -284,9 +403,9 @@ function MyAppointments() {
   return (
     <div className="appointments-page">
       <section className="appointments-page-head">
-        <div>
-          <span>Lịch hẹn</span>
+        <div className="appointments-head-info">
           <h1>Lịch hẹn của tôi</h1>
+          <p>Quản lý và theo dõi tất cả lịch hẹn của bạn</p>
         </div>
 
         <div className="appointment-stats-grid" aria-label="Tóm tắt lịch hẹn">
@@ -317,37 +436,37 @@ function MyAppointments() {
               Bạn đang có {stats.unpaid} lịch hẹn chưa thanh toán. Có thể mở lại cổng thanh toán online ngay trong từng lịch.
             </span>
           </div>
-          <button type="button" className="btn-primary" onClick={() => setFilter('unpaid')}>
+          <button type="button" className="btn-primary" onClick={() => changeFilter('unpaid')}>
             Xem lịch chưa thanh toán
           </button>
         </div>
       )}
 
       <div className="filter-buttons">
-        <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
+        <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => changeFilter('all')}>
           Tất cả ({stats.total})
         </button>
-        <button className={`filter-btn ${filter === 'pending' ? 'active' : ''}`} onClick={() => setFilter('pending')}>
+        <button className={`filter-btn ${filter === 'pending' ? 'active' : ''}`} onClick={() => changeFilter('pending')}>
           Chờ xác nhận ({stats.pending})
         </button>
-        <button className={`filter-btn ${filter === 'confirmed' ? 'active' : ''}`} onClick={() => setFilter('confirmed')}>
+        <button className={`filter-btn ${filter === 'confirmed' ? 'active' : ''}`} onClick={() => changeFilter('confirmed')}>
           Đã xác nhận ({stats.confirmed})
         </button>
         <button
           className={`filter-btn ${filter === 'unpaid' ? 'active' : ''}`}
-          onClick={() => setFilter('unpaid')}
+          onClick={() => changeFilter('unpaid')}
         >
           Chờ thanh toán ({stats.unpaid})
         </button>
         <button
           className={`filter-btn ${filter === 'cancellation_requested' ? 'active' : ''}`}
-          onClick={() => setFilter('cancellation_requested')}
+          onClick={() => changeFilter('cancellation_requested')}
         >
           Chờ hủy ({stats.cancellationRequested})
         </button>
         <button
           className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
-          onClick={() => setFilter('completed')}
+          onClick={() => changeFilter('completed')}
         >
           Hoàn thành ({stats.completed})
         </button>
@@ -355,52 +474,54 @@ function MyAppointments() {
 
       {filteredAppointments.length === 0 ? (
         <div className="no-appointments">
+          <span className="empty-icon">📋</span>
           <p>Bạn chưa có lịch hẹn nào thỏa mãn điều kiện lọc.</p>
         </div>
       ) : (
+        <>
         <div className="appointments-list">
-          {filteredAppointments.map((appointment) => {
+          {paginatedAppointments.map((appointment) => {
             const statusInfo = getStatusBadge(appointment);
             const draft = reviewDrafts[appointment.id] || { rating: '5', review: '' };
             const paymentMeta = formatPaymentStatus(appointment.payment_status);
+            const totalAmount = appointment.booking_total_amount || appointment.payment_amount || appointment.service_price || 0;
+            const hasBillAction = appointment.payment_status === 'paid' && appointment.payment_id;
+            const hasPaymentAction = canPayOnline(appointment);
+            const hasCancelAction = canRequestCancellation(appointment);
 
             return (
-              <div key={appointment.id} className="appointment-card">
-                <div className="appointment-header">
-                  <div className="appointment-header-main">
-                    <h3>{appointment.service_name}</h3>
-                    {appointment.payment_status === 'paid' && (
-                      <span className="payment-success-check" aria-label="Đã thanh toán">
-                        ✓
-                      </span>
-                    )}
+              <article key={getBookingGroupKey(appointment)} className="appointment-card booking-card">
+                <header className="appointment-header">
+                  <div className="booking-time-block">
+                    <span>Thời gian hẹn</span>
+                    <strong>{formatAppointmentTimeRange(appointment)} - {formatBookingDateLabel(appointment)}</strong>
+                    <small>Mã lịch #{appointment.id}</small>
                   </div>
-                  <span className={`badge ${statusInfo.class}`}>{statusInfo.label}</span>
-                </div>
+                  <div className="booking-header-side">
+                    <div className="booking-total booking-total-header">
+                      <span>Tổng thanh toán</span>
+                      <strong>{formatMoney(totalAmount)}</strong>
+                      <small>
+                        {formatPaymentMethodLabel(appointment.payment_method)} · {paymentMeta.label}
+                      </small>
+                    </div>
+                    <span className={`badge ${statusInfo.class}`}>{statusInfo.label}</span>
+                  </div>
+                </header>
 
                 <div className="appointment-body">
-                  <div className="appointment-info">
-                    <div className="info-row">
-                      <span className="label">Ngày hẹn:</span>
-                      <span className="value">{new Date(appointment.appointment_date).toLocaleDateString('vi-VN')}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Giờ hẹn:</span>
-                      <span className="value">{formatAppointmentTimeRange(appointment)}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Nhân viên:</span>
-                      <span className="value">{appointment.staff_name || 'Chưa phân công'}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Thời gian:</span>
-                      <span className="value">{appointment.duration} phút</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Giá:</span>
-                      <span className="value">{formatMoney(appointment.service_price || 0)}</span>
-                    </div>
-                  </div>
+                  <section className="booking-services-section">
+                    <span className="booking-section-label">Dịch vụ trong buổi hẹn</span>
+                    <ul className="booking-service-list">
+                      {appointment.services.map((serviceName) => (
+                        <li key={serviceName}>{serviceName}</li>
+                      ))}
+                    </ul>
+                    <small>
+                      Kỹ thuật viên: <strong>{appointment.staff_name || 'Chưa phân công'}</strong>
+                      {appointment.duration ? ` · Thời lượng ${appointment.duration} phút` : ''}
+                    </small>
+                  </section>
 
                   {appointment.notes && (
                     <div className="notes">
@@ -418,72 +539,37 @@ function MyAppointments() {
                     </div>
                   )}
 
-                  <div className="payment-card">
-                    <div className="payment-card-head">
-                      <div>
-                        <strong>Thanh toán</strong>
-                        <span>
-                          {appointment.payment_status === 'paid'
-                            ? 'Giao dịch đã được ghi nhận và có thể xuất bill ngay.'
-                            : appointment.payment_method === 'vietqr'
-                              ? 'Bạn có thể mở lại mã chuyển khoản để thanh toán đúng số tiền và nội dung.'
-                              : appointment.payment_method === 'banking'
-                                ? 'Lịch đang chọn chuyển khoản tại salon. Thu ngân sẽ xác nhận khi nhận được tiền.'
-                                : appointment.payment_method === 'cash'
-                                  ? 'Lịch đang chọn tiền mặt tại salon. Bạn vẫn có thể đổi sang thanh toán online nếu cần.'
-                                  : 'Bạn có thể thanh toán online bất cứ lúc nào nếu cần bill hoặc đối soát ngay.'}
-                        </span>
-                      </div>
-                      <div className="payment-status-wrap">
-                        {appointment.payment_status === 'paid' && <span className="payment-success-check">✓</span>}
-                        <span className={paymentMeta.className}>{paymentMeta.label}</span>
-                      </div>
-                    </div>
-
-                    <div className="payment-card-grid">
-                      <div className="payment-info-item">
-                        <span>Phương thức</span>
-                        <strong>{formatPaymentMethodLabel(appointment.payment_method)}</strong>
-                      </div>
-                      <div className="payment-info-item">
-                        <span>Số tiền</span>
-                        <strong>{formatMoney(appointment.payment_amount || appointment.service_price || 0)}</strong>
-                      </div>
-                      <div className="payment-info-item">
-                        <span>Mã đối soát</span>
-                        <strong>{appointment.payment_reference || '-'}</strong>
-                      </div>
-                      <div className="payment-info-item">
-                        <span>Mã giao dịch</span>
-                        <strong>{appointment.payment_transaction_code || '-'}</strong>
-                      </div>
-                    </div>
-
-                    <div className="payment-actions">
-                      {appointment.payment_status === 'paid' && appointment.payment_id ? (
+                  {(hasBillAction || hasPaymentAction || hasCancelAction) && (
+                  <footer className="booking-card-footer">
+                    <div className="booking-card-actions">
+                      {hasBillAction ? (
                         <button type="button" className="btn-secondary" onClick={() => openInvoice(appointment.payment_id)}>
                           Xem bill
                         </button>
-                      ) : canPayOnline(appointment) ? (
+                      ) : hasPaymentAction ? (
                         <button
                           type="button"
                           className="btn-primary"
                           disabled={processingPaymentId === appointment.id}
                           onClick={() => handleOnlinePayment(appointment)}
                         >
-                          {processingPaymentId === appointment.id
-                            ? 'Đang tạo giao dịch...'
-                            : appointment.payment_method === 'vietqr'
-                              ? 'Mở mã chuyển khoản'
-                              : appointment.payment_method === 'vnpay'
-                                ? 'Mở VNPay'
-                                : 'Thanh toán online ngay'}
+                          {processingPaymentId === appointment.id ? 'Đang tạo giao dịch...' : 'Thanh toán ngay'}
                         </button>
-                      ) : (
-                        <span className="payment-disabled-note">Lịch này không còn khả dụng để thanh toán online.</span>
+                      ) : null}
+
+                      {hasCancelAction && (
+                        <button
+                          type="button"
+                          onClick={() => requestCancel(appointment.id)}
+                          className="btn-danger"
+                          disabled={processingCancelId === appointment.id}
+                        >
+                          {processingCancelId === appointment.id ? 'Đang hủy...' : 'Hủy lịch hẹn'}
+                        </button>
                       )}
                     </div>
-                  </div>
+                  </footer>
+                  )}
 
                   {hasRated(appointment) && (
                     <div className="review-result">
@@ -529,22 +615,49 @@ function MyAppointments() {
                     </div>
                   )}
                 </div>
-
-                {canRequestCancellation(appointment) && (
-                  <div className="appointment-footer">
-                    <button
-                      onClick={() => requestCancel(appointment.id)}
-                      className="btn-danger"
-                      disabled={processingCancelId === appointment.id}
-                    >
-                      {processingCancelId === appointment.id ? 'Đang hủy...' : 'Hủy lịch hẹn'}
-                    </button>
-                  </div>
-                )}
-              </div>
+              </article>
             );
           })}
         </div>
+
+        {filteredAppointments.length > APPOINTMENTS_PER_PAGE && (
+          <nav className="appointments-pagination" aria-label="Phân trang lịch hẹn">
+            <span>
+              {appointmentStartIndex + 1}-{appointmentEndIndex} / {filteredAppointments.length} lịch
+            </span>
+            <div className="pagination-pages">
+              <button
+                type="button"
+                onClick={() => setAppointmentPage((prev) => Math.max(1, prev - 1))}
+                disabled={safeAppointmentPage === 1}
+              >
+                Trước
+              </button>
+              {appointmentPageNumbers.map((page, index) => (
+                <React.Fragment key={page}>
+                  {index > 0 && page - appointmentPageNumbers[index - 1] > 1 ? (
+                    <span className="pagination-gap">...</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={page === safeAppointmentPage ? 'active' : ''}
+                    onClick={() => setAppointmentPage(page)}
+                  >
+                    {page}
+                  </button>
+                </React.Fragment>
+              ))}
+              <button
+                type="button"
+                onClick={() => setAppointmentPage((prev) => Math.min(appointmentPageCount, prev + 1))}
+                disabled={safeAppointmentPage === appointmentPageCount}
+              >
+                Sau
+              </button>
+            </div>
+          </nav>
+        )}
+        </>
       )}
     </div>
   );

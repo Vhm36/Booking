@@ -31,14 +31,14 @@ exports.createAdmin = (req, res) => {
   if (!normalizedName || !normalizedEmail || !password) {
     return res.status(400).json({
       success: false,
-      message: 'Vui long cung cap day du thong tin'
+      message: 'Vui lòng cung cấp đầy đủ thông tin'
     });
   }
 
   if (String(password).length < 6) {
     return res.status(400).json({
       success: false,
-      message: 'Mat khau phai it nhat 6 ky tu'
+      message: 'Mật khẩu phải ít nhất 6 ký tự'
     });
   }
 
@@ -107,7 +107,7 @@ exports.updateAdmin = (req, res) => {
   ) {
     return res.status(400).json({
       success: false,
-      message: 'Khong co du lieu de cap nhat'
+      message: 'Không có dữ liệu để cập nhật'
     });
   }
 
@@ -134,14 +134,14 @@ exports.updateAdmin = (req, res) => {
         if (typeof password !== 'string' || password.trim().length === 0) {
           return res.status(400).json({
             success: false,
-            message: 'Mat khau moi khong duoc de trong'
+            message: 'Mật khẩu mới không được để trống'
           });
         }
 
         if (password.length < 6) {
           return res.status(400).json({
             success: false,
-            message: 'Mat khau moi phai it nhat 6 ky tu'
+            message: 'Mật khẩu mới phải ít nhất 6 ký tự'
           });
         }
 
@@ -164,7 +164,7 @@ exports.updateAdmin = (req, res) => {
         if (Number(id) === Number(req.user.id) && !activeValue) {
           return res.status(400).json({
             success: false,
-            message: 'Khong the tu vo hieu hoa tai khoan admin dang dang nhap'
+            message: 'Không thể tự vô hiệu hóa tài khoản admin đang đăng nhập'
           });
         }
 
@@ -180,7 +180,7 @@ exports.updateAdmin = (req, res) => {
           success: true,
           message:
             typeof password !== 'undefined'
-              ? 'Cập nhật admin va mat khau thành công'
+              ? 'Cập nhật admin và mật khẩu thành công'
               : 'Cập nhật admin thành công'
         });
       });

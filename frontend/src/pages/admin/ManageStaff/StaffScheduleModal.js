@@ -16,7 +16,7 @@ const getShiftFromTimes = (startTime, endTime) => {
   const startMinutes = startHour * 60 + startMinute;
   const endMinutes = endHour * 60 + endMinute;
 
-  if ((start === '08:00' && end === '21:30') || (start === '07:00' && end === '23:00')) return 'full';
+  if ((start === '08:00' && end === '21:00') || (start === '07:00' && end === '23:00')) return 'full';
   if (endMinutes - startMinutes > 8 * 60) return 'full';
 
   return startHour < 12 ? 'morning' : 'evening';
@@ -26,8 +26,8 @@ const getTimesFromShift = (dayIndex, shift) => {
   if (dayIndex >= 0 && dayIndex <= 4) {
     // Thứ 2 - Thứ 6
     if (shift === 'morning') return { start: '08:00', end: '16:00' };
-    if (shift === 'evening') return { start: '13:30', end: '21:30' };
-    if (shift === 'full') return { start: '08:00', end: '21:30' };
+    if (shift === 'evening') return { start: '13:30', end: '21:00' };
+    if (shift === 'full') return { start: '08:00', end: '21:00' };
   } else {
     // Thứ 7 - Chủ nhật
     if (shift === 'morning') return { start: '07:00', end: '15:00' };

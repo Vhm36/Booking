@@ -4,10 +4,10 @@ const path = require('path');
 const TEMPLATE_PATH = path.resolve(__dirname, '..', '..', 'templates', 'email', 'reset-password.html');
 const FALLBACK_TEMPLATE = `
   <html><body>
-  <p>Xin chao <strong>{{userName}}</strong>,</p>
-  <p>Nhan vao link sau de dat lai mat khau: <a href="{{resetLink}}">{{resetLink}}</a></p>
-  <p>Link co hieu luc trong {{expireInLabel}}.</p>
-  <p>Ho tro: {{supportEmail}}</p>
+  <p>Xin chào <strong>{{userName}}</strong>,</p>
+  <p>Nhấn vào link sau để đặt lại mật khẩu: <a href="{{resetLink}}">{{resetLink}}</a></p>
+  <p>Link có hiệu lực trong {{expireInLabel}}.</p>
+  <p>Hỗ trợ: {{supportEmail}}</p>
   </body></html>
 `;
 
@@ -53,13 +53,13 @@ const buildResetPasswordEmailPayload = ({
   });
 
   const text = [
-    `Xin chao ${safeName},`,
+    `Xin chào ${safeName},`,
     '',
-    'Chung toi da nhan duoc yeu cau dat lai mat khau cho tai khoan BeautyBook cua ban.',
-    `Dat lai mat khau tai day: ${safeLink}`,
-    `Link co hieu luc trong ${expireInLabel}.`,
-    'Neu ban khong yeu cau thao tac nay, vui long bo qua email.',
-    `Ho tro: ${supportEmail}`
+    'Chúng tôi đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản BeautyBook của bạn.',
+    `Đặt lại mật khẩu tại đây: ${safeLink}`,
+    `Link có hiệu lực trong ${expireInLabel}.`,
+    'Nếu bạn không yêu cầu thao tác này, vui lòng bỏ qua email.',
+    `Hỗ trợ: ${supportEmail}`
   ].join('\n');
 
   return {

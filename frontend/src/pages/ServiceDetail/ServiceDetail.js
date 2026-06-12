@@ -63,7 +63,7 @@ function ServiceDetail() {
 
   const handleBooking = () => {
     if (!user) {
-      navigate('/login');
+      navigate(`/login?redirect=${encodeURIComponent(`/booking/${id}`)}`);
       return;
     }
 
@@ -180,7 +180,7 @@ function ServiceDetail() {
             {!isActive
               ? 'Dịch vụ đang tạm dừng'
               : !user
-              ? 'Đăng nhập để đặt lịch'
+              ? 'Đặt lịch ngay'
               : user.role === 'customer'
               ? 'Đặt lịch ngay'
               : 'Tài khoản này không thể đặt lịch'}

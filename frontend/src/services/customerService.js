@@ -1,7 +1,7 @@
 import api from './api';
 
 const customerService = {
-  getAllCustomers: () => api.get('/customers'),
+  getAllCustomers: (params = {}) => api.get('/customers', { params }),
 
   createCustomer: (payload) => api.post('/customers', payload),
 

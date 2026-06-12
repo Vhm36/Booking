@@ -1,0 +1,65 @@
+{
+  "id": "/",
+  "short_name": "BeautyBook",
+  "name": "BeautyBook - Đặt lịch làm đẹp",
+  "description": "Ứng dụng đặt lịch dịch vụ làm đẹp, quản lý lịch hẹn, voucher và thanh toán cho BeautyBook Salon.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "theme_color": "#0f766e",
+  "background_color": "#f8fafc",
+  "categories": ["beauty", "lifestyle", "health"],
+  "lang": "vi",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Đặt lịch",
+      "short_name": "Đặt lịch",
+      "description": "Mở nhanh danh sách dịch vụ để đặt lịch.",
+      "url": "/services?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Lịch của tôi",
+      "short_name": "Lịch hẹn",
+      "description": "Xem các lịch hẹn đã đặt.",
+      "url": "/my-appointments?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

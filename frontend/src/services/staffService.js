@@ -70,6 +70,10 @@ const staffService = {
     return api.put('/staff/me/weekly-availability', { slots });
   },
 
+  startWork: () => {
+    return api.post('/staff/me/start-work');
+  },
+
   requestLeave: (leaveData) => {
     return api.post('/staff/leave-request', leaveData);
   },

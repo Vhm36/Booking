@@ -626,6 +626,14 @@
   border-radius: 11px;
 }
 
+.user-avatar-presence {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
 .user-avatar-small {
   width: 34px;
   height: 34px;
@@ -647,6 +655,27 @@
   font-size: 14px;
   font-weight: 800;
   flex-shrink: 0;
+}
+
+.user-presence-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.16);
+}
+
+.user-presence-dot.is-online {
+  background: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.18);
+}
+
+.user-presence-dot.is-offline {
+  background: #94a3b8;
 }
 
 .user-menu-info {

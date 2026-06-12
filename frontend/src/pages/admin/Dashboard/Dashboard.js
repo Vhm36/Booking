@@ -76,6 +76,19 @@ const formatDate = (value) => {
   return parsed.toLocaleDateString('vi-VN');
 };
 
+const formatDateTime = (value) => {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
+
 const formatDelta = (delta) => {
   if (delta === null || typeof delta === 'undefined') {
     return 'Chưa đủ dữ liệu so sánh';
@@ -189,6 +202,9 @@ function Dashboard() {
   }, [fetchDashboardData]);
 
   const summary = overview?.summary || {};
+  const automation = overview?.automation || {};
+  const voucherStats = automation?.voucher_stats || {};
+  const segmentRows = automation?.segment_breakdown || [];
   const trendRows = overview?.trend || [];
   const favoriteServices = overview?.favorite_services || [];
   const recentBookings = overview?.recent_bookings || [];
@@ -201,6 +217,18 @@ function Dashboard() {
   const completedRate = statusRows.find((item) => item.status === 'completed')?.percent || 0;
   const cancelledRate = statusRows.find((item) => item.status === 'cancelled')?.percent || 0;
   const favoriteService = favoriteServices[0];
+  const processedCustomers = Number(automation.processed_customers || 0);
+  const systemAssignedVouchers = Number(voucherStats.system_assigned || 0);
+  const comebackAssigned = Number(voucherStats.comeback_assigned || 0);
+  const vipAssigned = Number(voucherStats.vip_assigned || 0);
+  const systemUsedVouchers = Number(voucherStats.system_used || 0);
+  const activeSystemVouchers = Number(voucherStats.active_system_vouchers || 0);
+  const automationUsageRate =
+    systemAssignedVouchers > 0 ? (systemUsedVouchers / systemAssignedVouchers) * 100 : 0;
+  const leadingSegment = segmentRows.reduce(
+    (best, row) => (Number(row.count || 0) > Number(best?.count || 0) ? row : best),
+    null
+  );
   const getFavoriteServiceLimit = (p) => {
     if (p === 'day') return 3;
     if (p === 'year') return 10;
@@ -208,13 +236,20 @@ function Dashboard() {
   };
   const favoriteServiceLimit = getFavoriteServiceLimit(period);
   const visibleFavoriteServices = favoriteServices.slice(0, favoriteServiceLimit);
+  const favoriteServicePeakBookings = Math.max(
+    ...visibleFavoriteServices.map((service) => Number(service.booking_count || 0)),
+    1
+  );
+  const favoriteBookingTotal = visibleFavoriteServices.reduce(
+    (sum, service) => sum + Number(service.booking_count || 0),
+    0
+  );
+  const favoriteCompletedTotal = visibleFavoriteServices.reduce(
+    (sum, service) => sum + Number(service.completed_count || 0),
+    0
+  );
   const visibleRecentBookings = recentBookings.slice(0, 5);
   const trendBookingValues = trendRows.map((item) => Number(item.bookings || 0));
-  const trendAverageValue =
-    trendBookingValues.length > 0
-      ? trendBookingValues.reduce((sum, value) => sum + value, 0) / trendBookingValues.length
-      : 0;
-  const shouldShowTrendAverage = period === 'month' && trendAverageValue > 0;
   const panelTabs = [
     {
       key: 'trend',
@@ -228,8 +263,13 @@ function Dashboard() {
     },
     {
       key: 'services',
-      label: 'Dịch vụ ưa thích',
+      label: 'Dịch vụ yêu thích',
       value: favoriteService?.name || 'Chưa có dữ liệu'
+    },
+    {
+      key: 'automation',
+      label: 'Tự động hóa',
+      value: `${systemAssignedVouchers.toLocaleString('vi-VN')} voucher`
     },
     {
       key: 'recent',
@@ -282,22 +322,8 @@ function Dashboard() {
         pointHoverRadius: 5,
         tension: 0.34,
         fill: true
-      },
-      shouldShowTrendAverage
-        ? {
-            label: 'Trung bình ngày',
-            data: trendRows.map(() => Number(trendAverageValue.toFixed(1))),
-            borderColor: '#c69244',
-            backgroundColor: 'rgba(198, 146, 68, 0.16)',
-            borderDash: [6, 5],
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            tension: 0,
-            fill: false
-          }
-        : null
-    ].filter(Boolean)
+      }
+    ]
   };
 
   const statusChartData = {
@@ -513,14 +539,23 @@ function Dashboard() {
           </button>
           <button
             type="button"
-            className={`dashboard-metric-card ${activePanel === 'services' ? 'is-active' : ''}`}
+            className={`dashboard-metric-card dashboard-metric-card--favorite ${activePanel === 'services' ? 'is-active' : ''}`}
             onClick={() => setActivePanel('services')}
           >
-            <span>Dịch vụ ưa thích</span>
+            <span>Dịch vụ được yêu thích</span>
             <strong>{favoriteService?.name || 'Chưa có dữ liệu'}</strong>
             <small>
               {favoriteService ? `${favoriteService.favorite_score.toFixed(1)}/100 điểm` : 'Chờ thêm booking'}
             </small>
+          </button>
+          <button
+            type="button"
+            className={`dashboard-metric-card ${activePanel === 'automation' ? 'is-active' : ''}`}
+            onClick={() => setActivePanel('automation')}
+          >
+            <span>Tặng voucher tự động</span>
+            <strong>{systemAssignedVouchers.toLocaleString('vi-VN')}</strong>
+            <small>{processedCustomers.toLocaleString('vi-VN')} khách đã phân cụm</small>
           </button>
         </div>
       </section>
@@ -559,7 +594,7 @@ function Dashboard() {
                 <aside className="trend-favorite-rankings">
                   <div className="trend-favorite-head">
                     <div>
-                      <h4>Top {favoriteServiceLimit} dịch vụ được ưa thích</h4>
+                      <h4>Top {favoriteServiceLimit} dịch vụ được yêu thích</h4>
                     </div>
                   </div>
 
@@ -628,74 +663,168 @@ function Dashboard() {
             <>
               <div className="chart-card-head">
                 <div>
-                  <h3>Biểu đồ đường số lượt đặt theo từng dịch vụ</h3>
-                  <p>Số lượt đặt lịch của các dịch vụ trong kỳ </p>
+                  <h3>Dịch vụ được yêu thích</h3>
+                  <p>Xếp hạng theo lượt đặt thật, lịch hoàn thành và doanh thu trong kỳ.</p>
                 </div>
               </div>
               {visibleFavoriteServices.length > 0 ? (
                 <>
-                  <div className="chart-canvas-wrap service-score-wrap" style={{ height: '320px', marginBottom: '24px' }}>
-                    <Line data={serviceChartData} options={serviceChartOptions} />
+                  <div className="service-insight-summary">
+                    <div className="service-insight-summary-item is-featured">
+                      <span>Dẫn đầu</span>
+                      <strong>{favoriteService?.name}</strong>
+                      <small>{Number(favoriteService?.booking_count || 0).toLocaleString('vi-VN')} lượt đặt thật</small>
+                    </div>
+                    <div className="service-insight-summary-item">
+                      <span>Tổng lượt đặt</span>
+                      <strong>{favoriteBookingTotal.toLocaleString('vi-VN')}</strong>
+                      <small>{favoriteCompletedTotal.toLocaleString('vi-VN')} lịch hoàn thành</small>
+                    </div>
                   </div>
-                  
-                  <div className="services-ranking-section">
-                    <h4 className="services-ranking-title" style={{ margin: '24px 0 12px', fontSize: '15px', color: '#21322d', fontWeight: '700' }}>
-                      Bảng xếp hạng chi tiết ({visibleFavoriteServices.length} dịch vụ)
-                    </h4>
-                    <div className="services-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+
+                  <div className="service-insight-layout">
+                    <div className="chart-canvas-wrap service-score-wrap">
+                      <Line data={serviceChartData} options={serviceChartOptions} />
+                    </div>
+
+                    <section className="services-ranking-section">
+                      <div className="services-ranking-head">
+                        <h4>Bảng xếp hạng chi tiết</h4>
+                        <span>{visibleFavoriteServices.length} dịch vụ</span>
+                      </div>
+                      <div className="services-ranking-list">
                       {visibleFavoriteServices.map((srv, index) => {
-                        const rankColors = [
-                          { border: '1px solid #0f766e', bg: '#dcefeb', color: '#0f766e' },
-                          { border: '1px solid #c69244', bg: '#f7ead7', color: '#c69244' },
-                          { border: '1px solid #b86a55', bg: '#f3ded6', color: '#b86a55' }
-                        ];
-                        const rankStyle = rankColors[index] || { border: '1px solid #7c887d', bg: '#eef1ec', color: '#7c887d' };
+                        const bookingCount = Number(srv.booking_count || 0);
+                        const completedCount = Number(srv.completed_count || 0);
+                        const revenue = Number(srv.revenue || 0);
+                        const completionRate = bookingCount > 0 ? (completedCount / bookingCount) * 100 : 0;
+                        const score = Number(srv.favorite_score || 0);
+                        const rankClass = index < 3 ? `rank-${index + 1}` : 'rank-other';
+                        const meterWidth = `${Math.max(
+                          6,
+                          Math.min(100, (bookingCount / favoriteServicePeakBookings) * 100)
+                        )}%`;
+
                         return (
-                          <div 
-                            key={srv.id} 
-                            style={{ 
-                              background: '#fdfefa', 
-                              border: '1px solid rgba(123, 142, 134, 0.16)', 
-                              borderRadius: '12px', 
-                              padding: '16px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '8px',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span 
-                                style={{ 
-                                  fontSize: '11px', 
-                                  fontWeight: '800', 
-                                  padding: '2px 8px', 
-                                  borderRadius: '20px',
-                                  ...rankStyle
-                                }}
-                              >
-                                TOP {index + 1}
+                          <article className="service-rank-card" key={srv.id || srv.name}>
+                            <div className="service-rank-head">
+                              <span className={`service-rank-badge ${rankClass}`}>
+                                #{index + 1}
                               </span>
-                              <strong style={{ fontSize: '13px', color: '#0f766e' }} title={overview?.favorite_formula}>
-                                {srv.favorite_score.toFixed(1)}đ
-                              </strong>
+                              <strong title={srv.name}>{srv.name}</strong>
+                              <small title={overview?.favorite_formula}>{score.toFixed(1)}/100</small>
                             </div>
-                            <h5 style={{ margin: '4px 0 2px', fontSize: '14px', fontWeight: '700', color: '#34423c', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {srv.name}
-                            </h5>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px', color: '#687568' }}>
-                              <span>Lượt đặt: <strong>{srv.booking_count}</strong> ({srv.completed_count} thành công)</span>
-                              <span>Doanh thu: <strong>{formatMoney(srv.revenue)}</strong></span>
+
+                            <div className="service-rank-meter" aria-hidden="true">
+                              <i style={{ width: meterWidth }} />
                             </div>
-                          </div>
+
+                            <div className="service-rank-stats">
+                              <span>
+                                <b>{bookingCount.toLocaleString('vi-VN')}</b> lượt đặt
+                              </span>
+                              <span>
+                                <b>{completionRate.toFixed(0)}%</b> hoàn thành
+                              </span>
+                              <span>
+                                <b>{formatMoney(revenue)}</b>
+                              </span>
+                            </div>
+                          </article>
                         );
                       })}
-                    </div>
+                      </div>
+                    </section>
                   </div>
                 </>
               ) : (
                 <div className="chart-empty-state">Chưa có booking dịch vụ trong kỳ này.</div>
               )}
+            </>
+          )}
+
+
+          {activePanel === 'automation' && (
+            <>
+              <div className="chart-card-head">
+                <div>
+                  <h3>Tự động hóa voucher</h3>
+                  <p>Lần phân tích gần nhất: {formatDateTime(automation.last_analysis_at)}</p>
+                </div>
+                <span>{lastRealtimeEvent?.type?.startsWith('automation.') ? 'Realtime' : 'Định kỳ'}</span>
+              </div>
+
+              <div className="automation-summary-grid">
+                <div className="automation-summary-item">
+                  <span>Voucher hệ thống</span>
+                  <strong>{systemAssignedVouchers.toLocaleString('vi-VN')}</strong>
+                  <small>COMEBACK {comebackAssigned} · VIP {vipAssigned}</small>
+                </div>
+                <div className="automation-summary-item">
+                  <span>Đã sử dụng</span>
+                  <strong>{systemUsedVouchers.toLocaleString('vi-VN')}</strong>
+                  <small>{automationUsageRate.toFixed(1)}% voucher đã dùng</small>
+                </div>
+                <div className="automation-summary-item">
+                  <span>Còn hiệu lực</span>
+                  <strong>{activeSystemVouchers.toLocaleString('vi-VN')}</strong>
+                  <small>Mã tự động đang chạy</small>
+                </div>
+                <div className="automation-summary-item">
+                  <span>Khách đã phân cụm</span>
+                  <strong>{processedCustomers.toLocaleString('vi-VN')}</strong>
+                  <small>{leadingSegment?.label || 'Chưa có phân khúc nổi bật'}</small>
+                </div>
+              </div>
+
+              <div className="automation-detail-layout">
+                <section className="automation-segment-panel">
+                  <div className="automation-panel-head">
+                    <h4>Phân khúc khách hàng</h4>
+                    <span>{processedCustomers.toLocaleString('vi-VN')} khách</span>
+                  </div>
+                  <div className="automation-segment-list">
+                    {segmentRows.map((segment) => {
+                      const count = Number(segment.count || 0);
+                      const percent = processedCustomers > 0 ? (count / processedCustomers) * 100 : 0;
+
+                      return (
+                        <div className="automation-segment-row" key={segment.segment || segment.label}>
+                          <div className="automation-segment-copy">
+                            <strong>{segment.label || 'Chưa phân loại'}</strong>
+                            <small>{percent.toFixed(1)}% tổng khách</small>
+                          </div>
+                          <span>{count.toLocaleString('vi-VN')}</span>
+                          <div className="automation-progress" aria-hidden="true">
+                            <i style={{ width: `${Math.min(100, percent)}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="automation-voucher-panel">
+                  <div className="automation-panel-head">
+                    <h4>Voucher tự động</h4>
+                    <span>{automation.period_label || 'Từ 01/01/2024 đến nay'}</span>
+                  </div>
+                  <dl className="automation-voucher-list">
+                    <div>
+                      <dt>Nguy cơ rời bỏ</dt>
+                      <dd>{comebackAssigned.toLocaleString('vi-VN')} voucher quay lại</dd>
+                    </div>
+                    <div>
+                      <dt>Khách VIP</dt>
+                      <dd>{vipAssigned.toLocaleString('vi-VN')} voucher VIP</dd>
+                    </div>
+                    <div>
+                      <dt>Giảm giá đã áp dụng</dt>
+                      <dd>{formatMoney(voucherStats.system_discount_total)}</dd>
+                    </div>
+                  </dl>
+                </section>
+              </div>
             </>
           )}
 

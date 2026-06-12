@@ -153,6 +153,14 @@
   border-radius: 50%;
 }
 
+.role-sidebar__avatar-wrap {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
 .role-sidebar__avatar {
   object-fit: cover;
 }
@@ -165,6 +173,23 @@
   color: #ffffff;
   font-size: 13px;
   font-weight: 800;
+}
+
+.role-sidebar__presence-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.16);
+}
+
+.role-sidebar__presence-dot.is-online {
+  background: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.18);
 }
 
 .role-sidebar__user-copy strong {
@@ -200,6 +225,90 @@
 .role-sidebar__logout span {
   font-size: 12px;
   font-weight: 800;
+}
+
+.role-sidebar__logout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.role-sidebar__logout-modal {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 28px 72px rgba(15, 23, 42, 0.22);
+}
+
+.role-sidebar__logout-kicker {
+  margin: 0 0 5px;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.role-sidebar__logout-modal h2 {
+  margin: 0;
+  color: #12223b;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.role-sidebar__logout-modal span {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.role-sidebar__logout-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.role-sidebar__logout-confirm,
+.role-sidebar__logout-cancel {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.role-sidebar__logout-confirm {
+  border: 1px solid transparent;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.role-sidebar__logout-confirm:hover {
+  background: #991b1b;
+}
+
+.role-sidebar__logout-cancel {
+  border: 1px solid #d8e8e4;
+  background: #ffffff;
+  color: #12223b;
+}
+
+.role-sidebar__logout-cancel:hover {
+  border-color: #0f766e;
+  color: #0f766e;
 }
 
 @media (min-width: 981px) {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import authService from '../../services/authService';
 import serviceService from '../../services/serviceService';
 import { formatVnd } from '../../utils/formatters';
 import { resolveServiceImageUrl } from '../../utils/serviceImage';
@@ -206,33 +207,9 @@ const toVietnameseCategoryLabel = (category) => {
   return category || 'Làm đẹp';
 };
 
-const CATEGORY_ICONS = {
-  'toc': '💇',
-  'hair': '💇',
-  'nail': '💅',
-  'mong': '💅',
-  'massage': '💆',
-  'da': '✨',
-  'skin': '✨',
-  'facial': '✨',
-  'mi': '👁️',
-  'may': '👁️',
-  'brow': '👁️',
-  'lash': '👁️',
-  'makeup': '💄',
-  'trang diem': '💄'
-};
-
-const getCategoryIcon = (category) => {
-  const key = normalizeText(category);
-  for (const [pattern, icon] of Object.entries(CATEGORY_ICONS)) {
-    if (key.includes(pattern)) return icon;
-  }
-  return '💎';
-};
-
 function Home({ userLocation = null }) {
   const navigate = useNavigate();
+  const user = authService.getUser();
   const [keyword, setKeyword] = useState('');
   const [date, setDate] = useState(() => getLocalDateKey());
   const [services, setServices] = useState([]);
@@ -468,7 +445,7 @@ function Home({ userLocation = null }) {
   // Trending categories from API
   const trendingCategories = useMemo(() => {
     if (!trendingData?.categories) return [];
-    return trendingData.categories;
+    return trendingData.categories.filter((category) => Number(category.total_bookings || 0) > 0);
   }, [trendingData]);
 
   // Services for the currently selected trending category
@@ -477,12 +454,16 @@ function Home({ userLocation = null }) {
     
     if (activeTrendingCategory === null) {
       // Show top services across all categories (max 4)
-      const allServices = trendingData?.all_services || [];
+      const allServices = (trendingData?.all_services || []).filter(
+        (service) => Number(service.booking_count || 0) > 0
+      );
       return allServices.slice(0, 4);
     }
     
     const category = trendingCategories.find(c => c.category === activeTrendingCategory);
-    return category ? category.services.slice(0, 4) : [];
+    return category
+      ? category.services.filter((service) => Number(service.booking_count || 0) > 0).slice(0, 4)
+      : [];
   }, [trendingCategories, activeTrendingCategory, trendingData]);
 
   const categoryChips = useMemo(() => {
@@ -596,11 +577,15 @@ function Home({ userLocation = null }) {
       </article>
     ));
 
-  const buildServiceUrl = (searchKeyword, searchDate) => {
+  const buildServiceUrl = (searchKeyword, searchDate, category) => {
     const params = new URLSearchParams();
 
     if (searchKeyword) {
       params.set('q', searchKeyword.trim());
+    }
+
+    if (category) {
+      params.set('category', category);
     }
 
     if (searchDate) {
@@ -617,7 +602,7 @@ function Home({ userLocation = null }) {
   };
 
   const handleCategoryClick = (category) => {
-    navigate(buildServiceUrl(category, date));
+    navigate(buildServiceUrl('', date, category));
   };
 
   const todayFormatted = useMemo(() => {
@@ -719,7 +704,7 @@ function Home({ userLocation = null }) {
 
       <section className="fresha-listing">
         <div className="listing-head">
-          <h2>Danh mục nổi bật</h2>
+          <h2>Dịch vụ được yêu thích</h2>
           <Link to="/services">Xem tất cả</Link>
         </div>
 
@@ -732,7 +717,7 @@ function Home({ userLocation = null }) {
             {trendingCategories.length > 0 && (
               <div className="listing-group trending-section">
                 <div className="trending-header">
-                  <h3>Xu hướng</h3>
+                  <h3>Được đặt nhiều</h3>
                 </div>
 
                 <>
@@ -742,7 +727,6 @@ function Home({ userLocation = null }) {
                       className={`trending-tab ${activeTrendingCategory === null ? 'active' : ''}`}
                       onClick={() => setActiveTrendingCategory(null)}
                     >
-                      <span className="trending-tab-icon">🏆</span>
                       <span className="trending-tab-label">Tất cả</span>
                     </button>
                     {trendingCategories.map((cat) => (
@@ -752,11 +736,7 @@ function Home({ userLocation = null }) {
                         className={`trending-tab ${activeTrendingCategory === cat.category ? 'active' : ''}`}
                         onClick={() => setActiveTrendingCategory(cat.category)}
                       >
-                        <span className="trending-tab-icon">
-                          {getCategoryIcon(cat.category)}
-                        </span>
                         <span className="trending-tab-label">{cat.category}</span>
-                        <span className="trending-tab-count">{cat.total_bookings} lượt</span>
                       </button>
                     ))}
                   </div>
@@ -783,7 +763,7 @@ function Home({ userLocation = null }) {
                           />
                           {Number(service.booking_count) > 0 && (
                             <div className="trending-booking-badge">
-                              {service.booking_count} lượt đặt
+                              Hot
                             </div>
                           )}
                         </div>
@@ -809,16 +789,24 @@ function Home({ userLocation = null }) {
                         </div>
 
                         <div className="service-market-actions">
-                          <button
-                            type="button"
-                            className="btn-outline"
-                            onClick={() => handleCategoryClick(service.category || service.name)}
-                          >
-                            Tìm tương tự
-                          </button>
-                          <Link to={`/services/${service.id}`} className="btn-link">
+                          <Link to={`/services/${service.id}`} className="btn-outline">
                             Chi tiết
                           </Link>
+                          {(!user || user.role === 'customer') && (
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={() => {
+                                if (!user) {
+                                  navigate(`/login?redirect=${encodeURIComponent(`/booking/${service.id}`)}`);
+                                } else {
+                                  navigate(`/booking/${service.id}`);
+                                }
+                              }}
+                            >
+                              Đặt lịch
+                            </button>
+                          )}
                         </div>
                       </article>
                     ))}
@@ -872,16 +860,24 @@ function Home({ userLocation = null }) {
                         </div>
 
                         <div className="service-market-actions">
-                          <button
-                            type="button"
-                            className="btn-outline"
-                            onClick={() => handleCategoryClick(service.category || service.name)}
-                          >
-                            Tìm tương tự
-                          </button>
-                          <Link to={`/services/${service.id}`} className="btn-link">
+                          <Link to={`/services/${service.id}`} className="btn-outline">
                             Chi tiết
                           </Link>
+                          {(!user || user.role === 'customer') && (
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={() => {
+                                if (!user) {
+                                  navigate(`/login?redirect=${encodeURIComponent(`/booking/${service.id}`)}`);
+                                } else {
+                                  navigate(`/booking/${service.id}`);
+                                }
+                              }}
+                            >
+                              Đặt lịch
+                            </button>
+                          )}
                         </div>
                       </article>
                     ))}

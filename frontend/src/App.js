@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import authService from './services/authService';
+import connectDashboardRealtime from './services/dashboardRealtimeService';
+import { AUTH_EXPIRED_EVENT } from './services/api';
 import './App.css';
 
 import Home from './pages/Home';
@@ -23,10 +25,12 @@ import AdminDashboard from './pages/admin/Dashboard';
 import ManageServices from './pages/admin/ManageServices/ManageServices';
 import ManageAppointments from './pages/admin/ManageAppointments';
 import Analytics from './pages/admin/Analytics';
+import AnalyticsStrategy from './pages/admin/AnalyticsStrategy';
 import ManageStaff from './pages/admin/ManageStaff';
 import StaffLeaveManagement from './pages/admin/StaffLeaveManagement';
 import ManageVouchers from './pages/admin/ManageVouchers';
 import ServiceStaffDashboard from './pages/staff/ServiceStaffDashboard';
+import StaffShiftRegistration from './pages/staff/StaffShiftRegistration';
 import StaffScheduleCalendar from './pages/admin/StaffScheduleCalendar';
 
 import Header from './components/Header';
@@ -48,6 +52,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(() => readUserLocation());
+  const [presenceStatus, setPresenceStatus] = useState('offline');
 
   useEffect(() => {
     let isMounted = true;
@@ -66,11 +71,6 @@ function App() {
         setUser(savedUser);
       }
 
-      if (savedUser.created_at) {
-        if (isMounted) setLoading(false);
-        return;
-      }
-
       try {
         const response = await authService.getProfile();
         const profileUser = response.data?.data || response.data?.user;
@@ -83,6 +83,10 @@ function App() {
         }
       } catch (err) {
         console.error('[PROFILE_SYNC_ERROR]', err);
+        if (err.response?.status === 401 && isMounted) {
+          setUser(null);
+          authService.logout();
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -104,13 +108,53 @@ function App() {
     return () => document.body.classList.remove('has-bottom-nav');
   }, [user]);
 
+  useEffect(() => {
+    if (!user || !authService.getToken()) {
+      setPresenceStatus('offline');
+      return undefined;
+    }
+
+    let socket;
+    let cancelled = false;
+
+    connectDashboardRealtime({
+      onStatus: (status) => {
+        if (!cancelled) {
+          setPresenceStatus(status === 'connected' ? 'online' : 'offline');
+        }
+      },
+      onPresenceMe: (payload) => {
+        if (!cancelled) {
+          setPresenceStatus(payload?.online ? 'online' : 'offline');
+        }
+      }
+    }).then((connectedSocket) => {
+      if (cancelled) {
+        connectedSocket.disconnect();
+        return;
+      }
+      socket = connectedSocket;
+    }).catch(() => {
+      if (!cancelled) {
+        setPresenceStatus('offline');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      socket?.disconnect();
+      setPresenceStatus('offline');
+    };
+  }, [user]);
+
   const isAuthenticated = Boolean(user && authService.getToken());
   const authenticatedUser = isAuthenticated ? user : null;
   const usesRoleSidebar = Boolean(
     authenticatedUser && ['admin', 'staff'].includes(authenticatedUser.role)
   );
   const isCashierStaff =
-    authenticatedUser?.role === 'staff' && normalizeRoleName(authenticatedUser.staff_role_name) === 'thu ngan';
+    authenticatedUser?.role === 'staff' &&
+    ['thu ngan', 'quan ly'].includes(normalizeRoleName(authenticatedUser.staff_role_name));
 
   const handleLogin = (userData) => {
     setUser(userData);
@@ -119,8 +163,19 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+    setPresenceStatus('offline');
     authService.logout();
   };
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setUser(null);
+      setPresenceStatus('offline');
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+  }, []);
 
   if (loading) {
     return <div className="loading">Đang tải...</div>;
@@ -129,8 +184,8 @@ function App() {
   return (
     <Router>
       <div className={`app ${usesRoleSidebar ? 'app--role-sidebar' : ''}`.trim()}>
-        <Header user={authenticatedUser} onLogout={handleLogout} />
-        <RoleSidebar user={authenticatedUser} onLogout={handleLogout} />
+        <Header user={authenticatedUser} onLogout={handleLogout} presenceStatus={presenceStatus} />
+        <RoleSidebar user={authenticatedUser} onLogout={handleLogout} presenceStatus={presenceStatus} />
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home userLocation={userLocation} />} />
@@ -178,6 +233,11 @@ function App() {
                 <Route path="/admin/appointments" element={<ManageAppointments />} />
                 <Route path="/admin/schedule" element={<StaffScheduleCalendar />} />
                 <Route path="/admin/analytics" element={<Analytics />} />
+                <Route path="/admin/analytics/strategy" element={<Navigate to="/admin/analytics/strategy/table" />} />
+                <Route path="/admin/analytics/strategy/table" element={<AnalyticsStrategy view="table" />} />
+                <Route path="/admin/analytics/strategy/clusters" element={<AnalyticsStrategy view="clusters-detail" />} />
+                <Route path="/admin/analytics/strategy/clusters/profile" element={<AnalyticsStrategy view="clusters-profile" />} />
+                <Route path="/admin/analytics/strategy/clusters/strategy" element={<AnalyticsStrategy view="clusters-strategy" />} />
               </>
             )}
 
@@ -186,10 +246,12 @@ function App() {
                 {isCashierStaff ? (
                   <>
                     <Route path="/staff/dashboard" element={<ManageAppointments />} />
+                    <Route path="/staff/shifts" element={<StaffShiftRegistration />} />
                   </>
                 ) : (
                   <>
                     <Route path="/staff/dashboard" element={<ServiceStaffDashboard />} />
+                    <Route path="/staff/shifts" element={<StaffShiftRegistration />} />
                   </>
                 )}
               </>

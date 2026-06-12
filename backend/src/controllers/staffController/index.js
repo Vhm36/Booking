@@ -10,6 +10,7 @@ const {
   normalizeSelectedServiceIds,
   summarizeSelectedServices
 } = require('../../utils/appointmentServices');
+const { emitDashboardUpdate } = require('../../utils/realtime');
 
 const parseActiveValue = (value) => {
   if (typeof value === 'boolean') return value;
@@ -250,8 +251,8 @@ const getAllowedShiftWindows = (day) => {
   if (day >= 0 && day <= 4) {
     return [
       { type: 'morning', start: '08:00:00', end: '16:00:00', label: 'ca sáng 08:00-16:00' },
-      { type: 'evening', start: '13:30:00', end: '21:30:00', label: 'ca tối 13:30-21:30' },
-      { type: 'full', start: '08:00:00', end: '21:30:00', label: 'full ca 08:00-21:30' }
+      { type: 'evening', start: '13:30:00', end: '21:00:00', label: 'ca tối 13:30-21:00' },
+      { type: 'full', start: '08:00:00', end: '21:00:00', label: 'full ca 08:00-21:00' }
     ];
   }
 
@@ -431,6 +432,51 @@ exports.replaceMyWeeklyAvailability = (req, res) => {
     }
 
     return res.status(200).json({ success: true, message: 'Đã đăng ký ca làm' });
+  });
+};
+
+exports.startWork = (req, res) => {
+  if (req.user.role !== 'staff') {
+    return res.status(403).json({ success: false, message: 'Chỉ nhân viên mới có thể xác nhận bắt đầu làm' });
+  }
+
+  return staffModel.confirmPendingAppointmentsForStaff(req.user.id, (err, result) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Lỗi server', error: err });
+    }
+
+    const confirmedAppointments = result.appointments || [];
+
+    emitDashboardUpdate(req, 'staff.work_started', {
+      staffId: req.user.id,
+      confirmedCount: Number(result.affectedRows || 0)
+    });
+
+    confirmedAppointments.forEach((appointment) => {
+      emitDashboardUpdate(req, 'appointment.auto_confirmed', {
+        appointmentId: appointment.id,
+        status: 'confirmed',
+        userId: appointment.user_id,
+        staffId: appointment.staff_id,
+        serviceName: appointment.service_name,
+        staffName: appointment.staff_name,
+        customerName: appointment.customer_name,
+        appointmentDate: appointment.appointment_date,
+        appointmentTime: appointment.appointment_time
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        confirmedAppointments.length > 0
+          ? `Đã xác nhận ${confirmedAppointments.length} lịch hẹn được giao.`
+          : 'Không có lịch hẹn mới cần xác nhận.',
+      data: {
+        confirmed_count: confirmedAppointments.length,
+        appointments: confirmedAppointments
+      }
+    });
   });
 };
 

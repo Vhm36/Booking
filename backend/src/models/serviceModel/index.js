@@ -1,15 +1,15 @@
 const db = require('../../config/db');
 
 const createService = (serviceData, callback) => {
-  const { name, description, price, duration, category, image_url, status } = serviceData;
+  const { name, description, price, duration, category, image_url, status, service_code } = serviceData;
   const query = `
-    INSERT INTO services (name, description, price, duration, category, image_url, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+    INSERT INTO services (name, description, price, duration, category, image_url, status, service_code, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
   `;
 
   db.query(
     query,
-    [name, description, price, duration, category || '', image_url || '', status || 'active'],
+    [name, description, price, duration, category || '', image_url || '', status || 'active', service_code || null],
     (err, result) => {
       if (err) return callback(err);
       callback(null, result);
@@ -54,16 +54,16 @@ const getServicesByIds = (ids, callback) => {
 };
 
 const updateService = (id, serviceData, callback) => {
-  const { name, description, price, duration, category, image_url, status } = serviceData;
+  const { name, description, price, duration, category, image_url, status, service_code } = serviceData;
   const query = `
     UPDATE services
-    SET name = ?, description = ?, price = ?, duration = ?, category = ?, image_url = ?, status = ?
+    SET name = ?, description = ?, price = ?, duration = ?, category = ?, image_url = ?, status = ?, service_code = ?
     WHERE id = ?
   `;
 
   db.query(
     query,
-    [name, description, price, duration, category || '', image_url || '', status, id],
+    [name, description, price, duration, category || '', image_url || '', status, service_code || null, id],
     (err, result) => {
       if (err) return callback(err);
       callback(null, result);
@@ -131,14 +131,39 @@ const getTrendingServices = (callback) => {
     FROM services s
     LEFT JOIN (
       SELECT
-        a.service_id,
-        COUNT(a.id) AS booking_count,
-        SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
-        AVG(a.staff_rating) AS avg_rating
-      FROM appointments a
-      WHERE a.appointment_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
-        AND a.status != 'cancelled'
-      GROUP BY a.service_id
+        service_usage.service_id,
+        COUNT(service_usage.appointment_id) AS booking_count,
+        SUM(CASE WHEN service_usage.status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
+        AVG(service_usage.staff_rating) AS avg_rating
+      FROM (
+        SELECT
+          aps.service_id,
+          a.id AS appointment_id,
+          a.status,
+          a.staff_rating
+        FROM appointments a
+        JOIN appointment_services aps ON aps.appointment_id = a.id
+        WHERE a.appointment_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+          AND a.status != 'cancelled'
+
+        UNION ALL
+
+        SELECT
+          a.service_id,
+          a.id AS appointment_id,
+          a.status,
+          a.staff_rating
+        FROM appointments a
+        WHERE a.appointment_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+          AND a.status != 'cancelled'
+          AND a.service_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM appointment_services aps
+            WHERE aps.appointment_id = a.id
+          )
+      ) service_usage
+      GROUP BY service_usage.service_id
     ) stats ON stats.service_id = s.id
     WHERE s.status = 'active'
     ORDER BY booking_count DESC, completed_count DESC, s.created_at DESC

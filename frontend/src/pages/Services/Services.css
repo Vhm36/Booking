@@ -128,17 +128,19 @@
 .category-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 5px;
 }
 
 .category-chips .chip {
+  min-height: 32px;
   border: 1px solid #d7e4ef;
   background: #ffffff;
   color: #334155;
-  padding: 7px 10px;
+  padding: 6px 9px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.15;
 }
 
 .category-chips .chip.active {
@@ -164,6 +166,7 @@
 }
 
 .service-image-wrap {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
   border-radius: 10px;
@@ -181,27 +184,42 @@
 .service-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
 }
 
-.category-pill,
-.collection-pill {
+.service-card .category-pill,
+.service-card .collection-pill {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  align-items: center;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
-  padding: 4px 9px;
+  line-height: 1.15;
+  padding: 3px 7px;
+  white-space: nowrap;
 }
 
-.category-pill {
+.service-card .category-pill {
   border: 1px solid #d7e4ef;
   color: #4b5b77;
   background: #f8fbff;
 }
 
-.collection-pill {
-  border: 1px solid #f5ccb9;
-  color: #ac4f2d;
-  background: #fff2ec;
+.service-card .collection-pill {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  gap: 4px;
+  border: 1px solid #fed7aa;
+  color: #c2410c;
+  background: #fff7ed;
+  box-shadow: 0 8px 18px rgba(194, 65, 12, 0.18);
 }
 
 .service-card-top {
@@ -218,20 +236,25 @@
 }
 
 .service-card-top span {
+  min-height: 0;
   border: 1px solid #d7e4ef;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #51607a;
-  padding: 5px 8px;
+  padding: 4px 7px;
   white-space: nowrap;
 }
 
 .service-card p {
+  display: -webkit-box;
+  overflow: hidden;
   color: #51607a;
   line-height: 1.6;
   font-size: 13px;
   min-height: 58px;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .service-meta {
@@ -270,12 +293,24 @@
 }
 
 .service-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   text-align: center;
   text-decoration: none;
   border-radius: 9px;
   font-size: 13px;
   font-weight: 700;
   padding: 9px 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.service-actions a:only-child {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-width: 156px;
 }
 
 .btn-details {
@@ -330,5 +365,16 @@
 
   .service-actions {
     grid-template-columns: 1fr;
+  }
+
+  .service-actions a:only-child {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .category-chips .chip {
+    min-width: 0;
+    min-height: 32px;
+    padding: 6px 9px;
   }
 }

@@ -39,7 +39,7 @@ const suggestionIconMap = {
 
 const suggestionLabelFallbacks = {
   'gap nhan vien tu van': 'Gặp hỗ trợ viên',
-  'g?p nh?n vi?n t? v?n': 'Gặp hỗ trợ viên',
+  'gặp nhân viên tư vấn': 'Gặp hỗ trợ viên',
   'dat lich nhanh': 'Đặt lịch nhanh',
   'cat toc nam': 'Cắt tóc nam',
   'nhuom toc': 'Nhuộm tóc',

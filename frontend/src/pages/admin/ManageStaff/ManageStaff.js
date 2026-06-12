@@ -186,6 +186,27 @@ const formatWeeklyScheduleSummary = (rows = [], fallback = 'Chưa đăng ký') =
   return shifts.join(', ');
 };
 
+const getPrimaryShiftFromRows = (rows = []) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return 'unregistered';
+  }
+
+  const counts = rows.reduce(
+    (acc, row) => {
+      if (typeof row.day_of_week === 'undefined') return acc;
+      const shift = getShiftFromTimes(row.start_time, row.end_time);
+      acc[shift] = (acc[shift] || 0) + 1;
+      return acc;
+    },
+    { morning: 0, evening: 0, full: 0 }
+  );
+
+  if (counts.full >= counts.morning && counts.full >= counts.evening && counts.full > 0) return 'full';
+  if (counts.evening > counts.morning) return 'evening';
+  if (counts.morning > 0) return 'morning';
+  return 'unregistered';
+};
+
 const StaffActionIcon = ({ name }) => {
   const icons = {
     edit: (
@@ -232,6 +253,12 @@ const StaffActionIcon = ({ name }) => {
         <path d="M7 4h7l4 4v12H7z" />
         <path d="M14 4v5h5" />
       </>
+    ),
+    close: (
+      <>
+        <path d="M6 6l12 12" />
+        <path d="M18 6L6 18" />
+      </>
     )
   };
 
@@ -253,10 +280,13 @@ function ManageStaff() {
   const [tableSearch, setTableSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [shiftFilter, setShiftFilter] = useState('all');
   const [selectedStaffId, setSelectedStaffId] = useState(null);
   const [staffPage, setStaffPage] = useState(1);
   const [selectedAvailability, setSelectedAvailability] = useState([]);
   const [selectedAvailabilityLoading, setSelectedAvailabilityLoading] = useState(false);
+  const [weeklyAvailabilityByStaff, setWeeklyAvailabilityByStaff] = useState({});
+  const [weeklyAvailabilityLoading, setWeeklyAvailabilityLoading] = useState(false);
   
   const fileInputRef = useRef(null);
   const [importing, setImporting] = useState(false);
@@ -334,6 +364,16 @@ function ManageStaff() {
     });
   }, [visibleStaffRoles]);
 
+  const staffShiftById = useMemo(() => {
+    const map = {};
+    staffList.forEach((staff) => {
+      map[staff.id] = isAdminUser(staff)
+        ? 'admin'
+        : getPrimaryShiftFromRows(weeklyAvailabilityByStaff[staff.id] || []);
+    });
+    return map;
+  }, [staffList, weeklyAvailabilityByStaff]);
+
   const filteredStaffList = useMemo(() => {
     let list = staffList;
 
@@ -353,6 +393,19 @@ function ManageStaff() {
       list = list.filter((staff) => !staff.is_active);
     }
 
+    if (shiftFilter !== 'all') {
+      list = list.filter((staff) => staffShiftById[staff.id] === shiftFilter);
+    } else {
+      const shiftOrder = { morning: 0, evening: 1, unregistered: 2, full: 3, admin: 4 };
+      list = [...list].sort((a, b) => {
+        const shiftA = staffShiftById[a.id] || 'unregistered';
+        const shiftB = staffShiftById[b.id] || 'unregistered';
+        const byShift = (shiftOrder[shiftA] ?? 9) - (shiftOrder[shiftB] ?? 9);
+        if (byShift !== 0) return byShift;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+      });
+    }
+
     const normalizedKeyword = normalizeSearchText(tableSearch);
 
     if (!normalizedKeyword) {
@@ -365,7 +418,7 @@ function ManageStaff() {
       );
       return searchBlob.includes(normalizedKeyword);
     });
-  }, [staffList, tableSearch, roleFilter, statusFilter]);
+  }, [staffList, tableSearch, roleFilter, statusFilter, shiftFilter, staffShiftById]);
 
   const staffStats = useMemo(() => {
     const totalCount = staffList.length;
@@ -407,7 +460,7 @@ function ManageStaff() {
 
   useEffect(() => {
     setStaffPage(1);
-  }, [tableSearch, roleFilter, statusFilter]);
+  }, [tableSearch, roleFilter, statusFilter, shiftFilter]);
 
   useEffect(() => {
     setStaffPage((currentPage) => Math.min(currentPage, staffPageCount));
@@ -472,10 +525,58 @@ function ManageStaff() {
     };
   }, [selectedStaff]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const activeStaff = staffList.filter((staff) => staff.is_active && !isAdminUser(staff));
+
+    if (activeStaff.length === 0) {
+      setWeeklyAvailabilityByStaff({});
+      setWeeklyAvailabilityLoading(false);
+      return undefined;
+    }
+
+    setWeeklyAvailabilityLoading(true);
+    Promise.all(
+      activeStaff.map((staff) =>
+        staffService
+          .getStaffWeeklyAvailability(staff.id)
+          .then((response) => [staff.id, response.data?.data || []])
+          .catch(() => [staff.id, []])
+      )
+    )
+      .then((entries) => {
+        if (!cancelled) {
+          setWeeklyAvailabilityByStaff(Object.fromEntries(entries));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWeeklyAvailabilityLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [staffList]);
+
   const updateEditField = (field, value) => {
     setEditFeedback(emptyFeedback);
     setEditData((prev) => ({ ...prev, [field]: value }));
   };
+
+  useEffect(() => {
+    if (!showForm) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowForm(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showForm]);
 
   const handleCreate = async (event) => {
     event.preventDefault();
@@ -743,17 +844,20 @@ function ManageStaff() {
     try {
       setScheduleSaving(true);
       await staffService.replaceStaffWeeklyAvailability(scheduleModal.staff.id, slots);
+      const savedRows = slots.map((slot, index) => ({
+        id: index,
+        staff_id: scheduleModal.staff.id,
+        day_of_week: slot.day_of_week,
+        start_time: slot.start_time,
+        end_time: slot.end_time
+      }));
       if (String(scheduleModal.staff.id) === String(selectedStaffId)) {
-        setSelectedAvailability(
-          slots.map((slot, index) => ({
-            id: index,
-            staff_id: scheduleModal.staff.id,
-            day_of_week: slot.day_of_week,
-            start_time: slot.start_time,
-            end_time: slot.end_time
-          }))
-        );
+        setSelectedAvailability(savedRows);
       }
+      setWeeklyAvailabilityByStaff((prev) => ({
+        ...prev,
+        [scheduleModal.staff.id]: savedRows
+      }));
       closeScheduleModal();
     } catch (err) {
       alert(err.response?.data?.message || 'Không thể lưu lịch làm việc.');
@@ -821,6 +925,12 @@ function ManageStaff() {
             <option value="active">Đang làm</option>
             <option value="inactive">Tạm khóa</option>
           </select>
+          <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} disabled={weeklyAvailabilityLoading}>
+            <option value="all">Tất cả ca làm</option>
+            <option value="morning">Ca sáng</option>
+            <option value="evening">Ca tối</option>
+            <option value="full">Full ca</option>
+          </select>
 
           <div className="staff-command-actions">
             <input
@@ -833,10 +943,10 @@ function ManageStaff() {
             <button
               className="staff-primary-action"
               type="button"
-              onClick={() => setShowForm((prev) => !prev)}
+              onClick={() => setShowForm(true)}
             >
               <StaffActionIcon name="add" />
-              {showForm ? 'Đóng form' : 'Thêm nhân sự'}
+              Thêm nhân sự
             </button>
             <button
               className="staff-secondary-action"
@@ -875,8 +985,29 @@ function ManageStaff() {
       </section>
 
       {showForm && (
-        <div className="staff-form-card">
-          <h3>Tạo tài khoản nhân viên</h3>
+        <div
+          className="staff-create-modal"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowForm(false);
+            }
+          }}
+        >
+          <div className="staff-form-card staff-create-panel" role="dialog" aria-modal="true" aria-labelledby="staff-create-title">
+            <div className="staff-create-head">
+              <div>
+                <span>Tài khoản mới</span>
+                <h3 id="staff-create-title">Tạo tài khoản nhân viên</h3>
+              </div>
+              <button
+                type="button"
+                className="staff-modal-close"
+                onClick={() => setShowForm(false)}
+                aria-label="Đóng form tạo nhân viên"
+              >
+                <StaffActionIcon name="close" />
+              </button>
+            </div>
           <form onSubmit={handleCreate}>
             <div className="form-row">
               <div className="form-group">
@@ -954,6 +1085,7 @@ function ManageStaff() {
               Tạo nhân viên
             </button>
           </form>
+          </div>
         </div>
       )}
 

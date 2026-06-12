@@ -21,6 +21,40 @@ if (!JWT_SECRET) {
 const isBcryptHash = (value) =>
   typeof value === 'string' && BCRYPT_HASH_PATTERN.test(value);
 
+const normalizeDateOfBirth = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return null;
+  }
+
+  const birthDate = new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(birthDate.getTime())) {
+    return null;
+  }
+
+  return raw;
+};
+
+const attachMonthlyLoyaltyStats = (user, callback) => {
+  if (!user) {
+    return callback(null, user);
+  }
+
+  return userModel.getMonthlyLoyaltyStats(user.id, (err, stats) => {
+    if (err) return callback(err);
+
+    return callback(null, {
+      ...user,
+      ...stats,
+      loyalty_period: new Date().toISOString().slice(0, 7)
+    });
+  });
+};
+
 const getGoogleClientIds = () =>
   (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
@@ -49,6 +83,8 @@ const respondWithLoginSuccess = (res, user) => {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      date_of_birth: user.date_of_birth || null,
+      gender: user.gender || null,
       avatar: user.avatar || null,
       role: user.role,
       created_at: user.created_at || null,
@@ -59,12 +95,13 @@ const respondWithLoginSuccess = (res, user) => {
 
 // ─── REGISTER ────────────────────────────────────────────────
 exports.register = (req, res) => {
-  const { name, email, password, phone } = req.body;
+  const { name, email, password, phone, date_of_birth } = req.body;
   const normalizedName = (name || '').trim();
   const normalizedEmail = (email || '').trim().toLowerCase();
   const normalizedPhone = (phone || '').trim();
+  const normalizedDateOfBirth = normalizeDateOfBirth(date_of_birth);
 
-  if (!normalizedName || !normalizedEmail || !password) {
+  if (!normalizedName || !normalizedEmail || !password || !normalizedDateOfBirth) {
     return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin' });
   }
 
@@ -85,7 +122,14 @@ exports.register = (req, res) => {
       return res.status(500).json({ success: false, message: 'Lỗi server khi mã hóa mật khẩu' });
     }
 
-    const userData = { name: normalizedName, email: normalizedEmail, password: hashedPassword, phone: normalizedPhone, role: 'customer' };
+    const userData = {
+      name: normalizedName,
+      email: normalizedEmail,
+      password: hashedPassword,
+      phone: normalizedPhone,
+      date_of_birth: normalizedDateOfBirth,
+      role: 'customer'
+    };
 
     return userModel.createUser(userData, (createErr, result) => {
       if (createErr) {
@@ -95,7 +139,14 @@ exports.register = (req, res) => {
       return res.status(201).json({
         success: true,
         message: 'Đăng ký thành công',
-        user: { id: result.insertId, name: normalizedName, email: normalizedEmail, phone: normalizedPhone, role: 'customer' }
+        user: {
+          id: result.insertId,
+          name: normalizedName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          date_of_birth: normalizedDateOfBirth,
+          role: 'customer'
+        }
       });
     });
   });
@@ -380,27 +431,65 @@ exports.getProfile = (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
     }
-    return res.status(200).json({ success: true, data: user });
+
+    return attachMonthlyLoyaltyStats(user, (statsErr, profileUser) => {
+      if (statsErr) {
+        console.error('[GET_PROFILE_LOYALTY_ERROR]', statsErr);
+        return res.status(500).json({ success: false, message: 'Lỗi server khi tính điểm thành viên' });
+      }
+
+      return res.status(200).json({ success: true, data: profileUser });
+    });
   });
 };
 
 // ─── UPDATE PROFILE ──────────────────────────────────────────
 exports.updateProfile = (req, res) => {
   const userId = req.user.id;
-  const { name, email, phone } = req.body;
+  const { name, email, phone, date_of_birth, gender } = req.body;
 
   if (!name || !email) {
     return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin' });
   }
 
-  const userData = { name, email, phone: phone || '' };
+  const normalizedGender = gender ? String(gender).trim() : null;
+  if (normalizedGender && !['male', 'female', 'other'].includes(normalizedGender)) {
+    return res.status(400).json({ success: false, message: 'Giới tính không hợp lệ' });
+  }
+
+  const userData = {
+    name: String(name || '').trim(),
+    email: String(email || '').trim().toLowerCase(),
+    phone: phone || '',
+    date_of_birth: normalizeDateOfBirth(date_of_birth),
+    gender: normalizedGender
+  };
 
   return userModel.updateUser(userId, userData, (err) => {
     if (err) {
       console.error('[UPDATE_PROFILE_ERROR]', err);
       return res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật profile' });
     }
-    return res.status(200).json({ success: true, message: 'Cập nhật profile thành công' });
+
+    return userModel.getUserById(userId, (profileErr, updatedUser) => {
+      if (profileErr) {
+        console.error('[UPDATE_PROFILE_FETCH_ERROR]', profileErr);
+        return res.status(500).json({ success: false, message: 'Cập nhật thành công nhưng không thể tải lại hồ sơ' });
+      }
+
+      return attachMonthlyLoyaltyStats(updatedUser, (statsErr, profileUser) => {
+        if (statsErr) {
+          console.error('[UPDATE_PROFILE_LOYALTY_ERROR]', statsErr);
+          return res.status(500).json({ success: false, message: 'Cập nhật thành công nhưng không thể tính lại điểm thành viên' });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Cập nhật profile thành công',
+          data: profileUser
+        });
+      });
+    });
   });
 };
 

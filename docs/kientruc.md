@@ -213,3 +213,27 @@ Sentiment được tách từ text:
 - File: `backend/src/jobs/rfmClassificationJob.js`.
 - Lịch: 03:00 hằng ngày.
 - Mục đích: phân loại khách và gán voucher marketing.
+
+## 8. DEC Clustering Flow (Dynamic Engagement Clustering)
+
+DEC là thuật toán phân cụm khách hàng động, phân tích hành vi của khách hàng dựa trên dữ liệu đặt lịch thực tế trong một khoảng thời gian xác định (ngày, tuần, tháng, năm).
+
+```text
+AnalyticsStrategy.js (React Frontend)
+  -> dashboardService.getDecClustering()
+  -> API: GET /api/admin/dashboard/dec-clustering
+  -> dashboardController.getDecClustering()
+  -> decClusteringService.getDecClusteringReport()
+      -> getCustomerRows() & getServiceUsageRows() & getServicePrices() (Từ DB)
+      -> Tính toán phân vị động (Quantile Thresholds) xác định Premium/Budget
+      -> Áp dụng getClusterKey() phân loại khách hàng vào 7 cụm hành vi
+      -> Tính toán chỉ số trung bình (Averages) của từng cụm
+      -> Tạo chiến lược động buildDynamicStrategy() theo chu kỳ thời gian
+      -> Trả về JSON Report cho Frontend hiển thị lên Dashboard
+```
+
+Các thành phần chính:
+- `backend/src/services/decClusteringService/index.js`: Lớp logic tính toán phân cụm hành vi.
+- `backend/src/controllers/dashboardController/index.js`: Xử lý endpoint REST API và tham số truy vấn.
+- `frontend/src/pages/admin/AnalyticsStrategy/AnalyticsStrategy.js`: Hiển thị 4 tab dữ liệu phân tích chuyên sâu cho Quản trị viên kèm biểu đồ trực quan Chart.js và tính năng xuất báo cáo Excel.
+

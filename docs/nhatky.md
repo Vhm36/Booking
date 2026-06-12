@@ -96,3 +96,19 @@ Stop-Process -Id <PID> -Force
   - VIP Đồng: Từ 3.000.000đ
   - Thành viên thường: Dưới 3.000.000đ
 
+## 2026-06-12 - Phát triển V7: Hệ thống Phân Cụm Hành Vi Khách Hàng DEC (Dynamic Engagement Clustering)
+
+### Đã hoàn thành
+
+- Thiết kế và cài đặt thuật toán phân cụm hành vi động DEC trên Backend ([decClusteringService/index.js](file:///d:/Doantotnghiep/Code/backend/src/services/decClusteringService/index.js)).
+- Xây dựng 7 cụm hành vi đặc trưng của khách hàng salon dựa trên Recency, Frequency, Monetary, Tỷ lệ hủy/Hoàn thành, Đa dạng dịch vụ và Nhịp điệu theo tháng.
+- Thiết lập hệ thống nhãn tiềm năng (Potential status/labels) và staff hint riêng cho từng cụm hành vi.
+- Tích hợp API Endpoint `/api/admin/dashboard/dec-clustering` hỗ trợ đầy đủ các bộ lọc thời gian động (Day, Week, Month, Year, All) và thuật toán phân ngưỡng phân vị động (Quantile threshold).
+- Hoàn thiện UI trang Analytics Strategy (`/admin/analytics/strategy`) dành cho Quản trị viên với 4 góc nhìn phân tích chuyên sâu:
+  - **Bảng danh sách chiến lược**: Hiển thị chi tiết khách hàng và chiến lược hành động cụ thể theo tháng, hỗ trợ tìm kiếm/lọc và xuất báo cáo Excel định dạng chuẩn.
+  - **Đặc trưng chi tiết**: Hiển thị bảng mô tả đặc tính thống kê trung bình của từng cụm (Table 7).
+  - **Biểu đồ cụm (Figure 4)**: Vẽ biểu đồ so sánh các thông số trung bình quy đổi của các cụm bằng Chart.js.
+  - **Chiến lược hành động (Table 8)**: Khung ma trận chiến lược liên kết hành động, lý do và tác động kỳ vọng.
+- Tích hợp [CustomerInsightBadge.js](file:///d:/Doantotnghiep/Code/frontend/src/components/CustomerInsightBadge/CustomerInsightBadge.js) hiển thị cụm DEC và phân nhóm tiềm năng trên giao diện quản lý lịch hẹn (`ManageAppointments`).
+
+

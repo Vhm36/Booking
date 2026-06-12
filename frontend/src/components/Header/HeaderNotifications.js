@@ -133,7 +133,7 @@ const buildCustomerNotifications = (appointments = [], vouchers = []) => {
         type: 'appointment_confirmed',
         tone: 'success',
         title: `Lịch #${appointment.id} đã được xác nhận`,
-        description: `${appointment.service_name || 'Dịch vụ'} - ${formatDateTime(buildAppointmentDateTime(appointment))}`,
+        description: `${appointment.service_name || 'Dịch vụ'} - ${appointment.staff_name || 'Nhân viên'} - ${formatDateTime(buildAppointmentDateTime(appointment))}`,
         time,
         timestamp: toTimestamp(time),
         actionPath: '/my-appointments'
@@ -256,7 +256,7 @@ function HeaderNotifications({ user, navigate, onNavigate }) {
       }
 
       if (user.role === 'staff' || user.role === 'admin') {
-        const response = await bookingService.getAllBookings();
+        const response = await bookingService.getAllBookings({ limit: 100 });
         setNotifications(buildStaffNotifications(response.data?.data || [], user));
         return;
       }

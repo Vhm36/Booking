@@ -154,13 +154,20 @@ const enrichCustomerInsights = (customer) => {
   };
 };
 
-const getAllCustomers = (callback) => {
-  const query = `
+const getAllCustomers = ({ search = '', limit = 50, offset = 0 } = {}, callback) => {
+  const normalizedSearch = String(search || '').trim();
+  const searchPattern = `%${normalizedSearch}%`;
+  const searchClause = normalizedSearch
+    ? 'AND (u.name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)'
+    : '';
+  const searchParams = normalizedSearch ? [searchPattern, searchPattern, searchPattern] : [];
+  const customerQuery = `
     SELECT
       u.id,
       u.name,
       u.email,
       u.phone,
+      u.date_of_birth,
       u.is_active,
       u.customer_segment,
       u.rfm_score,
@@ -174,28 +181,44 @@ const getAllCustomers = (callback) => {
     LEFT JOIN appointments a
       ON a.user_id = u.id
     WHERE u.role = 'customer'
+      ${searchClause}
     GROUP BY
       u.id,
       u.name,
       u.email,
       u.phone,
+      u.date_of_birth,
       u.is_active,
       u.customer_segment,
       u.rfm_score,
       u.rfm_updated_at,
       u.created_at
     ORDER BY u.created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  const countQuery = `
+    SELECT COUNT(*) AS total
+    FROM users u
+    WHERE u.role = 'customer'
+      ${searchClause}
   `;
 
-  db.query(query, (err, results) => {
+  db.query(customerQuery, [...searchParams, limit, offset], (err, results) => {
     if (err) return callback(err);
-    callback(null, results.map(enrichCustomerInsights));
+
+    db.query(countQuery, searchParams, (countErr, countRows) => {
+      if (countErr) return callback(countErr);
+      callback(null, {
+        customers: results.map(enrichCustomerInsights),
+        total: Number(countRows[0]?.total || 0)
+      });
+    });
   });
 };
 
 const getCustomerById = (id, callback) => {
   const query = `
-    SELECT id, name, email, phone, role, is_active, created_at
+    SELECT id, name, email, phone, date_of_birth, role, is_active, created_at
     FROM users
     WHERE id = ? AND role = 'customer'
   `;
@@ -207,13 +230,13 @@ const getCustomerById = (id, callback) => {
 };
 
 const createCustomer = (customerData, callback) => {
-  const { name, email, password, phone, is_active } = customerData;
+  const { name, email, password, phone, date_of_birth, is_active } = customerData;
   const query = `
-    INSERT INTO users (name, email, password, phone, role, is_active, created_at)
-    VALUES (?, ?, ?, ?, 'customer', ?, NOW())
+    INSERT INTO users (name, email, password, phone, date_of_birth, role, is_active, created_at)
+    VALUES (?, ?, ?, ?, ?, 'customer', ?, NOW())
   `;
 
-  db.query(query, [name, email, password, phone || '', is_active ? 1 : 0], (err, result) => {
+  db.query(query, [name, email, password, phone || '', date_of_birth || null, is_active ? 1 : 0], (err, result) => {
     if (err) return callback(err);
     callback(null, result);
   });
@@ -236,6 +259,11 @@ const updateCustomer = (id, customerData, callback) => {
   if (typeof customerData.phone !== 'undefined') {
     fields.push('phone = ?');
     values.push(customerData.phone);
+  }
+
+  if (typeof customerData.date_of_birth !== 'undefined') {
+    fields.push('date_of_birth = ?');
+    values.push(customerData.date_of_birth || null);
   }
 
   if (typeof customerData.password !== 'undefined') {

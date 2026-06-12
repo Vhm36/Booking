@@ -25,7 +25,7 @@ const bookingService = {
       appointment_time
     }),
 
-  getAllBookings: () => api.get('/bookings'),
+  getAllBookings: (params = {}) => api.get('/bookings', { params }),
 
   getBookingById: (id) => api.get(`/bookings/${id}`),
 

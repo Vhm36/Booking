@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import authService from '../../../services/authService';
 import bookingService from '../../../services/bookingService';
 import { exportToExcel } from '../../../utils/exportExcel';
+import CustomerInsightBadge from '../../../components/CustomerInsightBadge/CustomerInsightBadge';
 import './ManageAppointments.css';
 
 const formatRating = (rating) => {
@@ -42,7 +43,8 @@ const normalizeRoleName = (value = '') =>
     .toLowerCase();
 
 const isCashierStaffUser = (user) =>
-  user?.role === 'staff' && normalizeRoleName(user?.staff_role_name) === 'thu ngan';
+  user?.role === 'staff' &&
+  ['thu ngan', 'quan ly'].includes(normalizeRoleName(user?.staff_role_name));
 
 const getStatusToneClass = (appointment) => {
   if (hasCancellationRequest(appointment)) {
@@ -166,16 +168,17 @@ function ManageAppointments() {
   const [processingId, setProcessingId] = useState(null);
   const [cancelDialog, setCancelDialog] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 1 });
+  const [serverStats, setServerStats] = useState(null);
 
-  useEffect(() => {
-    fetchAppointments();
-  }, []);
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await bookingService.getAllBookings();
+      const response = await bookingService.getAllBookings({ page, limit: 50, status: filter });
       setAppointments(response.data.data || []);
+      setPagination(response.data.pagination || { page: 1, total: 0, totalPages: 1 });
+      setServerStats(response.data.stats || null);
       setError('');
     } catch (err) {
       const apiMessage =
@@ -185,10 +188,14 @@ function ManageAppointments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, page]);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const stats = useMemo(
-    () => ({
+    () => serverStats || ({
       total: appointments.length,
       pending: appointments.filter((item) => isAwaitingStaffConfirmation(item)).length,
       confirmed: appointments.filter((item) => item.status === 'confirmed' && !hasCancellationRequest(item)).length,
@@ -196,7 +203,7 @@ function ManageAppointments() {
       completed: appointments.filter((item) => item.status === 'completed').length,
       cancelled: appointments.filter((item) => item.status === 'cancelled').length
     }),
-    [appointments]
+    [appointments, serverStats]
   );
 
   const pageTitle = isStaffView
@@ -429,7 +436,10 @@ function ManageAppointments() {
             <button
               key={option.key}
               className={`filter-btn ${filter === option.key ? 'active' : ''}`}
-              onClick={() => setFilter(option.key)}
+              onClick={() => {
+                setFilter(option.key);
+                setPage(1);
+              }}
             >
               <span>{option.label}</span>
               <strong>{option.count}</strong>
@@ -450,6 +460,14 @@ function ManageAppointments() {
                     { key: 'customer_name', header: 'Khách hàng', width: 22 },
                     { key: 'customer_email', header: 'Email', width: 26 },
                     { key: 'customer_phone', header: 'SĐT', width: 14 },
+                    {
+                      key: 'customer_insight',
+                      header: 'Nhận diện KH',
+                      width: 22,
+                      transform: (value) => value
+                        ? `${value.customer_potential_label || ''} - Cụm ${value.customer_dec_cluster_number || ''}`
+                        : ''
+                    },
                     { key: 'service_name', header: 'Dịch vụ', width: 28 },
                     { key: 'staff_name', header: 'Nhân viên', width: 20 },
                     { key: 'appointment_date', header: 'Ngày hẹn', width: 14, transform: (v) => v ? new Date(v).toLocaleDateString('vi-VN') : '' },
@@ -531,6 +549,7 @@ function ManageAppointments() {
                       <div className="cell-stack">
                         <strong>{appointment.customer_name}</strong>
                         <small>{appointment.customer_email || '-'}</small>
+                        <CustomerInsightBadge insight={appointment.customer_insight} />
                       </div>
                     </td>
                     <td className="appointment-service-cell">
@@ -575,15 +594,6 @@ function ManageAppointments() {
                         </span>
                         {requestPending && (
                           <small className="status-note">Khách đang chờ nhân viên xác nhận hủy.</small>
-                        )}
-                        {!requestPending && awaitingStaffConfirmation && (
-                          <small className="status-note status-note-pending">
-                            {isStaffView && !isCashierView
-                              ? 'Khách đã đặt lịch với bạn. Hãy xác nhận nhận lịch hoặc hủy lịch hẹn này.'
-                              : isCashierView
-                                ? 'Lịch chờ xác nhận. Thu ngân có thể xác nhận nhận lịch hoặc hủy thay nhân viên phụ trách.'
-                                : 'Lịch này đang chờ nhân viên phụ trách xác nhận nhận lịch.'}
-                          </small>
                         )}
                       </div>
                     </td>
@@ -645,6 +655,27 @@ function ManageAppointments() {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="appointments-server-pagination">
+          <span>
+            Trang {pagination.page || page}/{pagination.totalPages || 1} · {Number(pagination.total || 0).toLocaleString('vi-VN')} lịch
+          </span>
+          <div>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1 || loading}
+            >
+              Trang trước
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(pagination.totalPages || 1, current + 1))}
+              disabled={page >= (pagination.totalPages || 1) || loading}
+            >
+              Trang sau
+            </button>
+          </div>
         </div>
       </section>
 

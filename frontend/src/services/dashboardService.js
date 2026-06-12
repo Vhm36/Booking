@@ -44,6 +44,10 @@ const dashboardService = {
     return api.get('/admin/dashboard/customer-behavior-bot');
   },
 
+  getDecClustering: (params = {}) => {
+    return api.get('/admin/dashboard/dec-clustering', { params });
+  },
+
   getStaffCommissionByMonth: (month, year) => {
     const params = new URLSearchParams();
     if (month) params.set('month', String(month));

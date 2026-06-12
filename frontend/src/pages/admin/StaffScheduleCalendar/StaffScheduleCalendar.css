@@ -1,20 +1,20 @@
 /* ============================================================================
- * Staff Schedule Calendar — Boulevard-inspired Design
+ * Staff Schedule Calendar — Modern Premium Design
  * ============================================================================ */
 
 .staff-schedule-calendar {
   --sc-bg: #ffffff;
-  --sc-bg-alt: #fafbfc;
+  --sc-bg-alt: #f8fafb;
   --sc-surface: #ffffff;
-  --sc-ink: #1a1a2e;
-  --sc-muted: #6b7280;
-  --sc-line: #e5e7eb;
-  --sc-line-soft: #f3f4f6;
-  --sc-accent: #7c3aed;
-  --sc-accent-soft: #ede9fe;
+  --sc-ink: #0f172a;
+  --sc-muted: #64748b;
+  --sc-line: #e2e8f0;
+  --sc-line-soft: #f1f5f9;
+  --sc-accent: #0f766e;
+  --sc-accent-soft: #ccfbf1;
   --sc-danger: #ef4444;
   --sc-teal: #0f766e;
-  --sc-radius: 12px;
+  --sc-radius: 16px;
 
   width: 100%;
   color: var(--sc-ink);
@@ -35,12 +35,12 @@
 }
 
 .sc-loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--sc-line);
+  width: 44px;
+  height: 44px;
+  border: 3.5px solid var(--sc-line);
   border-top-color: var(--sc-teal);
   border-radius: 50%;
-  animation: sc-spin 0.8s linear infinite;
+  animation: sc-spin 0.7s linear infinite;
 }
 
 @keyframes sc-spin {
@@ -48,7 +48,7 @@
 }
 
 /* ============================================================================
- * Toolbar — Dark Boulevard-style bar
+ * Toolbar — Premium glassmorphism bar
  * ============================================================================ */
 
 .sc-toolbar {
@@ -58,10 +58,14 @@
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 0;
-  padding: 10px 16px;
-  background: #1a1a2e;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 40%, #115e59 100%);
   border-radius: var(--sc-radius) var(--sc-radius) 0 0;
   color: #ffffff;
+  box-shadow:
+    0 4px 16px rgba(15, 118, 110, 0.24),
+    0 1px 3px rgba(15, 118, 110, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .sc-toolbar-left {
@@ -75,31 +79,35 @@
   display: flex;
   align-items: center;
   background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   padding: 3px;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .sc-mode-btn {
-  padding: 5px 14px;
+  padding: 6px 16px;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 13px;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 7px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 32px;
 }
 
 .sc-mode-btn:hover {
   color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .sc-mode-btn.active {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  background: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  font-weight: 700;
 }
 
 .sc-toolbar-right {
@@ -110,27 +118,31 @@
 }
 
 .sc-btn-today {
-  padding: 5px 14px;
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.85);
+  padding: 6px 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 32px;
 }
 
 .sc-btn-today:hover {
   border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
 }
 
 .sc-btn-today.active {
-  background: var(--sc-teal);
-  border-color: var(--sc-teal);
-  color: #ffffff;
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #0f766e;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .sc-date-nav {
@@ -140,27 +152,28 @@
 }
 
 .sc-nav-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  min-height: 32px;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 34px;
   padding: 0;
 }
 
 .sc-nav-btn:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
+  transform: scale(1.05);
 }
 
 .sc-date-label {
@@ -169,23 +182,26 @@
   font-size: 14px;
   font-weight: 700;
   color: #ffffff;
+  letter-spacing: 0.01em;
 }
 
 .sc-date-picker {
-  padding: 5px 10px;
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  padding: 6px 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
   font-size: 13px;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
   cursor: pointer;
-  min-height: 32px;
+  min-height: 34px;
+  transition: all 0.2s ease;
 }
 
 .sc-date-picker:focus {
   outline: none;
-  border-color: var(--sc-teal);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
 }
 
 .sc-date-picker::-webkit-calendar-picker-indicator {
@@ -195,17 +211,19 @@
 .sc-stats-mini {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .sc-stat-item {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.72);
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .sc-stat-item strong {
   color: #ffffff;
+  font-weight: 800;
 }
 
 .sc-stat-pending strong { color: #fbbf24; }
@@ -213,42 +231,46 @@
 .sc-stat-completed strong { color: #60a5fa; }
 
 .sc-btn-all-staff {
-  padding: 5px 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.75);
+  padding: 6px 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.88);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 32px;
 }
 
 .sc-btn-all-staff:hover {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
 }
 
 .sc-btn-export {
-  padding: 5px 14px;
+  padding: 6px 16px;
   border: none;
-  border-radius: 8px;
-  background: var(--sc-teal);
-  color: #ffffff;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f766e;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 32px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .sc-btn-export:hover {
-  background: #0d665f;
+  background: #f0fdfa;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* ============================================================================
- * Staff Header Row — Integrated into grid top
+ * Staff Header Row — Clean with subtle depth
  * ============================================================================ */
 
 .sc-staff-row {
@@ -276,12 +298,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 12px 4px 10px;
+  gap: 6px;
+  padding: 14px 6px 12px;
   border: none;
   background: transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   border-right: 1px solid var(--sc-line-soft);
   position: relative;
 }
@@ -291,30 +313,30 @@
 }
 
 .sc-staff-avatar:hover {
-  background: var(--sc-bg-alt);
+  background: linear-gradient(180deg, #f0fdfa 0%, #f8fafb 100%);
 }
 
 .sc-staff-avatar.active {
-  background: var(--sc-bg-alt);
+  background: linear-gradient(180deg, #effcf8 0%, #f0fdfa 100%);
 }
 
 .sc-avatar-img {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: cover;
   border: 2.5px solid var(--sc-line);
-  transition: border-color 0.2s;
+  transition: all 0.22s ease;
 }
 
 .sc-staff-avatar.active .sc-avatar-img {
-  border-color: inherit;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  border-color: var(--sc-teal);
+  box-shadow: 0 2px 12px rgba(15, 118, 110, 0.2);
 }
 
 .sc-avatar-placeholder {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -322,11 +344,11 @@
   font-size: 14px;
   font-weight: 700;
   border: 2.5px solid transparent;
-  transition: all 0.2s;
+  transition: all 0.22s ease;
 }
 
 .sc-staff-avatar.active .sc-avatar-placeholder {
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 12px rgba(15, 118, 110, 0.2);
 }
 
 .sc-avatar-name {
@@ -337,10 +359,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.2s ease;
 }
 
 .sc-staff-avatar.active .sc-avatar-name {
-  color: var(--sc-ink);
+  color: var(--sc-teal);
+  font-weight: 800;
 }
 
 .sc-avatar-active-dot {
@@ -367,7 +391,7 @@
 }
 
 /* ============================================================================
- * Calendar Grid — Clean & spacious
+ * Calendar Grid — Refined with depth
  * ============================================================================ */
 
 .sc-grid-container {
@@ -375,7 +399,9 @@
   position: relative;
   background: var(--sc-surface);
   border-radius: 0 0 var(--sc-radius) var(--sc-radius);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 16px rgba(15, 23, 42, 0.05),
+    0 1px 3px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--sc-line);
   border-top: none;
   overflow-x: auto;
@@ -403,7 +429,7 @@
 .sc-time-label span {
   font-size: 11px;
   font-weight: 600;
-  color: #9ca3af;
+  color: #94a3b8;
   transform: translateY(-7px);
   white-space: nowrap;
 }
@@ -430,41 +456,43 @@
 }
 
 /* ============================================================================
- * Appointment Block — Bold colors, accent border
+ * Appointment Block — Premium card style
  * ============================================================================ */
 
 .sc-appointment-block {
   position: absolute;
   left: 3px;
   right: 3px;
-  border: none;
-  border-left: 4px solid currentColor;
-  border-radius: 6px;
-  padding: 5px 8px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  padding: 7px 10px;
   cursor: pointer;
   overflow: hidden;
   z-index: 2;
-  transition: transform 0.15s, box-shadow 0.15s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
 .sc-appointment-block:hover {
-  transform: scale(1.02) translateX(1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px) scale(1.015);
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.14),
+    0 2px 6px rgba(15, 23, 42, 0.06);
   z-index: 3;
 }
 
 .sc-appt-time {
   font-size: 10px;
   font-weight: 800;
-  opacity: 0.75;
-  margin-bottom: 1px;
+  opacity: 0.85;
+  margin-bottom: 2px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .sc-appt-customer {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -473,27 +501,30 @@
 
 .sc-appt-service {
   font-size: 11px;
-  opacity: 0.7;
+  opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 1px;
+  margin-top: 2px;
   font-weight: 500;
 }
 
 .sc-appt-duration {
   font-size: 10px;
-  opacity: 0.55;
+  opacity: 0.72;
   margin-top: 2px;
   font-weight: 600;
 }
 
 /* Status visual */
-.sc-status-pending { opacity: 0.85; }
-.sc-status-completed { opacity: 0.55; }
+.sc-status-pending,
+.sc-status-confirmed,
+.sc-status-completed {
+  opacity: 1;
+}
 
 /* ============================================================================
- * Now Indicator — Red current-time line
+ * Now Indicator — Refined red line
  * ============================================================================ */
 
 .sc-now-indicator {
@@ -513,25 +544,31 @@
   background: var(--sc-danger);
   flex-shrink: 0;
   margin-left: -6px;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2), 0 0 12px rgba(239, 68, 68, 0.35);
+  animation: sc-pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes sc-pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2), 0 0 12px rgba(239, 68, 68, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.12), 0 0 20px rgba(239, 68, 68, 0.25); }
 }
 
 .sc-now-line {
   flex: 1;
   height: 2px;
-  background: var(--sc-danger);
-  opacity: 0.5;
+  background: linear-gradient(90deg, var(--sc-danger) 0%, rgba(239, 68, 68, 0.3) 100%);
 }
 
 .sc-now-time {
   font-size: 10px;
   font-weight: 800;
   color: var(--sc-danger);
-  padding: 2px 6px;
+  padding: 2px 8px;
   background: #fff;
-  border-radius: 4px;
+  border-radius: 6px;
   margin-right: 4px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 6px rgba(239, 68, 68, 0.15);
+  letter-spacing: 0.02em;
 }
 
 /* ============================================================================
@@ -546,7 +583,7 @@
   padding: 60px 20px;
   color: var(--sc-muted);
   font-size: 15px;
-  background: var(--sc-surface);
+  background: linear-gradient(180deg, var(--sc-surface) 0%, var(--sc-bg-alt) 100%);
   border-radius: 0 0 var(--sc-radius) var(--sc-radius);
   border: 1px solid var(--sc-line);
   border-top: none;
@@ -554,8 +591,8 @@
 
 .sc-empty-icon {
   font-size: 48px;
-  margin-bottom: 12px;
-  opacity: 0.4;
+  margin-bottom: 16px;
+  opacity: 0.35;
 }
 
 /* ============================================================================
@@ -565,7 +602,9 @@
 .sc-table-container {
   background: var(--sc-surface);
   border-radius: 0 0 var(--sc-radius) var(--sc-radius);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 16px rgba(15, 23, 42, 0.05),
+    0 1px 3px rgba(15, 23, 42, 0.04);
   border: 1px solid var(--sc-line);
   border-top: none;
   padding: 0;
@@ -579,13 +618,13 @@
 
 .sc-list-table th {
   text-align: left;
-  padding: 12px 16px;
+  padding: 14px 16px;
   background: var(--sc-bg-alt);
   color: var(--sc-muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   border-bottom: 1px solid var(--sc-line);
 }
 
@@ -597,8 +636,12 @@
   vertical-align: middle;
 }
 
+.sc-list-table tbody tr {
+  transition: background 0.15s ease;
+}
+
 .sc-list-table tbody tr:hover td {
-  background: #f9fafb;
+  background: #f8fafc;
 }
 
 .sc-list-table tbody tr:last-child td {
@@ -607,7 +650,7 @@
 
 .sc-table-staff-tag {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -615,25 +658,27 @@
 }
 
 .sc-btn-small {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border: 1px solid var(--sc-line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--sc-surface);
   color: var(--sc-teal);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   min-height: 32px;
 }
 
 .sc-btn-small:hover {
   background: #f0fdfa;
   border-color: var(--sc-teal);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.1);
 }
 
 /* ============================================================================
- * Modal — Clean & modern
+ * Modal — Premium glassmorphism
  * ============================================================================ */
 
 .sc-modal-overlay {
@@ -643,9 +688,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(15, 23, 42, 0.42);
   backdrop-filter: blur(6px);
-  animation: sc-fadeIn 0.2s ease-out;
+  animation: sc-fadeIn 0.22s ease-out;
 }
 
 @keyframes sc-fadeIn {
@@ -654,26 +699,28 @@
 }
 
 .sc-modal {
-  width: 440px;
+  width: 480px;
   max-width: 92vw;
-  border-radius: 16px;
+  border-radius: 20px;
   background: var(--sc-surface);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
-  animation: sc-slideUp 0.25s ease-out;
+  box-shadow:
+    0 24px 64px rgba(15, 23, 42, 0.2),
+    0 8px 24px rgba(15, 23, 42, 0.08);
+  animation: sc-slideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
 }
 
 @keyframes sc-slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(24px) scale(0.97); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 .sc-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  background: #1a1a2e;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 60%, #115e59 100%);
   color: #ffffff;
 }
 
@@ -682,22 +729,23 @@
   font-size: 16px;
   font-weight: 700;
   color: #ffffff;
+  letter-spacing: 0.01em;
 }
 
 .sc-modal-close {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: inline-grid;
   place-items: center;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.12);
   color: transparent;
   font-size: 0;
   cursor: pointer;
-  transition: all 0.2s;
-  min-height: 32px;
+  transition: all 0.2s ease;
+  min-height: 34px;
   padding: 0;
 }
 
@@ -709,6 +757,7 @@
   height: 2px;
   background: rgba(255, 255, 255, 0.8);
   border-radius: 1px;
+  transition: transform 0.2s ease;
 }
 
 .sc-modal-close::before {
@@ -720,45 +769,60 @@
 }
 
 .sc-modal-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(1.08);
 }
 
 .sc-modal-body {
-  padding: 20px;
+  display: grid;
+  gap: 10px;
+  padding: 22px;
 }
 
 .sc-detail-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--sc-line-soft);
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  transition: border-color 0.2s ease;
+}
+
+.sc-detail-row:hover {
+  border-color: #cbd5e1;
 }
 
 .sc-detail-row:last-child {
-  border-bottom: none;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .sc-detail-label {
   font-size: 13px;
-  color: var(--sc-muted);
-  font-weight: 500;
+  color: #475569;
+  font-weight: 700;
 }
 
 .sc-detail-row strong {
-  font-size: 13px;
-  color: var(--sc-ink);
-  font-weight: 700;
+  max-width: 62%;
+  text-align: right;
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .sc-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
+  padding: 5px 14px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .sc-pill-pending { background: #fef3c7; color: #92400e; }
@@ -769,20 +833,20 @@
 .sc-modal-actions {
   display: flex;
   gap: 8px;
-  padding: 14px 20px;
+  padding: 16px 22px;
   border-top: 1px solid var(--sc-line-soft);
   flex-wrap: wrap;
   background: var(--sc-bg-alt);
 }
 
 .sc-btn {
-  padding: 8px 16px;
+  padding: 8px 18px;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 36px;
 }
 
@@ -792,27 +856,35 @@
 }
 
 .sc-btn-confirm {
-  background: var(--sc-teal);
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.2);
 }
 .sc-btn-confirm:hover:not(:disabled) {
-  background: #0d665f;
+  background: linear-gradient(135deg, #0d665f 0%, #0b8a7f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.25);
 }
 
 .sc-btn-complete {
-  background: #16a34a;
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.2);
 }
 .sc-btn-complete:hover:not(:disabled) {
-  background: #15803d;
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.25);
 }
 
 .sc-btn-cancel {
   background: #fee2e2;
   color: #dc2626;
+  border: 1px solid #fecaca;
 }
 .sc-btn-cancel:hover:not(:disabled) {
   background: #fecaca;
+  border-color: #fca5a5;
 }
 
 .sc-btn-close {
@@ -832,8 +904,8 @@
 @media (max-width: 900px) {
   .sc-toolbar {
     flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: 10px;
+    padding: 12px 14px;
     border-radius: var(--sc-radius) var(--sc-radius) 0 0;
   }
 
@@ -862,8 +934,8 @@
 
   .sc-avatar-img,
   .sc-avatar-placeholder {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     font-size: 12px;
   }
 
@@ -887,7 +959,8 @@
   }
 
   .sc-appointment-block {
-    padding: 3px 5px;
+    padding: 4px 6px;
+    border-radius: 8px;
   }
 
   .sc-appt-time {

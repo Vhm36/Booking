@@ -12,7 +12,7 @@ const normalizeRoleName = (value = '') =>
     .trim()
     .toLowerCase();
 
-function Header({ user, onLogout }) {
+function Header({ user, onLogout, presenceStatus = 'offline' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -97,7 +97,7 @@ function Header({ user, onLogout }) {
     }
 
     if (user.role === 'staff') {
-      const isCashier = normalizeRoleName(user.staff_role_name) === 'thu ngan';
+      const isCashier = ['thu ngan', 'quan ly'].includes(normalizeRoleName(user.staff_role_name));
 
       if (isCashier) {
         return {
@@ -113,6 +113,7 @@ function Header({ user, onLogout }) {
         label: 'Nhân viên dịch vụ',
         links: [
           { to: '/staff/dashboard', label: 'Lịch làm việc' },
+          { to: '/staff/shifts', label: 'Ca làm' },
           { to: '/profile', label: 'Hồ sơ' }
         ]
       };
@@ -128,9 +129,12 @@ function Header({ user, onLogout }) {
     };
   }, [user]);
 
-  const isActivePath = (to) => {
-    if (to === '/') {
-      return location.pathname === '/';
+  const isActivePath = (link) => {
+    const to = typeof link === 'string' ? link : link.to;
+    const exact = typeof link === 'object' && link.exact;
+
+    if (to === '/' || exact) {
+      return location.pathname === to;
     }
 
     return location.pathname.startsWith(to);
@@ -140,18 +144,20 @@ function Header({ user, onLogout }) {
     if (!user) return '';
     if (user.role === 'admin') return 'Quản trị viên';
     if (user.role === 'staff') {
-      const isCashier = normalizeRoleName(user.staff_role_name) === 'thu ngan';
+      const isCashier = ['thu ngan', 'quan ly'].includes(normalizeRoleName(user.staff_role_name));
       return isCashier ? 'Thu ngân' : 'Nhân viên dịch vụ';
     }
     return 'Khách hàng';
   };
+
+  const isUserOnline = presenceStatus === 'online';
 
   const renderNavLink = (link, extraClass = '') => (
     <Link
       key={link.to}
       to={link.to}
       onClick={closeMenus}
-      className={`nav-link ${isActivePath(link.to) ? 'is-active' : ''} ${extraClass}`.trim()}
+      className={`nav-link ${isActivePath(link) ? 'is-active' : ''} ${extraClass}`.trim()}
     >
       {link.label}
     </Link>
@@ -229,17 +235,24 @@ function Header({ user, onLogout }) {
                 <>
                   <HeaderNotifications user={user} navigate={navigate} onNavigate={closeMenus} />
                   <Link to="/profile" className="user-menu" onClick={closeMenus}>
-                    {user.avatar ? (
-                      <img
-                        src={`${process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000'}${user.avatar}`}
-                        alt={user.name}
-                        className="user-avatar-small"
+                    <span className="user-avatar-presence">
+                      {user.avatar ? (
+                        <img
+                          src={`${process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000'}${user.avatar}`}
+                          alt={user.name}
+                          className="user-avatar-small"
+                        />
+                      ) : (
+                        <span className="user-avatar-placeholder">
+                          {(user.name || 'U').charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span
+                        className={`user-presence-dot ${isUserOnline ? 'is-online' : 'is-offline'}`}
+                        title={isUserOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+                        aria-label={isUserOnline ? 'Đang hoạt động' : 'Không hoạt động'}
                       />
-                    ) : (
-                      <span className="user-avatar-placeholder">
-                        {(user.name || 'U').charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                    </span>
                     <div className="user-menu-info">
                       <span className="user-name">{user.name}</span>
                       <small>{getRoleLabel()}</small>

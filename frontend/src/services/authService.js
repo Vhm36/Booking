@@ -2,12 +2,13 @@ import api from './api';
 
 const authService = {
   // Đăng ký
-  register: (name, email, password, phone) => {
+  register: (name, email, password, phone, dateOfBirth) => {
     return api.post('/auth/register', {
       name,
       email,
       password,
-      phone
+      phone,
+      date_of_birth: dateOfBirth
     });
   },
 
@@ -51,11 +52,13 @@ const authService = {
   },
 
   // Cập nhật profile
-  updateProfile: (name, email, phone) => {
+  updateProfile: ({ name, email, phone, date_of_birth, gender }) => {
     return api.put('/auth/profile', {
       name,
       email,
-      phone
+      phone,
+      date_of_birth,
+      gender
     });
   },
 
@@ -124,4 +127,3 @@ const authService = {
 };
 
 export default authService;
-

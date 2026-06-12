@@ -5,6 +5,67 @@ const { rateLimit } = require('express-rate-limit');
 const bodyParser = require('body-parser');
 require('./config/loadEnv');
 
+const db = require('./config/db');
+db.ready.then(() => {
+  db.query('ALTER TABLE services ADD COLUMN service_code VARCHAR(50) UNIQUE DEFAULT NULL', (err) => {
+    if (err) {
+      if (err.errno === 1060 || err.code === 'ER_DUP_FIELDNAME') {
+        console.log('Column service_code already exists');
+      } else {
+        console.error('Migration service_code error:', err.message);
+      }
+    } else {
+      console.log('Migration service_code completed successfully');
+    }
+  });
+
+  const ensureDateOfBirthIndex = () => {
+    db.query('ALTER TABLE users ADD INDEX idx_users_date_of_birth (date_of_birth)', (indexErr) => {
+      if (indexErr) {
+        if (indexErr.errno === 1061 || indexErr.code === 'ER_DUP_KEYNAME') {
+          console.log('Index idx_users_date_of_birth already exists');
+        } else {
+          console.error('Migration idx_users_date_of_birth error:', indexErr.message);
+        }
+      } else {
+        console.log('Migration idx_users_date_of_birth completed successfully');
+      }
+    });
+  };
+
+  const ensureGenderColumn = () => {
+    db.query("ALTER TABLE users ADD COLUMN gender ENUM('male','female','other') NULL AFTER date_of_birth", (err) => {
+      if (err) {
+        if (err.errno === 1060 || err.code === 'ER_DUP_FIELDNAME') {
+          console.log('Column gender already exists');
+        } else {
+          console.error('Migration gender error:', err.message);
+        }
+      } else {
+        console.log('Migration gender completed successfully');
+      }
+    });
+  };
+
+  db.query('ALTER TABLE users ADD COLUMN date_of_birth DATE NULL AFTER phone', (err) => {
+    if (err) {
+      if (err.errno === 1060 || err.code === 'ER_DUP_FIELDNAME') {
+        console.log('Column date_of_birth already exists');
+        ensureDateOfBirthIndex();
+        ensureGenderColumn();
+      } else {
+        console.error('Migration date_of_birth error:', err.message);
+      }
+    } else {
+      console.log('Migration date_of_birth completed successfully');
+      ensureDateOfBirthIndex();
+      ensureGenderColumn();
+    }
+  });
+}).catch(err => {
+  console.error('Database ready failed:', err.message);
+});
+
 const authRoutes = require('./routes/authRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
@@ -18,7 +79,8 @@ const voucherRoutes = require('./routes/voucherRoutes');
 
 // Cron Jobs
 const { startReminderJob } = require('./jobs/appointmentReminderJob');
-const { startClusteringJob } = require('./jobs/clusteringJob');
+const { startClusteringJob, runClusteringJob } = require('./jobs/clusteringJob');
+const { startBirthdayVoucherJob } = require('./jobs/birthdayVoucherJob');
 
 // Smart Services
 const cancellationScoreService = require('./services/cancellationScoreService');
@@ -145,7 +207,7 @@ app.post('/api/cancellation-score', verifyToken, async (req, res) => {
 // Clustering — Manual trigger (admin)
 app.post('/api/admin/rfm/run', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const result = await clusteringService.runFullAnalysis();
+    const result = await runClusteringJob({ app: req.app, trigger: 'manual' });
     return res.json({ success: true, data: result });
   } catch (err) {
     console.error('[CLUSTERING_RUN_ERROR]', err);
@@ -167,7 +229,8 @@ app.get('/api/admin/rfm/stats', verifyToken, verifyAdmin, async (req, res) => {
 // Start Cron Jobs
 try {
   startReminderJob();
-  startClusteringJob();
+  startClusteringJob(app);
+  startBirthdayVoucherJob(app);
 } catch (cronErr) {
   console.error('[CRON_INIT_ERROR]', cronErr.message);
 }

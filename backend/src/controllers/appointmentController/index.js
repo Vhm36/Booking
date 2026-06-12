@@ -5,19 +5,61 @@ const voucherService = require('../../services/voucherService');
 const zaloService = require('../../services/zaloService');
 const userModel = require('../../models/userModel');
 const { calculateScore: calculateCancellationScore } = require('../../services/cancellationScoreService');
+const { getDecCustomerInsights } = require('../../services/decClusteringService');
 const { normalizeTimeString, addMinutesToTimeString, toShortTimeString } = require('../../utils/timeSlot');
 const { emitDashboardUpdate } = require('../../utils/realtime');
+const { runClusteringJob } = require('../../jobs/clusteringJob');
 const {
   normalizeSelectedServiceIds,
   summarizeSelectedServices
 } = require('../../utils/appointmentServices');
 
 const CUSTOMER_CANCELLABLE_STATUSES = new Set(['pending', 'confirmed']);
+const AUTOMATION_TRIGGER_STATUSES = new Set(['completed', 'cancelled']);
+
+const enrichAppointmentsWithCustomerInsights = async (appointments = []) => {
+  if (!Array.isArray(appointments) || appointments.length === 0) {
+    return appointments;
+  }
+
+  const customerIds = [...new Set(
+    appointments
+      .map((appointment) => Number(appointment.user_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )];
+
+  if (customerIds.length === 0) {
+    return appointments;
+  }
+
+  try {
+    const insights = await getDecCustomerInsights({ customerIds });
+    const insightByCustomerId = new Map(insights.map((insight) => [Number(insight.customer_id), insight]));
+
+    return appointments.map((appointment) => ({
+      ...appointment,
+      customer_insight: insightByCustomerId.get(Number(appointment.user_id)) || null
+    }));
+  } catch (insightErr) {
+    console.error('[APPOINTMENT_CUSTOMER_INSIGHTS_ERROR]', insightErr.message);
+    return appointments.map((appointment) => ({
+      ...appointment,
+      customer_insight: null
+    }));
+  }
+};
 
 const isCashierStaffUser = (user) =>
   user &&
   user.role === 'staff' &&
-  staffModel.isStaffRoleExcludedFromCustomerBooking(user.staff_role_name);
+  ['thu ngan', 'quan ly'].includes(
+    String(user.staff_role_name || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .trim()
+      .toLowerCase()
+  );
 
 const canManageAppointment = (appointment, currentUser) => {
   if (currentUser.role === 'admin') {
@@ -50,6 +92,23 @@ const sendZaloStatusNotification = (appointment, status, cancelReason = '') => {
       }
     }).catch(zErr => console.error('[ZALO_NOTIFICATION_STATUS_ERROR]', zErr.message));
   }
+};
+
+const triggerVoucherAutomation = (req, { appointmentId, status }) => {
+  const normalizedStatus = String(status || '').toLowerCase();
+  if (!AUTOMATION_TRIGGER_STATUSES.has(normalizedStatus)) {
+    return;
+  }
+
+  setImmediate(() => {
+    runClusteringJob({
+      app: req.app,
+      trigger: `appointment.${normalizedStatus}`,
+      sourceAppointmentId: Number(appointmentId)
+    }).catch((automationErr) => {
+      console.error('[APPOINTMENT_AUTOMATION_TRIGGER_ERROR]', automationErr.message);
+    });
+  });
 };
 
 exports.createAppointment = (req, res) => {
@@ -374,12 +433,13 @@ exports.getMyAppointments = (req, res) => {
   const { role } = req.user;
 
   if (role === 'staff') {
-    appointmentModel.getAppointmentsByStaffId(req.user.id, (err, appointments) => {
+    appointmentModel.getAppointmentsByStaffId(req.user.id, async (err, appointments) => {
       if (err) {
         return res.status(500).json({ success: false, message: 'Lỗi server', error: err });
       }
 
-      return res.status(200).json({ success: true, data: appointments });
+      const enrichedAppointments = await enrichAppointmentsWithCustomerInsights(appointments);
+      return res.status(200).json({ success: true, data: enrichedAppointments });
     });
   } else {
     appointmentModel.getAppointmentsByUserId(req.user.id, (err, appointments) => {
@@ -393,23 +453,42 @@ exports.getMyAppointments = (req, res) => {
 };
 
 exports.getAllAppointments = (req, res) => {
-  const callback = (err, appointments) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+  const status = String(req.query.status || 'all').trim().toLowerCase();
+  const dateFrom = String(req.query.date_from || '').trim();
+  const dateTo = String(req.query.date_to || '').trim();
+  const search = String(req.query.search || '').trim().slice(0, 100);
+  const offset = (page - 1) * limit;
+
+  const callback = (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, message: 'Lỗi server', error: err });
     }
 
-    return res.status(200).json({ success: true, data: appointments });
+    const total = Number(result.total || 0);
+    return res.status(200).json({
+      success: true,
+      data: result.appointments,
+      stats: result.stats,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit))
+      }
+    });
   };
 
   const run = () => {
-    if (req.user.role === 'staff') {
-      if (isCashierStaffUser(req.user)) {
-        return appointmentModel.getAllAppointments(callback);
-      }
-      return appointmentModel.getAppointmentsByStaffId(req.user.id, callback);
-    }
+    const staffId = req.user.role === 'staff' && !isCashierStaffUser(req.user)
+      ? req.user.id
+      : null;
 
-    return appointmentModel.getAllAppointments(callback);
+    return appointmentModel.getAppointmentsPage(
+      { staffId, status, dateFrom, dateTo, search, limit, offset },
+      callback
+    );
   };
 
   if (req.user.role === 'staff' && typeof req.user.staff_role_name === 'undefined') {
@@ -501,6 +580,7 @@ exports.updateAppointmentStatus = (req, res) => {
         userId: appointment.user_id,
         staffId: appointment.staff_id
       });
+      triggerVoucherAutomation(req, { appointmentId: id, status });
 
       sendZaloStatusNotification(appointment, status, cancelReason);
 
@@ -543,6 +623,7 @@ exports.cancelAppointment = (req, res) => {
           userId: appointment.user_id,
           staffId: appointment.staff_id
         });
+        triggerVoucherAutomation(req, { appointmentId: id, status: 'cancelled' });
 
         sendZaloStatusNotification(appointment, 'cancelled', 'Hủy bởi quản lý');
 
@@ -597,6 +678,7 @@ exports.cancelAppointment = (req, res) => {
         userId: appointment.user_id,
         staffId: appointment.staff_id
       });
+      triggerVoucherAutomation(req, { appointmentId: id, status: 'cancelled' });
 
       sendZaloStatusNotification(appointment, 'cancelled', 'Khách hàng yêu cầu hủy');
 
@@ -721,6 +803,7 @@ exports.confirmCancellationRequest = (req, res) => {
         userId: appointment.user_id,
         staffId: appointment.staff_id
       });
+      triggerVoucherAutomation(req, { appointmentId: id, status: 'cancelled' });
 
       sendZaloStatusNotification(appointment, 'cancelled', 'Yêu cầu hủy được nhân viên xác nhận');
 

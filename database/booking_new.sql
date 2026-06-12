@@ -15,11 +15,13 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   phone VARCHAR(20),
+  date_of_birth DATE NULL,
   role ENUM('customer', 'admin', 'staff') DEFAULT 'customer',
   staff_role_id INT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_users_staff_role_id (staff_role_id),
+  INDEX idx_users_date_of_birth (date_of_birth),
   FOREIGN KEY (staff_role_id) REFERENCES staff_role(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

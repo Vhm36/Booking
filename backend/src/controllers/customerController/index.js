@@ -15,6 +15,48 @@ const parseActiveValue = (value) => {
   return null;
 };
 
+const normalizeDateOfBirth = (value) => {
+  if (typeof value === 'undefined') {
+    return { provided: false, valid: true, value: null };
+  }
+
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return { provided: true, valid: true, value: null };
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return { provided: true, valid: false, value: null };
+  }
+
+  const [year, month, day] = raw.split('-').map(Number);
+  const birthDate = new Date(year, month - 1, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (
+    Number.isNaN(birthDate.getTime()) ||
+    birthDate.getFullYear() !== year ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day ||
+    birthDate >= today
+  ) {
+    return { provided: true, valid: false, value: null };
+  }
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return {
+    provided: true,
+    valid: age >= 13 && age <= 100,
+    value: raw
+  };
+};
+
 const addDays = (days) => {
   const nextDate = new Date();
   nextDate.setDate(nextDate.getDate() + days);
@@ -41,17 +83,32 @@ const createSampleVoucherForCustomer = (customer, overrides = {}) => {
 };
 
 exports.getAllCustomers = (req, res) => {
-  customerModel.getAllCustomers((err, customers) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(200, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+  const search = String(req.query.search || '').trim().slice(0, 100);
+  const offset = (page - 1) * limit;
+
+  customerModel.getAllCustomers({ search, limit, offset }, (err, result) => {
     if (err) {
       return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
-    return res.status(200).json({ success: true, data: customers });
+    const total = Number(result.total || 0);
+    return res.status(200).json({
+      success: true,
+      data: result.customers,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit))
+      }
+    });
   });
 };
 
 exports.createCustomer = (req, res) => {
-  const { name, email, password, phone, is_active } = req.body;
+  const { name, email, password, phone, date_of_birth, is_active } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' });
@@ -73,11 +130,16 @@ exports.createCustomer = (req, res) => {
       return res.status(400).json({ message: 'is_active không hợp lệ' });
     }
 
+    const normalizedBirthday = normalizeDateOfBirth(date_of_birth);
+    if (!normalizedBirthday.valid) {
+      return res.status(400).json({ message: 'Ngày sinh không hợp lệ' });
+    }
+
     let hashedPassword = '';
     try {
       hashedPassword = await bcrypt.hash(password, 10);
     } catch (hashErr) {
-      return res.status(500).json({ message: 'Lá»—i server', error: hashErr });
+      return res.status(500).json({ message: 'Lỗi server', error: hashErr });
     }
 
     return customerModel.createCustomer(
@@ -86,6 +148,7 @@ exports.createCustomer = (req, res) => {
         email: email.trim(),
         password: hashedPassword,
         phone: (phone || '').trim(),
+        date_of_birth: normalizedBirthday.value,
         is_active: activeValue
       },
       (createErr, result) => {
@@ -105,12 +168,13 @@ exports.createCustomer = (req, res) => {
 
 exports.updateCustomer = (req, res) => {
   const { id } = req.params;
-  const { name, email, phone, is_active, password } = req.body;
+  const { name, email, phone, date_of_birth, is_active, password } = req.body;
 
   if (
     typeof name === 'undefined' &&
     typeof email === 'undefined' &&
     typeof phone === 'undefined' &&
+    typeof date_of_birth === 'undefined' &&
     typeof is_active === 'undefined' &&
     typeof password === 'undefined'
   ) {
@@ -132,6 +196,11 @@ exports.updateCustomer = (req, res) => {
       if (typeof name !== 'undefined') payload.name = name.trim();
       if (typeof email !== 'undefined') payload.email = email.trim();
       if (typeof phone !== 'undefined') payload.phone = phone.trim();
+      const normalizedBirthday = normalizeDateOfBirth(date_of_birth);
+      if (!normalizedBirthday.valid) {
+        return res.status(400).json({ message: 'Ngày sinh không hợp lệ' });
+      }
+      if (normalizedBirthday.provided) payload.date_of_birth = normalizedBirthday.value;
 
       if (typeof password !== 'undefined') {
         if (typeof password !== 'string' || password.trim().length === 0) {
@@ -145,7 +214,7 @@ exports.updateCustomer = (req, res) => {
         try {
           payload.password = await bcrypt.hash(password, 10);
         } catch (hashErr) {
-          return res.status(500).json({ message: 'Lá»—i server', error: hashErr });
+          return res.status(500).json({ message: 'Lỗi server', error: hashErr });
         }
       }
 

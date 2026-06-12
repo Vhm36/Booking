@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const AUTOMATION_HISTORY_START_DATE = '2024-01-01';
 
 /**
  * Customer Clustering Service — Phân cụm khách hàng bằng K-Means
@@ -8,13 +9,18 @@ const db = require('../../config/db');
  * K = 5 cụm mặc định
  */
 
-const query = (sql, params = []) =>
-  new Promise((resolve, reject) => {
+const query = async (sql, params = []) => {
+  if (db.ready) {
+    await db.ready;
+  }
+
+  return new Promise((resolve, reject) => {
     db.query(sql, params, (err, results) => {
       if (err) return reject(err);
       resolve(results);
     });
   });
+};
 
 // ============================
 // K-Means Algorithm (thuần JS)
@@ -296,11 +302,12 @@ const extractCustomerFeatures = async () => {
     FROM users u
     LEFT JOIN appointments a
       ON u.id = a.user_id
+      AND a.appointment_date BETWEEN ? AND CURDATE()
     WHERE u.role = 'customer' AND u.is_active = 1
     GROUP BY u.id, u.name, u.email
   `;
 
-  const rows = await query(sql);
+  const rows = await query(sql, [AUTOMATION_HISTORY_START_DATE]);
 
   return rows.map((row) => ({
     customer_id: row.customer_id,
@@ -358,13 +365,29 @@ const runFullAnalysis = async (k = 5) => {
   });
 
   // Cập nhật DB
-  const updatePromises = results.map((c) =>
-    query(
-      'UPDATE users SET customer_segment = ?, rfm_score = ?, rfm_updated_at = NOW() WHERE id = ?',
-      [c.segment, `C${c.cluster_id}`, c.customer_id]
-    )
-  );
-  await Promise.all(updatePromises);
+  const updateBatchSize = 500;
+  for (let index = 0; index < results.length; index += updateBatchSize) {
+    const batch = results.slice(index, index + updateBatchSize);
+    const segmentCases = batch.map(() => 'WHEN ? THEN ?').join(' ');
+    const scoreCases = batch.map(() => 'WHEN ? THEN ?').join(' ');
+    const ids = batch.map((customer) => customer.customer_id);
+    const params = [
+      ...batch.flatMap((customer) => [customer.customer_id, customer.segment]),
+      ...batch.flatMap((customer) => [customer.customer_id, `C${customer.cluster_id}`]),
+      ...ids
+    ];
+
+    await query(
+      `
+        UPDATE users
+        SET customer_segment = CASE id ${segmentCases} ELSE customer_segment END,
+            rfm_score = CASE id ${scoreCases} ELSE rfm_score END,
+            rfm_updated_at = NOW()
+        WHERE id IN (${ids.map(() => '?').join(', ')})
+      `,
+      params
+    );
+  }
 
   // Thống kê
   const segments = {};

@@ -613,6 +613,69 @@ const getBusyTimeSlots = (staffId, appointmentDate, callback) => {
   });
 };
 
+const confirmPendingAppointmentsForStaff = (staffId, callback) => {
+  getAppointmentServiceSchemaInfo((schemaErr, appointmentServiceSchemaInfo) => {
+    if (schemaErr) return callback(schemaErr);
+
+    const { summaryJoin, busyEndExpression, bookedServiceNameExpression } =
+      getAppointmentConflictExpressions(appointmentServiceSchemaInfo.hasAppointmentServicesTable);
+    const selectQuery = `
+      SELECT
+        a.id,
+        a.user_id,
+        a.staff_id,
+        a.appointment_date,
+        TIME_FORMAT(a.appointment_time, '%H:%i') AS appointment_time,
+        TIME_FORMAT(${busyEndExpression}, '%H:%i') AS end_time,
+        ${bookedServiceNameExpression} AS service_name,
+        customer.name AS customer_name,
+        customer.email AS customer_email,
+        staff_user.name AS staff_name
+      FROM appointments a
+      JOIN users customer
+        ON customer.id = a.user_id
+      JOIN users staff_user
+        ON staff_user.id = a.staff_id
+      JOIN services booked_service
+        ON booked_service.id = a.service_id
+      ${summaryJoin}
+      WHERE a.staff_id = ?
+        AND a.status = 'pending'
+        AND a.appointment_date >= CURDATE()
+      ORDER BY a.appointment_date ASC, a.appointment_time ASC, a.id ASC
+    `;
+
+    return db.query(selectQuery, [staffId], (selectErr, appointments) => {
+      if (selectErr) return callback(selectErr);
+
+      const appointmentIds = (appointments || []).map((appointment) => Number(appointment.id)).filter(Boolean);
+      if (appointmentIds.length === 0) {
+        return callback(null, { affectedRows: 0, appointments: [] });
+      }
+
+      const updateQuery = `
+        UPDATE appointments
+        SET
+          status = 'confirmed',
+          cancellation_requested = 0,
+          cancellation_requested_at = NULL
+        WHERE staff_id = ?
+          AND status = 'pending'
+          AND id IN (?)
+      `;
+
+      return db.query(updateQuery, [staffId, appointmentIds], (updateErr, result) => {
+        if (updateErr) return callback(updateErr);
+
+        return callback(null, {
+          affectedRows: Number(result.affectedRows || 0),
+          appointments
+        });
+      });
+    });
+  });
+};
+
 const getStaffBookedMinutes = (staffId, appointmentDate, callback) => {
   getAppointmentServiceSchemaInfo((schemaErr, appointmentServiceSchemaInfo) => {
     if (schemaErr) return callback(schemaErr);
@@ -949,6 +1012,7 @@ module.exports = {
   replaceWeeklyAvailability,
   isStaffAvailableForWeeklySchedule,
   getBusyTimeSlots,
+  confirmPendingAppointmentsForStaff,
   isStaffRoleExcludedFromCustomerBooking,
   getStaffRoleNameByUserId,
   createLeaveRequest,

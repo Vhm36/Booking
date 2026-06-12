@@ -46,24 +46,38 @@ function Footer() {
     <>
       <footer className="footer">
         <div className="footer-shell">
-          <div className="footer-brand">
-            <span className="footer-brand-mark">BB</span>
-            <div className="footer-brand-copy">
-              <strong>BeautyBook</strong>
-              <small>Đặt lịch làm đẹp nhanh gọn</small>
+          <section className="footer-column footer-brand-column" aria-label="BeautyBook">
+            <div className="footer-brand">
+              <span className="footer-brand-mark">BB</span>
+              <div className="footer-brand-copy">
+                <strong>BeautyBook</strong>
+                <small>Đặt lịch làm đẹp nhanh gọn.</small>
+              </div>
             </div>
-          </div>
+          </section>
 
-          <nav className="footer-links" aria-label="Liên kết cuối trang">
-            <Link to="/">Trang chủ</Link>
-            <Link to="/services">Dịch vụ</Link>
-            <Link to="/login">Đăng nhập</Link>
+          <nav className="footer-column footer-links" aria-label="Liên kết cuối trang">
+            <h2>Liên kết</h2>
+            <div className="footer-link-list">
+              <Link to="/">Trang chủ</Link>
+              <Link to="/services">Dịch vụ</Link>
+              <Link to="/login">Đăng nhập</Link>
+            </div>
           </nav>
 
-          <div className="footer-support">
-            <span>support@beautybook.vn</span>
-            <span>0123 456 789</span>
-          </div>
+          <address className="footer-column footer-support">
+            <h2>Hỗ trợ</h2>
+            <div className="footer-contact-list">
+              <a href="mailto:support@beautybook.vn">
+                <span aria-hidden="true">✉</span>
+                support@beautybook.vn
+              </a>
+              <a href="tel:0123456789">
+                <span aria-hidden="true">☎</span>
+                0123 456 789
+              </a>
+            </div>
+          </address>
         </div>
 
         <div className="footer-bottom">

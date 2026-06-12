@@ -19,9 +19,9 @@ const getCategoryKey = (category) => {
   const key = normalizeText(category);
 
   if (key.includes('hair') || key.includes('toc')) return 'toc';
-  if (key.includes('nail') || key.includes('mong')) return 'mong';
-  if (key.includes('massage')) return 'massage';
-  if (key.includes('facial') || key.includes('skin') || key.includes('cham soc da')) return 'da';
+  if (key.includes('nail') || key.includes('mong')) return 'nail-mong';
+  if (key.includes('goi') || key.includes('massage')) return 'goi-massage';
+  if (key.includes('facial') || key.includes('skin') || key.includes('cham soc da') || key.includes('da mat')) return 'da-mat';
   if (
     key.includes('lash') ||
     key.includes('brow') ||
@@ -42,26 +42,14 @@ const getCategoryLabel = (category) => {
   const key = getCategoryKey(category);
 
   if (key === 'toc') return 'Tóc';
-  if (key === 'mong') return 'Móng';
-  if (key === 'massage') return 'Massage';
-  if (key === 'da') return 'Chăm sóc da';
-  if (key === 'mi-may') return 'Mi & mày';
+  if (key === 'nail-mong') return 'Nail/Móng';
+  if (key === 'goi-massage') return 'Gội/Massage';
+  if (key === 'da-mat') return 'Da mặt';
+  if (key === 'mi-may') return 'Mi/Mày';
   if (key === 'trang-diem') return 'Trang điểm';
+  if (key === 'khac') return 'Khác';
 
   return category || 'Dịch vụ làm đẹp';
-};
-
-const getCollectionLabel = (category) => {
-  const key = getCategoryKey(category);
-
-  if (key === 'toc') return 'Gợi ý nổi bật';
-  if (key === 'mi-may') return 'Mi & mày';
-  if (key === 'mong') return 'Nail';
-  if (key === 'da') return 'Chăm sóc da';
-  if (key === 'massage') return 'Massage phục hồi';
-  if (key === 'trang-diem') return 'Trang điểm chuyên nghiệp';
-
-  return 'Đề xuất hôm nay';
 };
 
 const getServiceImage = (service) =>
@@ -70,13 +58,17 @@ const getServiceImage = (service) =>
 function Services() {
   const [services, setServices] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
+  const [favoriteServices, setFavoriteServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState('recommended');
   const [durationFilter, setDurationFilter] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
-  const [activeCategory, setActiveCategory] = useState('all');
   const [searchParams, setSearchParams] = useSearchParams();
+  const [activeCategory, setActiveCategory] = useState(() => {
+    const categoryParam = searchParams.get('category');
+    return categoryParam ? getCategoryKey(categoryParam) : 'all';
+  });
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [preferredDate, setPreferredDate] = useState(searchParams.get('date') || '');
 
@@ -85,25 +77,43 @@ function Services() {
   useEffect(() => {
     setQuery(searchParams.get('q') || '');
     setPreferredDate(searchParams.get('date') || '');
+    const categoryParam = searchParams.get('category');
+    setActiveCategory(categoryParam ? getCategoryKey(categoryParam) : 'all');
   }, [searchParams]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch both services and categories in parallel
-        const [servicesResponse, categoriesResponse] = await Promise.all([
+
+        const [servicesResult, categoriesResult, trendingResult] = await Promise.allSettled([
           serviceService.getAllServices(),
-          serviceService.getAllCategories()
+          serviceService.getAllCategories(),
+          serviceService.getTrendingServices()
         ]);
-        
-        setServices(servicesResponse.data.data || []);
-        setDbCategories(categoriesResponse.data.data || []);
+
+        if (servicesResult.status === 'rejected') {
+          throw servicesResult.reason;
+        }
+
+        setServices(servicesResult.value.data.data || []);
+        setDbCategories(
+          categoriesResult.status === 'fulfilled'
+            ? categoriesResult.value.data.data || []
+            : []
+        );
+        setFavoriteServices(
+          trendingResult.status === 'fulfilled'
+            ? trendingResult.value.data.data?.all_services || []
+            : []
+        );
         setError(null);
       } catch (err) {
         setError('Không thể tải danh sách dịch vụ.');
         console.error(err);
+        setServices([]);
+        setDbCategories([]);
+        setFavoriteServices([]);
       } finally {
         setLoading(false);
       }
@@ -112,11 +122,24 @@ function Services() {
     fetchData();
   }, []);
 
+  const favoriteServicesById = useMemo(() => {
+    const map = new Map();
+
+    favoriteServices.forEach((service) => {
+      const bookingCount = Number(service.booking_count || 0);
+      if (bookingCount > 0) {
+        map.set(String(service.id), { ...service, booking_count: bookingCount });
+      }
+    });
+
+    return map;
+  }, [favoriteServices]);
+
   const categories = useMemo(() => {
     // Use database categories if available, otherwise fallback to service-based categories
     const categoryList = dbCategories && dbCategories.length > 0 
       ? dbCategories.map(cat => ({
-          key: normalizeText(cat.category_name),
+          key: getCategoryKey(cat.category_name),
           label: cat.category_name
         }))
       : services
@@ -143,6 +166,10 @@ function Services() {
       return;
     }
 
+    if (categories.length <= 1) {
+      return;
+    }
+
     if (!categories.some((item) => item.key === activeCategory)) {
       setActiveCategory('all');
     }
@@ -155,6 +182,7 @@ function Services() {
       const name = normalizeText(service.name || '');
       const description = normalizeText(service.description || '');
       const category = normalizeText(service.category || '');
+      const categoryLabel = normalizeText(getCategoryLabel(service.category));
       const duration = Number(service.duration) || 0;
       const price = Number(service.price) || 0;
 
@@ -162,7 +190,8 @@ function Services() {
         normalizedQuery === '' ||
         name.includes(normalizedQuery) ||
         description.includes(normalizedQuery) ||
-        category.includes(normalizedQuery);
+        category.includes(normalizedQuery) ||
+        categoryLabel.includes(normalizedQuery);
 
       const matchesCategory =
         activeCategory === 'all' || getCategoryKey(service.category) === activeCategory;
@@ -204,16 +233,53 @@ function Services() {
         return durationA - durationB;
       }
 
+      const favoriteA = Number(favoriteServicesById.get(String(a.id))?.booking_count || 0);
+      const favoriteB = Number(favoriteServicesById.get(String(b.id))?.booking_count || 0);
+      if (favoriteA !== favoriteB) {
+        return favoriteB - favoriteA;
+      }
+
       return idB - idA;
     });
 
     return sorted;
-  }, [activeCategory, durationFilter, priceRange, query, services, sortBy]);
+  }, [activeCategory, durationFilter, favoriteServicesById, priceRange, query, services, sortBy]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
 
     const params = new URLSearchParams(searchParams);
+
+    if (query.trim()) {
+      params.set('q', query.trim());
+    } else {
+      params.delete('q');
+    }
+
+    if (preferredDate) {
+      params.set('date', preferredDate);
+    } else {
+      params.delete('date');
+    }
+
+    if (activeCategory !== 'all') {
+      params.set('category', activeCategory);
+    } else {
+      params.delete('category');
+    }
+
+    setSearchParams(params);
+  };
+
+  const handleCategoryChange = (categoryKey) => {
+    setActiveCategory(categoryKey);
+
+    const params = new URLSearchParams(searchParams);
+    if (categoryKey === 'all') {
+      params.delete('category');
+    } else {
+      params.set('category', categoryKey);
+    }
 
     if (query.trim()) {
       params.set('q', query.trim());
@@ -243,8 +309,8 @@ function Services() {
   const getBookingAction = (serviceId) => {
     if (!user) {
       return {
-        target: '/login',
-        label: 'Đăng nhập để đặt lịch'
+        target: `/login?redirect=${encodeURIComponent(`/booking/${serviceId}`)}`,
+        label: 'Đặt lịch'
       };
     }
 
@@ -326,8 +392,9 @@ function Services() {
               <button
                 key={category.key}
                 type="button"
+                aria-pressed={activeCategory === category.key}
                 className={activeCategory === category.key ? 'chip active' : 'chip'}
-                onClick={() => setActiveCategory(category.key)}
+                onClick={() => handleCategoryChange(category.key)}
               >
                 {category.label}
               </button>
@@ -348,6 +415,8 @@ function Services() {
           {filteredServices.map((service) => {
             const price = Number(service.price) || 0;
             const duration = Number(service.duration) || 0;
+            const favoriteMeta = favoriteServicesById.get(String(service.id));
+            const favoriteBookingCount = Number(favoriteMeta?.booking_count || 0);
             const bookingAction = getBookingAction(service.id);
 
             return (
@@ -364,11 +433,18 @@ function Services() {
                       }
                     }}
                   />
+                  {favoriteBookingCount > 0 && (
+                    <span
+                      className="collection-pill"
+                      title="Dịch vụ hot theo lượt đặt thật từ khách hàng"
+                    >
+                      Hot
+                    </span>
+                  )}
                 </div>
 
                 <div className="service-badges">
                   <span className="category-pill">{getCategoryLabel(service.category)}</span>
-                  <span className="collection-pill">{getCollectionLabel(service.category)}</span>
                 </div>
 
                 <div className="service-card-top">
@@ -381,9 +457,7 @@ function Services() {
                 <div className="service-meta">
                   <div className="price-block">
                     <strong>{formatVnd(price)}</strong>
-                    <small>Giá tại salon</small>
                   </div>
-                  <small className="meta-note">Đặt nhanh trên hệ thống</small>
                 </div>
 
                 <div className="service-actions">

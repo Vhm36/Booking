@@ -77,6 +77,15 @@ const saveServiceImage = async (imageData) => {
   return `${SERVICE_UPLOAD_URL_PREFIX}${fileName}`;
 };
 
+const generateServiceCode = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `SVC-${result}`;
+};
+
 const buildServiceData = (payload, imageUrlOverride) => ({
   name: payload.name.trim(),
   description: (payload.description || '').trim(),
@@ -84,7 +93,8 @@ const buildServiceData = (payload, imageUrlOverride) => ({
   duration: Number(payload.duration),
   category: (payload.category || '').trim(),
   image_url: imageUrlOverride,
-  status: payload.status || 'active'
+  status: payload.status || 'active',
+  service_code: payload.service_code ? payload.service_code.trim() : null
 });
 
 exports.getAllServices = (req, res) => {
@@ -127,7 +137,7 @@ exports.getServiceById = (req, res) => {
 };
 
 exports.createService = async (req, res) => {
-  const { name, description, price, duration, category, image_url, image_data } = req.body;
+  const { name, description, price, duration, category, image_url, image_data, service_code } = req.body;
 
   if (!name || !price || !duration) {
     return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' });
@@ -152,8 +162,11 @@ exports.createService = async (req, res) => {
     return res.status(error.status || 500).json({ message: error.message });
   }
 
+  const hasCustomCode = typeof service_code === 'string' && service_code.trim() !== '';
+  const finalServiceCode = hasCustomCode ? service_code.trim() : generateServiceCode();
+
   const serviceData = buildServiceData(
-    { name, description, price: parsedPrice, duration: parsedDuration, category, status: 'active' },
+    { name, description, price: parsedPrice, duration: parsedDuration, category, status: 'active', service_code: finalServiceCode },
     storedImageUrl
   );
 
@@ -165,6 +178,10 @@ exports.createService = async (req, res) => {
         } catch (cleanupError) {
           console.error('[SERVICE_IMAGE_CLEANUP_CREATE_ERROR]', cleanupError);
         }
+      }
+
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({ message: 'Mã dịch vụ đã tồn tại. Vui lòng nhập mã khác.' });
       }
 
       return res.status(500).json({ message: 'Lỗi server', error: err });
@@ -180,7 +197,7 @@ exports.createService = async (req, res) => {
 
 exports.updateService = (req, res) => {
   const { id } = req.params;
-  const { name, description, price, duration, category, image_url, image_data, status } = req.body;
+  const { name, description, price, duration, category, image_url, image_data, status, service_code } = req.body;
 
   if (!name || !price || !duration) {
     return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' });
@@ -214,8 +231,15 @@ exports.updateService = (req, res) => {
       return res.status(error.status || 500).json({ message: error.message });
     }
 
+    let finalServiceCode = existingService.service_code;
+    if (typeof service_code === 'string' && service_code.trim() !== '') {
+      finalServiceCode = service_code.trim();
+    } else if (!finalServiceCode) {
+      finalServiceCode = generateServiceCode();
+    }
+
     const serviceData = buildServiceData(
-      { name, description, price: parsedPrice, duration: parsedDuration, category, status },
+      { name, description, price: parsedPrice, duration: parsedDuration, category, status, service_code: finalServiceCode },
       storedImageUrl
     );
 
@@ -227,6 +251,10 @@ exports.updateService = (req, res) => {
           } catch (cleanupError) {
             console.error('[SERVICE_IMAGE_CLEANUP_UPDATE_ERROR]', cleanupError);
           }
+        }
+
+        if (updateErr.code === 'ER_DUP_ENTRY') {
+          return res.status(400).json({ message: 'Mã dịch vụ đã tồn tại. Vui lòng nhập mã khác.' });
         }
 
         return res.status(500).json({ message: 'Lỗi server', error: updateErr });
@@ -393,9 +421,11 @@ exports.getTrendingServices = (req, res) => {
       return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 
+    const bookedServices = (services || []).filter((service) => Number(service.booking_count || 0) > 0);
+
     // Group services by category
     const categoryMap = {};
-    (services || []).forEach((service) => {
+    bookedServices.forEach((service) => {
       const category = service.category || 'Khác';
       if (!categoryMap[category]) {
         categoryMap[category] = {
@@ -416,9 +446,8 @@ exports.getTrendingServices = (req, res) => {
       success: true,
       data: {
         categories,
-        all_services: services || []
+        all_services: bookedServices
       }
     });
   });
 };
-

@@ -489,7 +489,7 @@ exports.createPayment = (req, res) => {
       ) {
         return res.status(400).json({
           success: false,
-          message: 'Lich co rui ro huy cao can thanh toan coc online de giu cho.'
+          message: 'Lịch có rủi ro hủy cao cần thanh toán cọc online để giữ chỗ.'
         });
       }
 

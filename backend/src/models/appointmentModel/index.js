@@ -31,10 +31,32 @@ const getAppointmentServiceSelectFragment = (hasAppointmentServicesTable) => {
   }
 
   return [
-    'COALESCE(service_summary.service_names, s.name) AS service_name',
-    'COALESCE(service_summary.total_price, a.total_amount, s.price) AS service_price',
-    'COALESCE(service_summary.total_duration, s.duration) AS duration',
-    'COALESCE(service_summary.service_count, 1) AS service_count'
+    `COALESCE((
+      SELECT GROUP_CONCAT(
+        COALESCE(aps.service_name_snapshot, service_item.name)
+        ORDER BY aps.sort_order ASC SEPARATOR ', '
+      )
+      FROM appointment_services aps
+      LEFT JOIN services service_item ON service_item.id = aps.service_id
+      WHERE aps.appointment_id = a.id
+    ), s.name) AS service_name`,
+    `COALESCE((
+      SELECT SUM(COALESCE(aps.price_snapshot, service_item.price, 0))
+      FROM appointment_services aps
+      LEFT JOIN services service_item ON service_item.id = aps.service_id
+      WHERE aps.appointment_id = a.id
+    ), a.total_amount, s.price) AS service_price`,
+    `COALESCE((
+      SELECT SUM(COALESCE(aps.duration_snapshot, service_item.duration, 0))
+      FROM appointment_services aps
+      LEFT JOIN services service_item ON service_item.id = aps.service_id
+      WHERE aps.appointment_id = a.id
+    ), s.duration) AS duration`,
+    `COALESCE(NULLIF((
+      SELECT COUNT(*)
+      FROM appointment_services aps
+      WHERE aps.appointment_id = a.id
+    ), 0), 1) AS service_count`
   ].join(',\n    ');
 };
 
@@ -75,18 +97,13 @@ const buildAppointmentSelect = (schemaInfo, appointmentServiceSchemaInfo) => `
   FROM appointments a
   JOIN users u ON a.user_id = u.id
   JOIN services s ON a.service_id = s.id
-  ${appointmentServiceSchemaInfo.hasAppointmentServicesTable ? getAppointmentServiceSummaryJoin('a', 'service_summary') : ''}
   LEFT JOIN users st ON a.staff_id = st.id
-  LEFT JOIN (
-    SELECT p1.*
-    FROM payments p1
-    INNER JOIN (
-      SELECT appointment_id, MAX(id) AS latest_payment_id
-      FROM payments
-      GROUP BY appointment_id
-    ) latest
-      ON latest.latest_payment_id = p1.id
-  ) latest_payment ON latest_payment.appointment_id = a.id
+  LEFT JOIN payments latest_payment
+    ON latest_payment.id = (
+      SELECT MAX(payment_item.id)
+      FROM payments payment_item
+      WHERE payment_item.appointment_id = a.id
+    )
 `;
 
 const runAppointmentQuery = (queryTail, params, callback, pickOne = false) => {
@@ -229,6 +246,118 @@ const createAppointment = (appointmentData, callback) => {
 
 const getAllAppointments = (callback) => {
   return runAppointmentQuery('ORDER BY a.appointment_date DESC, a.appointment_time DESC', [], callback);
+};
+
+const getAppointmentsPage = (
+  { staffId = null, status = 'all', dateFrom = '', dateTo = '', search = '', limit = 50, offset = 0 },
+  callback
+) => {
+  const baseClauses = [];
+  const baseParams = [];
+  const normalizedSearch = String(search || '').trim();
+
+  if (staffId) {
+    baseClauses.push('a.staff_id = ?');
+    baseParams.push(staffId);
+  }
+  if (dateFrom) {
+    baseClauses.push('a.appointment_date >= ?');
+    baseParams.push(dateFrom);
+  }
+  if (dateTo) {
+    baseClauses.push('a.appointment_date <= ?');
+    baseParams.push(dateTo);
+  }
+  if (normalizedSearch) {
+    const pattern = `%${normalizedSearch}%`;
+    baseClauses.push('(u.name LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR s.name LIKE ? OR st.name LIKE ?)');
+    baseParams.push(pattern, pattern, pattern, pattern, pattern);
+  }
+
+  const statusClauseMap = {
+    pending: "a.status = 'pending' AND COALESCE(a.cancellation_requested, 0) = 0",
+    confirmed: "a.status = 'confirmed' AND COALESCE(a.cancellation_requested, 0) = 0",
+    cancellation_requested: 'COALESCE(a.cancellation_requested, 0) = 1',
+    completed: "a.status = 'completed'",
+    cancelled: "a.status = 'cancelled'"
+  };
+  const filteredClauses = [...baseClauses];
+  if (statusClauseMap[status]) {
+    filteredClauses.push(statusClauseMap[status]);
+  }
+
+  const dataWhere = filteredClauses.length > 0 ? `WHERE ${filteredClauses.join(' AND ')}` : '';
+  const statsWhere = baseClauses.length > 0 ? `WHERE ${baseClauses.join(' AND ')}` : '';
+  let pageRows = null;
+  let statsRows = null;
+  let settled = false;
+
+  const finish = (err) => {
+    if (settled) return;
+    if (err) {
+      settled = true;
+      callback(err);
+      return;
+    }
+    if (!pageRows || !statsRows) return;
+
+    settled = true;
+    const stats = statsRows[0] || {};
+    const normalizedStats = {
+      total: Number(stats.total || 0),
+      pending: Number(stats.pending || 0),
+      confirmed: Number(stats.confirmed || 0),
+      cancellationRequested: Number(stats.cancellation_requested || 0),
+      completed: Number(stats.completed || 0),
+      cancelled: Number(stats.cancelled || 0)
+    };
+    const totalByStatus = {
+      pending: normalizedStats.pending,
+      confirmed: normalizedStats.confirmed,
+      cancellation_requested: normalizedStats.cancellationRequested,
+      completed: normalizedStats.completed,
+      cancelled: normalizedStats.cancelled
+    };
+
+    callback(null, {
+      appointments: pageRows,
+      stats: normalizedStats,
+      total: status === 'all' ? normalizedStats.total : Number(totalByStatus[status] || 0)
+    });
+  };
+
+  runAppointmentQuery(
+    `${dataWhere} ORDER BY a.appointment_date DESC, a.appointment_time DESC LIMIT ? OFFSET ?`,
+    [...baseParams, limit, offset],
+    (err, rows) => {
+      if (err) return finish(err);
+      pageRows = rows;
+      finish();
+    }
+  );
+
+  db.query(
+    `
+      SELECT
+        COUNT(*) AS total,
+        SUM(a.status = 'pending' AND COALESCE(a.cancellation_requested, 0) = 0) AS pending,
+        SUM(a.status = 'confirmed' AND COALESCE(a.cancellation_requested, 0) = 0) AS confirmed,
+        SUM(COALESCE(a.cancellation_requested, 0) = 1) AS cancellation_requested,
+        SUM(a.status = 'completed') AS completed,
+        SUM(a.status = 'cancelled') AS cancelled
+      FROM appointments a
+      JOIN users u ON u.id = a.user_id
+      JOIN services s ON s.id = a.service_id
+      LEFT JOIN users st ON st.id = a.staff_id
+      ${statsWhere}
+    `,
+    baseParams,
+    (err, rows) => {
+      if (err) return finish(err);
+      statsRows = rows;
+      finish();
+    }
+  );
 };
 
 const getAppointmentsByStaffId = (staff_id, callback) => {
@@ -424,6 +553,7 @@ const refreshCustomerCancellationCount = (userId, callback) => {
 module.exports = {
   createAppointment,
   getAllAppointments,
+  getAppointmentsPage,
   getAppointmentsByStaffId,
   getAppointmentsByUserId,
   getAppointmentById,

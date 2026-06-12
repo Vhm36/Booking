@@ -364,10 +364,10 @@ const TOOL_REGISTRY = {
         code: v.code,
         type:
           v.voucher_type === 'percentage'
-            ? `Giam ${Number(v.discount_percent || 0)}%`
-            : `Giam ${Number(v.discount_amount || 0).toLocaleString('vi-VN')} VND`,
+            ? `Giảm ${Number(v.discount_percent || 0)}%`
+            : `Giảm ${Number(v.discount_amount || 0).toLocaleString('vi-VN')} VND`,
         max_discount: v.max_discount_amount
-          ? `Toi da ${Number(v.max_discount_amount).toLocaleString('vi-VN')} VND`
+          ? `Tối đa ${Number(v.max_discount_amount).toLocaleString('vi-VN')} VND`
           : null,
         min_order: `${Number(v.min_order_value || 0).toLocaleString('vi-VN')} VND`,
         valid_until: v.expiry_date,
@@ -435,7 +435,7 @@ const TOOL_REGISTRY = {
       return {
         business_name: 'BeautyBook Salon',
         hours: {
-          'Thứ 2 - Thứ 6': '08:00 - 21:30',
+          'Thứ 2 - Thứ 6': '08:00 - 21:00',
           'Thứ 7 - Chủ nhật': '07:00 - 23:00'
         },
         note: 'Ca sáng và ca tối được quản lý theo lịch nhân viên. Ngày nghỉ xử lý bằng yêu cầu xin nghỉ đã duyệt.',

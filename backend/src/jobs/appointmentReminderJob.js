@@ -40,7 +40,15 @@ const formatDate = (dateVal) => {
   return `${days[d.getDay()]}, ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 };
 
-const getUpcomingAppointments = () => {
+const waitForDatabase = async () => {
+  if (db.ready) {
+    await db.ready;
+  }
+};
+
+const getUpcomingAppointments = async () => {
+  await waitForDatabase();
+
   return new Promise((resolve, reject) => {
     const query = `
       SELECT
@@ -75,7 +83,9 @@ const getUpcomingAppointments = () => {
   });
 };
 
-const markReminderSent = (appointmentId) => {
+const markReminderSent = async (appointmentId) => {
+  await waitForDatabase();
+
   return new Promise((resolve, reject) => {
     db.query(
       'UPDATE appointments SET reminder_sent = 1, reminder_sent_at = NOW() WHERE id = ?',
@@ -148,7 +158,9 @@ const processReminders = async () => {
   }
 };
 
-const expireVouchers = () => {
+const expireVouchers = async () => {
+  await waitForDatabase();
+
   return new Promise((resolve, reject) => {
     db.query(
       "UPDATE vouchers SET status = 'expired' WHERE expiry_date <= NOW() AND status = 'active'",

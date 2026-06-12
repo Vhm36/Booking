@@ -41,8 +41,6 @@ const getTimesFromShift = (dayIndex, shift) => {
   return null;
 };
 
-const getShiftLabel = (shift) => SHIFT_OPTIONS.find((item) => item.value === shift)?.label || 'Ca sáng';
-
 const buildWeekFromRows = (rows = []) =>
   WEEKDAY_LABELS.map((label, dayIndex) => {
     const row = rows.find((item) => Number(item.day_of_week) === dayIndex);
@@ -64,10 +62,20 @@ const minutesFromTime = (time) => {
   return hour * 60 + minute;
 };
 
+const getStaffInitials = (name = '') =>
+  String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(-2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'NV';
+
 function StaffLeaveManagement() {
   const navigate = useNavigate();
   const [staffList, setStaffList] = useState([]);
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [isStaffPickerOpen, setIsStaffPickerOpen] = useState(false);
   const [weekSlots, setWeekSlots] = useState(() => buildWeekFromRows());
   const [loading, setLoading] = useState(true);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -78,6 +86,9 @@ function StaffLeaveManagement() {
   const [activeTab, setActiveTab] = useState('weekly');
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [confirmLeaveAction, setConfirmLeaveAction] = useState(null);
+  const [leaveActionLoadingId, setLeaveActionLoadingId] = useState(null);
+  const [leaveActionSuccess, setLeaveActionSuccess] = useState('');
 
   const loadLeaveRequests = async () => {
     try {
@@ -133,10 +144,33 @@ function StaffLeaveManagement() {
     loadSchedule();
   }, [selectedStaffId]);
 
+  useEffect(() => {
+    if (!leaveActionSuccess) return undefined;
+
+    const timer = window.setTimeout(() => setLeaveActionSuccess(''), 1800);
+    return () => window.clearTimeout(timer);
+  }, [leaveActionSuccess]);
+
   const selectedStaff = useMemo(
     () => staffList.find((staff) => String(staff.id) === String(selectedStaffId)) || null,
     [staffList, selectedStaffId]
   );
+
+  useEffect(() => {
+    if (selectedStaff && !isStaffPickerOpen) {
+      setStaffSearch(selectedStaff.name || '');
+    }
+  }, [selectedStaff, isStaffPickerOpen]);
+
+  const filteredStaffList = useMemo(() => {
+    const keyword = staffSearch.trim().toLowerCase();
+    if (!keyword) return staffList;
+
+    return staffList.filter((staff) => {
+      const content = `${staff.name || ''} ${staff.email || ''} ${staff.role_name || ''}`.toLowerCase();
+      return content.includes(keyword);
+    });
+  }, [staffList, staffSearch]);
 
   const morningShiftCount = useMemo(() => weekSlots.filter((day) => day.shift === 'morning').length, [weekSlots]);
   const eveningShiftCount = useMemo(() => weekSlots.filter((day) => day.shift === 'evening').length, [weekSlots]);
@@ -164,15 +198,12 @@ function StaffLeaveManagement() {
     setWeekSlots((prev) => prev.map((day, index) => (index === dayIndex ? { ...day, ...patch } : day)));
   };
 
-  const applyShiftToWholeWeek = (shiftType) => {
+  const chooseStaff = (staff) => {
     setSuccess('');
     setError('');
-    setWeekSlots((prev) =>
-      prev.map((day) => ({
-        ...day,
-        shift: shiftType
-      }))
-    );
+    setSelectedStaffId(String(staff.id));
+    setStaffSearch(staff.name || '');
+    setIsStaffPickerOpen(false);
   };
 
   const saveSchedule = async () => {
@@ -205,14 +236,31 @@ function StaffLeaveManagement() {
     }
   };
 
-  const handleUpdateStatus = async (id, status) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn ${status === 'approved' ? 'duyệt' : 'từ chối'} yêu cầu này?`)) return;
+  const openLeaveActionConfirm = (request, status) => {
+    setError('');
+    setLeaveActionSuccess('');
+    setConfirmLeaveAction({ request, status });
+  };
+
+  const closeLeaveActionConfirm = () => {
+    if (leaveActionLoadingId) return;
+    setConfirmLeaveAction(null);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!confirmLeaveAction?.request) return;
+
+    const { request, status } = confirmLeaveAction;
     try {
-      await staffService.updateLeaveRequestStatus(id, status);
-      window.alert('Cập nhật trạng thái thành công');
-      loadLeaveRequests();
+      setLeaveActionLoadingId(request.id);
+      await staffService.updateLeaveRequestStatus(request.id, status);
+      setConfirmLeaveAction(null);
+      setLeaveActionSuccess(status === 'approved' ? 'Đã duyệt đơn nghỉ phép' : 'Đã từ chối đơn nghỉ phép');
+      await loadLeaveRequests();
     } catch (err) {
-      window.alert('Lỗi: ' + (err.response?.data?.message || err.message));
+      setError(err.response?.data?.message || err.message || 'Không thể cập nhật trạng thái yêu cầu nghỉ phép.');
+    } finally {
+      setLeaveActionLoadingId(null);
     }
   };
 
@@ -226,7 +274,6 @@ function StaffLeaveManagement() {
         <div className="staff-leave-head-copy">
           <p className="staff-leave-kicker">Admin</p>
           <h1>Quản lý ca làm nhân viên</h1>
-          <p>Thiết lập ca sáng/ca tối/full ca theo khung giờ chuẩn. Ngày nghỉ được xử lý qua yêu cầu xin nghỉ của nhân viên.</p>
         </div>
 
         <div className="staff-leave-head-actions">
@@ -258,117 +305,148 @@ function StaffLeaveManagement() {
 
       <div className="staff-leave-panel">
         {activeTab === 'weekly' && (
-          <>
-            <div className="staff-leave-control-grid">
-          <div className="form-group">
-            <label>Chọn nhân viên</label>
-            <select value={selectedStaffId} onChange={(event) => setSelectedStaffId(event.target.value)}>
-              {staffList.length === 0 && <option value="">Không có nhân viên đang hoạt động</option>}
-              {staffList.map((staff) => (
-                <option key={staff.id} value={staff.id}>
-                  {staff.name} ({staff.role_name || 'Nhân viên'})
-                </option>
-              ))}
-            </select>
+          <div className="staff-leave-weekly-layout">
+            <section className="staff-leave-config-panel">
+              <div className="staff-search-block">
+                <label htmlFor="staff-search-combobox">Chọn nhân viên</label>
+                <div className="staff-search-select">
+                  <input
+                    id="staff-search-combobox"
+                    type="search"
+                    value={staffSearch}
+                    placeholder="Tìm theo tên, email..."
+                    autoComplete="off"
+                    disabled={staffList.length === 0}
+                    onFocus={() => setIsStaffPickerOpen(true)}
+                    onBlur={() => window.setTimeout(() => setIsStaffPickerOpen(false), 120)}
+                    onChange={(event) => {
+                      setStaffSearch(event.target.value);
+                      setIsStaffPickerOpen(true);
+                    }}
+                  />
+
+                  {isStaffPickerOpen && (
+                    <div className="staff-search-menu" role="listbox">
+                      {filteredStaffList.length === 0 ? (
+                        <div className="staff-search-empty">Không tìm thấy nhân viên</div>
+                      ) : (
+                        filteredStaffList.map((staff) => (
+                          <button
+                            key={staff.id}
+                            type="button"
+                            className={`staff-search-option ${String(staff.id) === String(selectedStaffId) ? 'selected' : ''}`}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              chooseStaff(staff);
+                            }}
+                          >
+                            <span className="staff-option-avatar">{getStaffInitials(staff.name)}</span>
+                            <span className="staff-option-copy">
+                              <strong>{staff.name}</strong>
+                              <small>{staff.email || staff.role_name || 'Nhân viên'}</small>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedStaff && (
+                <div className="staff-profile-card">
+                  <div className="staff-profile-avatar">{getStaffInitials(selectedStaff.name)}</div>
+                  <div className="staff-profile-copy">
+                    <strong>{selectedStaff.name}</strong>
+                    <span>{selectedStaff.email || 'Chưa có email'}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="staff-leave-stat-card">
+                <div className="staff-leave-stat-grid">
+                  <div className="staff-leave-stat">
+                    <span>Ca sáng</span>
+                    <strong>{morningShiftCount}/7</strong>
+                  </div>
+                  <div className="staff-leave-stat">
+                    <span>Ca tối</span>
+                    <strong>{eveningShiftCount}/7</strong>
+                  </div>
+                  <div className="staff-leave-stat">
+                    <span>Full ca</span>
+                    <strong>{fullShiftCount}/7</strong>
+                  </div>
+                  <div className="staff-leave-stat">
+                    <span>Tổng giờ</span>
+                    <strong>{weeklyHoursLabel}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="staff-shift-legend" aria-label="Chú thích ca làm">
+                <span><i className="shift-dot morning" />Ca sáng</span>
+                <span><i className="shift-dot evening" />Ca tối</span>
+                <span><i className="shift-dot full" />Full ca</span>
+              </div>
+            </section>
+
+            <section className="staff-leave-schedule-panel">
+              {loadingSchedule ? (
+                <div className="staff-leave-loading">Đang tải lịch tuần...</div>
+              ) : (
+                <div className="staff-leave-table-wrap staff-leave-weekly-table-wrap">
+                  <table className="staff-leave-table">
+                    <thead>
+                      <tr>
+                        <th>Ngày</th>
+                        <th>Ca làm</th>
+                        <th>Khung giờ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weekSlots.map((day, index) => {
+                        const times = getTimesFromShift(day.day_of_week, day.shift);
+                        return (
+                          <tr key={day.day_of_week} className={`is-working shift-${day.shift}`}>
+                            <td className="staff-leave-day-cell">
+                              <strong>{day.label}</strong>
+                            </td>
+                            <td>
+                              <select
+                                className="staff-shift-select"
+                                value={day.shift}
+                                onChange={(event) => updateDay(index, { shift: event.target.value })}
+                              >
+                                {SHIFT_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              {times ? (
+                                <span className="staff-shift-time">{times.start} - {times.end}</span>
+                              ) : (
+                                <span className="staff-shift-time muted">Chưa có khung giờ</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="staff-leave-actions">
+                <button type="button" className="btn-primary" onClick={saveSchedule} disabled={savingSchedule || !selectedStaffId}>
+                  {savingSchedule ? 'Đang lưu...' : 'Lưu ca làm'}
+                </button>
+              </div>
+            </section>
           </div>
-
-          <div className="staff-leave-stat-grid">
-            <div className="staff-leave-stat">
-              <span>Ca sáng</span>
-              <strong>{morningShiftCount}/7</strong>
-            </div>
-            <div className="staff-leave-stat">
-              <span>Ca tối</span>
-              <strong>{eveningShiftCount}/7</strong>
-            </div>
-            <div className="staff-leave-stat">
-              <span>Full ca</span>
-              <strong>{fullShiftCount}/7</strong>
-            </div>
-            <div className="staff-leave-stat">
-              <span>Tổng giờ/tuần</span>
-              <strong>{weeklyHoursLabel}</strong>
-            </div>
-          </div>
-        </div>
-
-        {selectedStaff && (
-          <div className="staff-leave-meta">
-            <strong>{selectedStaff.name}</strong>
-            <span>{selectedStaff.email}</span>
-            <span>{morningShiftCount} ca sáng · {eveningShiftCount} ca tối · {fullShiftCount} full ca</span>
-          </div>
-        )}
-
-        <div className="staff-leave-tools">
-          <button type="button" className="btn-secondary btn-small" onClick={() => applyShiftToWholeWeek('morning')}>
-            Ca sáng
-          </button>
-          <button type="button" className="btn-secondary btn-small" onClick={() => applyShiftToWholeWeek('evening')}>
-            Ca tối
-          </button>
-          <button type="button" className="btn-secondary btn-small" onClick={() => applyShiftToWholeWeek('full')}>
-            Full ca
-          </button>
-        </div>
-
-        {loadingSchedule ? (
-          <div className="staff-leave-loading">Đang tải lịch tuần...</div>
-        ) : (
-          <div className="staff-leave-table-wrap">
-            <table className="staff-leave-table">
-              <thead>
-                <tr>
-                  <th>Ngày</th>
-                  <th>Ca làm</th>
-                  <th>Khung giờ thực tế</th>
-                </tr>
-              </thead>
-              <tbody>
-                {weekSlots.map((day, index) => {
-                  const times = getTimesFromShift(day.day_of_week, day.shift);
-                  return (
-                    <tr key={day.day_of_week} className="is-working">
-                      <td className="staff-leave-day-cell">
-                        <strong>{day.label}</strong>
-                        <span className="staff-leave-day-badge working">
-                          {getShiftLabel(day.shift)}
-                        </span>
-                      </td>
-                      <td>
-                        <select
-                          className="staff-shift-select"
-                          value={day.shift}
-                          onChange={(event) => updateDay(index, { shift: event.target.value })}
-                        >
-                          {SHIFT_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        {times ? (
-                          <span className="staff-shift-time">{times.start} - {times.end}</span>
-                        ) : (
-                          <span className="staff-shift-time muted">Chưa có khung giờ</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="staff-leave-actions">
-          <button type="button" className="btn-primary" onClick={saveSchedule} disabled={savingSchedule || !selectedStaffId}>
-            {savingSchedule ? 'Đang lưu...' : 'Lưu ca làm'}
-          </button>
-        </div>
-        </>
         )}
 
         {activeTab === 'requests' && (
@@ -407,8 +485,22 @@ function StaffLeaveManagement() {
                       <td>
                         {req.status === 'pending' && (
                           <div className="action-buttons">
-                            <button className="btn-success btn-small" onClick={() => handleUpdateStatus(req.id, 'approved')}>Duyệt</button>
-                            <button className="btn-danger btn-small" onClick={() => handleUpdateStatus(req.id, 'rejected')}>Từ chối</button>
+                            <button
+                              type="button"
+                              className="btn-success btn-small"
+                              disabled={leaveActionLoadingId === req.id}
+                              onClick={() => openLeaveActionConfirm(req, 'approved')}
+                            >
+                              Duyệt
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger btn-small"
+                              disabled={leaveActionLoadingId === req.id}
+                              onClick={() => openLeaveActionConfirm(req, 'rejected')}
+                            >
+                              Từ chối
+                            </button>
                           </div>
                         )}
                       </td>
@@ -420,6 +512,71 @@ function StaffLeaveManagement() {
           </div>
         )}
       </div>
+
+      {confirmLeaveAction && (
+        <div className="leave-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="leave-confirm-title">
+          <div className="leave-confirm-modal">
+            <div className="leave-confirm-head">
+              <span className={`leave-confirm-mark ${confirmLeaveAction.status}`} aria-hidden="true" />
+              <div>
+                <p>{confirmLeaveAction.status === 'approved' ? 'Xác nhận duyệt' : 'Xác nhận từ chối'}</p>
+                <h2 id="leave-confirm-title">
+                  {confirmLeaveAction.status === 'approved'
+                    ? 'Bạn muốn duyệt đơn nghỉ phép này?'
+                    : 'Bạn muốn từ chối đơn nghỉ phép này?'}
+                </h2>
+              </div>
+            </div>
+
+            <div className="leave-confirm-details">
+              <div>
+                <span>Nhân viên</span>
+                <strong>{confirmLeaveAction.request.staff_name || '-'}</strong>
+              </div>
+              <div>
+                <span>Khoảng nghỉ</span>
+                <strong>
+                  {new Date(confirmLeaveAction.request.start_date).toLocaleDateString('vi-VN')} - {new Date(confirmLeaveAction.request.end_date).toLocaleDateString('vi-VN')}
+                </strong>
+              </div>
+              <div className="leave-confirm-reason">
+                <span>Lý do</span>
+                <strong>{confirmLeaveAction.request.reason || '-'}</strong>
+              </div>
+            </div>
+
+            <div className="leave-confirm-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={Boolean(leaveActionLoadingId)}
+                onClick={closeLeaveActionConfirm}
+              >
+                Không
+              </button>
+              <button
+                type="button"
+                className={`leave-confirm-primary ${confirmLeaveAction.status}`}
+                disabled={Boolean(leaveActionLoadingId)}
+                onClick={handleUpdateStatus}
+              >
+                {leaveActionLoadingId
+                  ? 'Đang xử lý...'
+                  : confirmLeaveAction.status === 'approved'
+                    ? 'Có, duyệt'
+                    : 'Có, từ chối'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {leaveActionSuccess && (
+        <div className="leave-success-toast" role="status" aria-live="polite">
+          <span className="leave-success-check" aria-hidden="true" />
+          <strong>{leaveActionSuccess}</strong>
+        </div>
+      )}
     </div>
   );
 }

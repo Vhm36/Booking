@@ -132,3 +132,24 @@
   - Cọc 20%.
   - Booking UI khóa thanh toán tiền mặt.
   - Backend payment từ chối cash và chỉ cho online.
+
+## 11. Phân cụm hành vi động (Mô hình DEC)
+
+- File chính backend: [decClusteringService/index.js](file:///d:/Doantotnghiep/Code/backend/src/services/decClusteringService/index.js).
+- File chính frontend: [AnalyticsStrategy.js](file:///d:/Doantotnghiep/Code/frontend/src/pages/admin/AnalyticsStrategy/AnalyticsStrategy.js).
+- Phân cụm hành vi động (Dynamic Engagement Clustering - DEC) tự động phân nhóm khách hàng dựa trên hành vi giao dịch và đặt hẹn thực tế (Recency, Frequency, Monetary, tỷ lệ hoàn thành, tỷ lệ hủy, sự đa dạng dịch vụ và nhịp đặt theo tháng).
+- 7 cụm khách hàng (Cluster Definitions):
+  1. **Thường xuyên đặt 1 dịch vụ (`frequent_single_service`)**: Từ 3 lịch trở lên và chỉ dùng một dịch vụ cố định. Chiến lược: gợi ý combo, bán thêm.
+  2. **Đặt nhiều nhưng ít đến (`many_bookings_low_arrival`)**: Từ 4 lịch trở lên nhưng tỷ lệ hoàn thành thấp (dưới 45%). Chiến lược: xác nhận kỹ, đặt cọc nhẹ.
+  3. **Hay hủy lịch hoặc không đến (`frequent_cancel_no_show`)**: Từ 2 lịch hủy/no-show và tỷ lệ rủi ro từ 35% trở lên. Chiến lược: nhắc hẹn sớm, ưu tiên khung giờ linh hoạt.
+  4. **Dùng ít nhưng chọn dịch vụ cao cấp (`low_usage_premium`)**: Dưới 2 lịch hoàn thành nhưng giá trị trung bình thuộc nhóm cao (top 25%). Chiến lược: chăm sóc VIP cá nhân hóa.
+  5. **Dùng nhiều dịch vụ bình dân (`high_usage_budget`)**: Từ 3 lịch hoàn thành trở lên nhưng giá trị trung bình ở mức phổ thông. Chiến lược: combo tích điểm, nâng cấp dịch vụ.
+  6. **Đặt 1 lần rồi bỏ (`one_time_then_left`)**: Chỉ có 1 lịch và đã qua hơn 21 ngày chưa quay lại. Chiến lược: voucher kích hoạt lại.
+  7. **Đặt theo tháng ít (`low_monthly_usage`)**: Nhịp đặt thưa thớt qua nhiều tháng nhưng tần suất trung bình dưới 1.25 lịch/tháng. Chiến lược: nhắc lịch định kỳ theo tháng.
+- API Route: `/api/admin/dashboard/dec-clustering` hỗ trợ lọc theo ngày, tuần, tháng, năm.
+- Admin Analytics Strategy UI:
+  - **Bảng chiến lược**: Xem danh sách khách hàng, nhãn tiềm năng (Potential/Not potential), và xuất Excel báo cáo chiến lược.
+  - **Đặc trưng chi tiết từng cụm**: So sánh chỉ số quy mô, chi tiêu trung bình, tỷ lệ hủy, tần suất, và dịch vụ trung bình.
+  - **Biểu đồ cụm (Average Profile Chart)**: Trực quan hóa tương quan so sánh các cụm bằng Chart.js.
+  - **Chiến lược hành động đề xuất**: Kết hợp hành vi với hành động vận hành, lý do đề xuất và tác động kỳ vọng.
+

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import authService from '../../services/authService';
 import '../Auth/Auth.css';
 
@@ -63,9 +63,33 @@ function PasswordToggleIcon({ visible }) {
   );
 }
 
+const getTodayDateInputValue = () => {
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+};
+
+const getAgeFromBirthday = (dateValue) => {
+  if (!dateValue) return null;
+
+  const birthDate = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(birthDate.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return age;
+};
+
 function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -74,7 +98,6 @@ function Register() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const passwordRequirements = {
     minLength: password.length >= 6,
@@ -87,6 +110,7 @@ function Register() {
     passwordRequirements.hasLetter &&
     passwordRequirements.hasNumber;
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const todayDateValue = getTodayDateInputValue();
 
   const submitLabel = loading ? 'Đang xử lý...' : 'Đăng ký';
 
@@ -108,6 +132,17 @@ function Register() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError('Bạn đang nhập sai định dạng Email. Bạn cần nhập lại nếu sai.');
+      return;
+    }
+
+    if (!dateOfBirth) {
+      setError('Bạn còn thiếu Ngày sinh. Vui lòng nhập đầy đủ.');
+      return;
+    }
+
+    const age = getAgeFromBirthday(dateOfBirth);
+    if (age === null || dateOfBirth >= todayDateValue || age < 13 || age > 100) {
+      setError('Ngày sinh không hợp lệ. Tuổi đăng ký phải từ 13 đến 100.');
       return;
     }
 
@@ -139,7 +174,7 @@ function Register() {
     setLoading(true);
 
     try {
-      await authService.register(name, email, password, phone);
+      await authService.register(name, email, password, phone, dateOfBirth);
 
       // Auto login sau khi đăng ký
       const loginRes = await authService.login(email, password);
@@ -194,6 +229,17 @@ function Register() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Ngày sinh</label>
+            <input
+              type="date"
+              value={dateOfBirth}
+              max={todayDateValue}
+              autoComplete="bday"
+              onChange={(e) => setDateOfBirth(e.target.value)}
             />
           </div>
 
