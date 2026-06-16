@@ -57,8 +57,8 @@ const configuredDbName =
 const dbName = configuredDbName || DEFAULT_LOCAL_DATABASE;
 const dbHost =
   urlConfig.host ||
-  (shouldPreferRailwayVars ? railwayHost : process.env.DB_HOST) ||
   railwayHost ||
+  (process.env.DB_HOST && !isLocalHost(process.env.DB_HOST) ? process.env.DB_HOST : undefined) ||
   "127.0.0.1";
 const dbPort = parsePositiveInt(
   urlConfig.port ||
