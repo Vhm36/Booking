@@ -36,9 +36,9 @@ const shouldPreferRailwayVars = railwayHost && (!process.env.DB_HOST || isLocalH
 
 const dbName = (
   urlConfig.database ||
-  (shouldPreferRailwayVars ? process.env.MYSQLDATABASE : process.env.DB_NAME) ||
-  process.env.DB_NAME ||
-  process.env.MYSQLDATABASE
+  process.env.MYSQLDATABASE ||
+  process.env.MYSQL_DATABASE ||
+  process.env.DB_NAME
 );
 const dbHost = (
   urlConfig.host ||
@@ -89,6 +89,7 @@ const connectionOptions = {
   port: normalizedDbPort,
   user: dbUser,
   password: dbPassword,
+  database: dbName,
   charset: "utf8mb4",
   connectTimeout: normalizedConnectTimeout
 };
