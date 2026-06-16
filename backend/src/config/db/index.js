@@ -36,96 +36,118 @@ const isLocalHost = (value) => {
   return ["localhost", "127.0.0.1", "::1"].includes(host);
 };
 
-const databaseUrl =
-  process.env.DATABASE_URL ||
-  process.env.MYSQL_URL ||
-  process.env.MYSQL_PRIVATE_URL ||
-  process.env.MYSQL_PUBLIC_URL ||
-  process.env.DATABASE_PRIVATE_URL ||
-  process.env.DATABASE_PUBLIC_URL ||
-  process.env.RAILWAY_DATABASE_URL;
-
-const urlConfig = parseDatabaseUrl(databaseUrl);
-const railwayHost = process.env.MYSQLHOST || process.env.MYSQL_HOST;
-const shouldPreferRailwayVars = railwayHost && (!process.env.DB_HOST || isLocalHost(process.env.DB_HOST));
-
-const configuredDbName =
-  urlConfig.database ||
-  process.env.MYSQLDATABASE ||
-  process.env.MYSQL_DATABASE ||
-  process.env.DB_NAME;
-const dbName = configuredDbName || DEFAULT_LOCAL_DATABASE;
-const dbHost =
-  urlConfig.host ||
-  railwayHost ||
-  (process.env.DB_HOST && !isLocalHost(process.env.DB_HOST) ? process.env.DB_HOST : undefined) ||
-  "127.0.0.1";
-const dbPort = parsePositiveInt(
-  urlConfig.port ||
-    (shouldPreferRailwayVars ? process.env.MYSQLPORT || process.env.MYSQL_PORT : process.env.DB_PORT) ||
-    process.env.DB_PORT ||
-    process.env.MYSQLPORT ||
-    process.env.MYSQL_PORT,
-  3306
-);
-const dbUser =
-  urlConfig.user ||
-  (shouldPreferRailwayVars ? process.env.MYSQLUSER || process.env.MYSQL_USER : process.env.DB_USER) ||
-  process.env.DB_USER ||
-  process.env.MYSQLUSER ||
-  process.env.MYSQL_USER ||
-  "root";
-const dbPassword =
-  urlConfig.password ||
-  (shouldPreferRailwayVars ? process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD : process.env.DB_PASSWORD) ||
-  process.env.DB_PASSWORD ||
-  process.env.MYSQLPASSWORD ||
-  process.env.MYSQL_PASSWORD ||
-  "";
-const dbConnectTimeout = parsePositiveInt(process.env.DB_CONNECT_TIMEOUT_MS, 10000);
-const dbConnectionLimit = parsePositiveInt(process.env.DB_CONNECTION_LIMIT, 15);
-const dbSslMode = String(process.env.DB_SSL || urlConfig.ssl || "").trim().toLowerCase();
-const isRailwayRuntime = Boolean(
-  process.env.RAILWAY_ENVIRONMENT ||
-    process.env.RAILWAY_PROJECT_ID ||
-    process.env.RAILWAY_SERVICE_ID ||
-    process.env.RAILWAY_DEPLOYMENT_ID
-);
-const isProductionRuntime = isRailwayRuntime || process.env.NODE_ENV === "production";
-
-const connectionOptions = {
-  host: dbHost,
-  port: dbPort,
-  user: dbUser,
-  password: dbPassword,
-  database: dbName,
-  waitForConnections: true,
-  connectionLimit: dbConnectionLimit,
-  queueLimit: 0,
-  charset: "utf8mb4",
-  connectTimeout: dbConnectTimeout
-};
-
-if (["1", "true", "yes", "required", "require"].includes(dbSslMode)) {
-  connectionOptions.ssl = { rejectUnauthorized: false };
-}
-
-const pool = mysql.createPool(connectionOptions);
+// All database configuration is resolved lazily inside resolveConfig() so that
+// Railway's reference variables (MYSQLHOST, DATABASE_URL, etc.) are guaranteed
+// to be injected before we read them.  At module-load time these are undefined;
+// by the time the first async initializePool() call runs they are present.
+let connectionOptions = null;
+let pool = null;
 let transactionConnection = null;
 
+// Populated by resolveConfig(); exposed for diagnostics helpers below.
+let _databaseUrl = null;
+let _urlConfig = {};
+let _railwayHost = null;
+let _configuredDbName = null;
+let _dbName = DEFAULT_LOCAL_DATABASE;
+let _isRailwayRuntime = false;
+let _isProductionRuntime = false;
+
+const resolveConfig = () => {
+  if (pool) return; // already resolved
+
+  _databaseUrl =
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.MYSQL_PRIVATE_URL ||
+    process.env.MYSQL_PUBLIC_URL ||
+    process.env.DATABASE_PRIVATE_URL ||
+    process.env.DATABASE_PUBLIC_URL ||
+    process.env.RAILWAY_DATABASE_URL;
+
+  _urlConfig = parseDatabaseUrl(_databaseUrl);
+  _railwayHost = process.env.MYSQLHOST || process.env.MYSQL_HOST;
+  const shouldPreferRailwayVars = _railwayHost && (!process.env.DB_HOST || isLocalHost(process.env.DB_HOST));
+
+  _configuredDbName =
+    _urlConfig.database ||
+    process.env.MYSQLDATABASE ||
+    process.env.MYSQL_DATABASE ||
+    process.env.DB_NAME;
+  _dbName = _configuredDbName || DEFAULT_LOCAL_DATABASE;
+
+  const dbHost =
+    _urlConfig.host ||
+    _railwayHost ||
+    (process.env.DB_HOST && !isLocalHost(process.env.DB_HOST) ? process.env.DB_HOST : undefined) ||
+    "127.0.0.1";
+  const dbPort = parsePositiveInt(
+    _urlConfig.port ||
+      (shouldPreferRailwayVars ? process.env.MYSQLPORT || process.env.MYSQL_PORT : process.env.DB_PORT) ||
+      process.env.DB_PORT ||
+      process.env.MYSQLPORT ||
+      process.env.MYSQL_PORT,
+    3306
+  );
+  const dbUser =
+    _urlConfig.user ||
+    (shouldPreferRailwayVars ? process.env.MYSQLUSER || process.env.MYSQL_USER : process.env.DB_USER) ||
+    process.env.DB_USER ||
+    process.env.MYSQLUSER ||
+    process.env.MYSQL_USER ||
+    "root";
+  const dbPassword =
+    _urlConfig.password ||
+    (shouldPreferRailwayVars ? process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD : process.env.DB_PASSWORD) ||
+    process.env.DB_PASSWORD ||
+    process.env.MYSQLPASSWORD ||
+    process.env.MYSQL_PASSWORD ||
+    "";
+  const dbConnectTimeout = parsePositiveInt(process.env.DB_CONNECT_TIMEOUT_MS, 10000);
+  const dbConnectionLimit = parsePositiveInt(process.env.DB_CONNECTION_LIMIT, 15);
+  const dbSslMode = String(process.env.DB_SSL || _urlConfig.ssl || "").trim().toLowerCase();
+
+  _isRailwayRuntime = Boolean(
+    process.env.RAILWAY_ENVIRONMENT ||
+      process.env.RAILWAY_PROJECT_ID ||
+      process.env.RAILWAY_SERVICE_ID ||
+      process.env.RAILWAY_DEPLOYMENT_ID
+  );
+  _isProductionRuntime = _isRailwayRuntime || process.env.NODE_ENV === "production";
+
+  connectionOptions = {
+    host: dbHost,
+    port: dbPort,
+    user: dbUser,
+    password: dbPassword,
+    database: _dbName,
+    waitForConnections: true,
+    connectionLimit: dbConnectionLimit,
+    queueLimit: 0,
+    charset: "utf8mb4",
+    connectTimeout: dbConnectTimeout
+  };
+
+  if (["1", "true", "yes", "required", "require"].includes(dbSslMode)) {
+    connectionOptions.ssl = { rejectUnauthorized: false };
+  }
+
+  pool = mysql.createPool(connectionOptions);
+};
+
 const getConnectionContext = () => ({
-  host: connectionOptions.host,
-  port: connectionOptions.port,
-  user: connectionOptions.user,
-  database: dbName,
-  connectTimeoutMs: connectionOptions.connectTimeout,
-  connectionLimit: connectionOptions.connectionLimit,
-  runtime: isRailwayRuntime ? "railway" : (process.env.NODE_ENV || "development"),
-  configSource: urlConfig.host ? "database_url" : (shouldPreferRailwayVars ? "railway_mysql_vars" : "db_vars_or_defaults"),
-  hasDatabaseUrl: Boolean(databaseUrl),
-  hasMysqlHost: Boolean(railwayHost),
+  host: connectionOptions ? connectionOptions.host : "(not yet resolved)",
+  port: connectionOptions ? connectionOptions.port : undefined,
+  user: connectionOptions ? connectionOptions.user : undefined,
+  database: _dbName,
+  connectTimeoutMs: connectionOptions ? connectionOptions.connectTimeout : undefined,
+  connectionLimit: connectionOptions ? connectionOptions.connectionLimit : undefined,
+  runtime: _isRailwayRuntime ? "railway" : (process.env.NODE_ENV || "development"),
+  configSource: _urlConfig.host ? "database_url" : (_railwayHost ? "railway_mysql_vars" : "db_vars_or_defaults"),
+  hasDatabaseUrl: Boolean(_databaseUrl),
+  hasMysqlHost: Boolean(_railwayHost),
   hasDbHost: Boolean(process.env.DB_HOST),
-  hasConfiguredDatabase: Boolean(configuredDbName)
+  hasConfiguredDatabase: Boolean(_configuredDbName)
 });
 
 const logConnectionDiagnostics = (err, phase) => {
@@ -133,7 +155,7 @@ const logConnectionDiagnostics = (err, phase) => {
   console.error(`Database ${phase} error:`, err);
   console.error("Database connection context:", context);
 
-  if (err?.code === "ECONNREFUSED" && isLocalHost(connectionOptions.host)) {
+  if (err?.code === "ECONNREFUSED" && connectionOptions && isLocalHost(connectionOptions.host)) {
     console.error(
       "MySQL is still configured as localhost. On Railway, add MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, and MYSQLDATABASE to the backend service."
     );
@@ -156,13 +178,13 @@ const getStandaloneConnectionOptions = () => {
 };
 
 const assertProductionConfig = () => {
-  if (isProductionRuntime && !configuredDbName) {
+  if (_isProductionRuntime && !_configuredDbName) {
     throw new Error(
       "Missing database name. Set MYSQLDATABASE, DB_NAME, or include a database name in DATABASE_URL/MYSQL_URL."
     );
   }
 
-  if (isProductionRuntime && isLocalHost(connectionOptions.host)) {
+  if (_isProductionRuntime && isLocalHost(connectionOptions.host)) {
     throw new Error(
       "Database host is localhost in production/Railway. Add Railway MySQL variables to this backend service " +
         "(MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE) or set DATABASE_URL/MYSQL_URL. " +
@@ -184,7 +206,7 @@ const createDatabaseIfMissing = async () => {
   const connection = await mysql.createConnection(getStandaloneConnectionOptions());
   try {
     await connection.query(
-      `CREATE DATABASE IF NOT EXISTS ${mysqlCore.escapeId(dbName)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+      `CREATE DATABASE IF NOT EXISTS ${mysqlCore.escapeId(_dbName)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
     );
   } finally {
     await connection.end();
@@ -192,16 +214,19 @@ const createDatabaseIfMissing = async () => {
 };
 
 const initializePool = async () => {
+  // Resolve config lazily here so that Railway's reference variables
+  // (MYSQLHOST, DATABASE_URL, etc.) are fully injected before we read them.
+  resolveConfig();
   assertProductionConfig();
 
   try {
     await pingPool();
-    console.log(`Database pool ready: ${dbName}`);
+    console.log(`Database pool ready: ${_dbName}`);
   } catch (err) {
-    if (err?.code === "ER_BAD_DB_ERROR" && !isProductionRuntime) {
+    if (err?.code === "ER_BAD_DB_ERROR" && !_isProductionRuntime) {
       await createDatabaseIfMissing();
       await pingPool();
-      console.log(`Database created and pool ready: ${dbName}`);
+      console.log(`Database created and pool ready: ${_dbName}`);
       return;
     }
 
