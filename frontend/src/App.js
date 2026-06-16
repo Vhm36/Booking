@@ -49,6 +49,9 @@ const normalizeRoleName = (value = '') =>
     .toLowerCase();
 
 function App() {
+  const isFreshSessionRequest =
+    window.location.pathname === '/login' &&
+    new URLSearchParams(window.location.search).get('session') === 'new';
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(() => readUserLocation());
@@ -58,6 +61,10 @@ function App() {
     let isMounted = true;
 
     const loadSession = async () => {
+      if (isFreshSessionRequest) {
+        authService.startFreshSession();
+      }
+
       const savedUser = authService.getUser();
       const savedToken = authService.getToken();
 
@@ -77,7 +84,7 @@ function App() {
 
         if (profileUser && isMounted) {
           const refreshedUser = { ...savedUser, ...profileUser };
-          const rememberMe = Boolean(localStorage.getItem('token'));
+          const rememberMe = authService.isRemembered();
           setUser(refreshedUser);
           authService.setUser(refreshedUser, rememberMe);
         }
@@ -97,7 +104,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isFreshSessionRequest]);
 
   useEffect(() => {
     if (user) {
@@ -158,7 +165,6 @@ function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
-    authService.setUser(userData);
   };
 
   const handleLogout = () => {
@@ -196,7 +202,7 @@ function App() {
             <Route path="/payment-bill/:paymentId" element={<PaymentInvoice />} />
             <Route
               path="/login"
-              element={isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
+              element={isAuthenticated && !isFreshSessionRequest ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
             />
             <Route
               path="/register"
@@ -235,6 +241,7 @@ function App() {
                 <Route path="/admin/analytics" element={<Analytics />} />
                 <Route path="/admin/analytics/strategy" element={<Navigate to="/admin/analytics/strategy/table" />} />
                 <Route path="/admin/analytics/strategy/table" element={<AnalyticsStrategy view="table" />} />
+                <Route path="/admin/analytics/strategy/customers" element={<AnalyticsStrategy view="customers" />} />
                 <Route path="/admin/analytics/strategy/clusters" element={<AnalyticsStrategy view="clusters-detail" />} />
                 <Route path="/admin/analytics/strategy/clusters/profile" element={<AnalyticsStrategy view="clusters-profile" />} />
                 <Route path="/admin/analytics/strategy/clusters/strategy" element={<AnalyticsStrategy view="clusters-strategy" />} />

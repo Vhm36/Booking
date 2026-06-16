@@ -19,6 +19,13 @@ const main = async () => {
   }
 
   try {
+    const status = mailService.getMailConfigStatus();
+    if (!status.configured) {
+      console.error(`SMTP config is incomplete. Missing: ${status.missing.join(', ')}`);
+      process.exitCode = 1;
+      return;
+    }
+
     await mailService.verifySmtpConnection();
 
     const result = await mailService.sendEmail({

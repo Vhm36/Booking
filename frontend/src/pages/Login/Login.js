@@ -74,6 +74,12 @@ function generateCodeVerifier() {
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function generateOAuthState() {
+  const array = new Uint8Array(16);
+  window.crypto.getRandomValues(array);
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 async function generateCodeChallenge(codeVerifier) {
   const encoder = new TextEncoder();
   const data = encoder.encode(codeVerifier);
@@ -100,7 +106,7 @@ function Login({ onLogin }) {
   const redirectPath = searchParams.get('redirect');
   const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
   const zaloAppId = process.env.REACT_APP_ZALO_APP_ID || '';
-  const zaloCallbackUrl = process.env.REACT_APP_ZALO_CALLBACK_URL || '';
+  const zaloCallbackUrl = process.env.REACT_APP_ZALO_CALLBACK_URL || `${window.location.origin}/auth/zalo-callback`;
 
   // Countdown timer for rate-limit lockout
   useEffect(() => {
@@ -236,16 +242,24 @@ function Login({ onLogin }) {
     try {
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await generateCodeChallenge(codeVerifier);
+      const state = generateOAuthState();
 
       // Lưu code_verifier vào sessionStorage để dùng khi callback
       sessionStorage.setItem('zalo_code_verifier', codeVerifier);
+      sessionStorage.setItem('zalo_oauth_state', state);
       if (redirectPath) {
         sessionStorage.setItem('login_redirect', redirectPath);
       }
 
-      const zaloAuthUrl = `https://oauth.zaloapp.com/v4/permission?app_id=${zaloAppId}&redirect_uri=${encodeURIComponent(zaloCallbackUrl)}&code_challenge=${codeChallenge}&state=zalo_login`;
+      const zaloParams = new URLSearchParams({
+        app_id: zaloAppId,
+        redirect_uri: zaloCallbackUrl,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        state
+      });
 
-      window.location.href = zaloAuthUrl;
+      window.location.href = `https://oauth.zaloapp.com/v4/permission?${zaloParams.toString()}`;
     } catch (err) {
       console.error('[ZALO_PKCE_ERROR]', err);
       setError('Không thể khởi tạo đăng nhập Zalo.');

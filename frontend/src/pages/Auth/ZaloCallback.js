@@ -23,7 +23,22 @@ function ZaloCallback({ onLogin }) {
 
   useEffect(() => {
     const code = searchParams.get('code');
+    const zaloError = searchParams.get('error') || searchParams.get('error_description');
+    const returnedState = searchParams.get('state');
     const codeVerifier = sessionStorage.getItem('zalo_code_verifier');
+    const expectedState = sessionStorage.getItem('zalo_oauth_state');
+
+    if (zaloError) {
+      setError(`Zalo từ chối đăng nhập: ${zaloError}`);
+      setLoading(false);
+      return;
+    }
+
+    if (expectedState && returnedState !== expectedState) {
+      setError('Phiên đăng nhập Zalo không hợp lệ. Vui lòng thử đăng nhập lại.');
+      setLoading(false);
+      return;
+    }
 
     if (!code) {
       setError('Không nhận được mã xác thực từ Zalo.');
@@ -47,6 +62,7 @@ function ZaloCallback({ onLogin }) {
 
         // Xóa code verifier sau khi dùng
         sessionStorage.removeItem('zalo_code_verifier');
+        sessionStorage.removeItem('zalo_oauth_state');
 
         const savedRedirect = sessionStorage.getItem('login_redirect');
         sessionStorage.removeItem('login_redirect');

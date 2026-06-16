@@ -11,6 +11,7 @@ Thư mục này chứa tài liệu dự án, được chia theo nhóm để dễ
 - `goi-y-ppt-giua-ki.md`: dàn ý slide giữa kì, kịch bản demo, câu hỏi phản biện và checklist trước khi thuyết trình.
 - `lamviec.md`: cách chạy local, lệnh kiểm tra, biến môi trường và lỗi thường gặp.
 - `nhatky.md`: nhật ký thay đổi và ghi chú triển khai mới nhất.
+- `ly-thuyet-phan-cum.md`: lý thuyết phân cụm (Clustering), các chiến lược thịnh hành và cách DEC hỗ trợ K-Means.
 
 ## Tài Liệu Theo Nhóm
 

@@ -1,13 +1,9 @@
 import { io } from 'socket.io-client';
 import { API_ORIGIN, AUTH_EXPIRED_EVENT } from './api';
-
-const getAuthToken = () => localStorage.getItem('token') || sessionStorage.getItem('token');
+import { clearAuthSession, getAuthToken } from '../utils/authStorage';
 
 const clearStoredAuth = () => {
-  localStorage.removeItem('token');
-  sessionStorage.removeItem('token');
-  localStorage.removeItem('user');
-  sessionStorage.removeItem('user');
+  clearAuthSession();
 };
 
 const connectDashboardRealtime = async ({ onUpdate, onStatus, onPresenceMe, onPresenceUpdate } = {}) => {

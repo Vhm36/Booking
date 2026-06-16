@@ -19,6 +19,7 @@ CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100) NOT NULL UNIQUE,
+  zalo_id VARCHAR(64) NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   phone VARCHAR(20),
   role ENUM('customer', 'admin', 'staff') DEFAULT 'customer',

@@ -15,7 +15,7 @@ import './AnalyticsStrategy.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
-const DEC_LIMIT_PER_CLUSTER = 80;
+const DEC_LIMIT_PER_CLUSTER = 100;
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1);
 const CURRENT_DATE = new Date();
 const CURRENT_YEAR = CURRENT_DATE.getFullYear();
@@ -23,10 +23,16 @@ const YEAR_OPTIONS = Array.from({ length: 3 }, (_, index) => CURRENT_YEAR - inde
 
 const VIEW_META = {
   table: {
-    kicker: 'Bảng chiến lược',
-    title: 'Danh sách khách hàng theo chiến lược',
+    kicker: 'Ưu tiên vận hành',
+    title: 'Khuyến nghị chiến lược thịnh hành',
     description:
-      'Theo dõi từng khách hàng, ngày đặt gần nhất, cụm hành vi và chiến lược chăm sóc phù hợp trong tháng.'
+      'Xếp hạng các chiến lược nên ưu tiên theo quy mô và đặc trưng hành vi của từng cụm trong kỳ.'
+  },
+  customers: {
+    kicker: 'Kiểm tra phân cụm',
+    title: 'Danh sách khách hàng',
+    description:
+      'Tra cứu khách hàng thuộc C0-C6, đối chiếu lịch hẹn, tỷ lệ hoàn thành, tỷ lệ hủy và mức chi tiêu.'
   },
   'clusters-detail': {
     kicker: 'Phân tích cụm',
@@ -36,15 +42,14 @@ const VIEW_META = {
   },
   'clusters-profile': {
     kicker: 'Phân tích cụm',
-    title: 'Biểu đồ so sánh profile cụm',
+    title: 'Hồ sơ trung bình theo cụm',
     description:
       'So sánh các đặc điểm trung bình của từng cụm để nhìn ra nhóm nào chi tiêu cao, hủy nhiều hoặc quay lại thường xuyên.'
   },
   'clusters-strategy': {
     kicker: 'Phân tích cụm',
-    title: 'Gợi ý chiến lược theo cụm',
-    description:
-      'Liên kết đặc trưng hành vi với hành động vận hành, lý do triển khai và tác động kỳ vọng cho từng cụm.'
+    title: 'Chiến lược theo cụm',
+    description: 'Hành động ưu tiên dành cho từng nhóm hành vi C0-C6.'
   }
 };
 
@@ -63,22 +68,22 @@ const slugifyPeriod = (value = '') =>
 
 const CLUSTER_ACTION_META = {
   frequent_single_service: {
-    action: 'Combo bổ trợ',
-    rationale: 'Khách quay lại đều nhưng còn tập trung vào một dịch vụ chính.',
-    impact: 'Tăng bán chéo và giữ chân nhóm ổn định thêm 5%-15%.'
-  },
-  many_bookings_low_arrival: {
-    action: 'Xác nhận/cọc nhẹ',
-    rationale: 'Nhóm đặt nhiều nhưng tỷ lệ hoàn thành thấp làm giảm độ tin cậy lịch.',
-    impact: 'Giảm lịch rỗng, cải thiện độ chắc chắn đặt hẹn 5%-15%.'
+    action: 'Gói dịch vụ định kỳ',
+    rationale: 'Khách trung thành với một dịch vụ và có chu kỳ quay lại rõ.',
+    impact: 'Giữ chân khách ổn định và mở cơ hội bán thêm dịch vụ bổ trợ.'
   },
   frequent_cancel_no_show: {
-    action: 'Nhắc lịch 24h',
-    rationale: 'Nhóm có rủi ro hủy hoặc không đến cao cần xác nhận nhiều bước.',
-    impact: 'Giảm tỷ lệ hủy và bảo vệ các khung giờ cao điểm.'
+    action: 'Nhắc lịch + đặt cọc',
+    rationale: 'Tỷ lệ hủy hoặc không đến, hoặc Cancellation Score đã vượt ngưỡng an toàn.',
+    impact: 'Giảm hủy sát giờ và bảo vệ công suất của nhân viên.'
+  },
+  many_bookings_low_arrival: {
+    action: 'Giới hạn giữ chỗ',
+    rationale: 'Khách tạo nhiều lịch nhưng tỷ lệ đến thực tế cực thấp.',
+    impact: 'Ngăn đặt lịch ảo và giải phóng sớm các khung giờ có giá trị.'
   },
   low_usage_premium: {
-    action: 'Chăm sóc VIP',
+    action: 'Chăm sóc cao cấp',
     rationale: 'Mỗi lần dùng có giá trị cao, cần cá nhân hóa để tăng tần suất quay lại.',
     impact: 'Tăng doanh thu trên khách hàng và khả năng quay lại 5%-15%.'
   },
@@ -141,8 +146,8 @@ const buildClusterProfiles = (clusters = []) =>
 
     return {
       ...cluster,
-      code: `C${index}`,
-      display: `C${index}`,
+      code: cluster.code || `C${index}`,
+      display: cluster.code || `C${index}`,
       index,
       count: toNumber(cluster.count),
       percent: toNumber(cluster.percent),
@@ -171,6 +176,8 @@ function AnalyticsStrategy({ view = 'table' }) {
   const [decLoading, setDecLoading] = useState(true);
   const [decError, setDecError] = useState('');
   const [clusterFilter, setClusterFilter] = useState('all');
+  const [strategyFilter, setStrategyFilter] = useState('all');
+  const [customerSearch, setCustomerSearch] = useState('');
 
   useEffect(() => {
     fetchStrategyData();
@@ -191,23 +198,22 @@ function AnalyticsStrategy({ view = 'table' }) {
     }
   }, [clusterFilter, decClusters]);
 
-  const clusterLookup = useMemo(() => {
-    const lookup = new Map();
-    decClusters.forEach((cluster, index) => {
-      lookup.set(cluster.key, {
-        ...cluster,
-        cluster_number: index,
-        cluster_display: `C${index}`
-      });
-    });
-    return lookup;
-  }, [decClusters]);
+  useEffect(() => {
+    if (strategyFilter === 'all') {
+      return;
+    }
+
+    const hasSelectedStrategy = decClusters.some((cluster) => cluster.key === strategyFilter);
+    if (!hasSelectedStrategy) {
+      setStrategyFilter('all');
+    }
+  }, [strategyFilter, decClusters]);
 
   const clusterOptions = useMemo(
     () =>
       decClusters.map((cluster, index) => ({
         key: cluster.key,
-        label: `C${index} - ${cluster.short_label}`,
+        label: `${cluster.code || `C${index}`} - ${cluster.short_label}`,
         count: Number(cluster.count || 0),
         cluster_number: index
       })),
@@ -217,12 +223,13 @@ function AnalyticsStrategy({ view = 'table' }) {
   const strategyRows = useMemo(() => {
     const rows = [];
     decClusters.forEach((cluster, index) => {
+      const clusterCode = cluster.code || `C${index}`;
       (cluster.customers || []).forEach((customer) => {
         rows.push({
           ...customer,
           cluster_key: cluster.key,
           cluster_number: index,
-          cluster_display: `C${index}`,
+          cluster_display: clusterCode,
           cluster_label: cluster.label,
           cluster_short_label: cluster.short_label,
           strategy: cluster.strategy
@@ -238,11 +245,30 @@ function AnalyticsStrategy({ view = 'table' }) {
   }, [decClusters]);
 
   const filteredStrategyRows = useMemo(
+    () => {
+      const normalizedSearch = customerSearch.trim().toLocaleLowerCase('vi-VN');
+      return strategyRows.filter((customer) => {
+        const matchesCluster = clusterFilter === 'all' || customer.cluster_key === clusterFilter;
+        const matchesSearch = !normalizedSearch ||
+          String(customer.name || '').toLocaleLowerCase('vi-VN').includes(normalizedSearch) ||
+          String(customer.email || '').toLocaleLowerCase('vi-VN').includes(normalizedSearch);
+        return matchesCluster && matchesSearch;
+      });
+    },
+    [clusterFilter, customerSearch, strategyRows]
+  );
+
+  const trendingStrategyRows = useMemo(
+    () => [...clusterProfiles].sort((a, b) => b.count - a.count || a.index - b.index),
+    [clusterProfiles]
+  );
+
+  const filteredTrendingStrategyRows = useMemo(
     () =>
-      clusterFilter === 'all'
-        ? strategyRows
-        : strategyRows.filter((customer) => customer.cluster_key === clusterFilter),
-    [clusterFilter, strategyRows]
+      strategyFilter === 'all'
+        ? trendingStrategyRows
+        : trendingStrategyRows.filter((cluster) => cluster.key === strategyFilter),
+    [strategyFilter, trendingStrategyRows]
   );
 
   const activeClusterOption = useMemo(
@@ -386,8 +412,37 @@ function AnalyticsStrategy({ view = 'table' }) {
   };
 
   const handleExportStrategies = () => {
-    if (filteredStrategyRows.length === 0) {
+    if (filteredTrendingStrategyRows.length === 0) {
       window.alert('Không có dữ liệu chiến lược để xuất.');
+      return;
+    }
+
+    const periodSuffix = slugifyPeriod(periodLabel) || `thang-${strategyMonth}-${strategyYear}`;
+
+    exportToExcel({
+      fileName: `chien-luoc-thinh-hanh_${periodSuffix}`,
+      sheets: [
+        {
+          name: 'Khuyến nghị',
+          columns: [
+            { key: 'strategy', header: 'Chiến lược', width: 52 },
+            { key: 'action', header: 'Hành động chính', width: 28 },
+            { key: 'count', header: 'Số khách', width: 14 },
+            { key: 'code', header: 'Cụm', width: 10 },
+            { key: 'label', header: 'Tên cụm', width: 30 }
+          ],
+          rows: filteredTrendingStrategyRows.map((cluster) => ({
+            ...cluster,
+            action: cluster.actionMeta.action
+          }))
+        }
+      ]
+    });
+  };
+
+  const handleExportCustomers = () => {
+    if (filteredStrategyRows.length === 0) {
+      window.alert('Không có khách hàng để xuất.');
       return;
     }
 
@@ -395,16 +450,20 @@ function AnalyticsStrategy({ view = 'table' }) {
     const periodSuffix = slugifyPeriod(periodLabel) || `thang-${strategyMonth}-${strategyYear}`;
 
     exportToExcel({
-      fileName: `chien-luoc-thinh-hanh_${periodSuffix}_${clusterSuffix}`,
+      fileName: `danh-sach-khach-hang_${periodSuffix}_${clusterSuffix}`,
       sheets: [
         {
-          name: 'Chiến lược',
+          name: 'Khách hàng',
           columns: [
-            { key: 'name', header: 'Tên người dùng', width: 24 },
+            { key: 'name', header: 'Khách hàng', width: 24 },
             { key: 'email', header: 'Email', width: 30 },
-            { key: 'last_booking_date', header: 'Ngày', width: 14, transform: (value) => formatDate(value) },
-            { key: 'strategy', header: 'Chiến lược', width: 52 },
-            { key: 'cluster_label', header: 'Cụm', width: 28 }
+            { key: 'cluster_display', header: 'Cụm', width: 10 },
+            { key: 'cluster_label', header: 'Nhóm hành vi', width: 30 },
+            { key: 'total_bookings', header: 'Tổng lịch', width: 12 },
+            { key: 'completion_rate', header: 'Hoàn thành (%)', width: 16 },
+            { key: 'cancellation_rate', header: 'Hủy (%)', width: 14 },
+            { key: 'completed_revenue', header: 'Tổng chi tiêu', width: 20 },
+            { key: 'last_booking_date', header: 'Lịch gần nhất', width: 16, transform: formatDate }
           ],
           rows: filteredStrategyRows
         }
@@ -454,7 +513,15 @@ function AnalyticsStrategy({ view = 'table' }) {
                 `dec-strategy-link ${isActive || activeView === 'table' ? 'is-active' : ''}`
               }
             >
-              Bảng chiến lược
+              Khuyến nghị thịnh hành
+            </NavLink>
+            <NavLink
+              to="/admin/analytics/strategy/customers"
+              className={() =>
+                `dec-strategy-link ${activeView === 'customers' ? 'is-active' : ''}`
+              }
+            >
+              Danh sách khách hàng
             </NavLink>
             <NavLink
               to="/admin/analytics/strategy/clusters"
@@ -470,7 +537,7 @@ function AnalyticsStrategy({ view = 'table' }) {
                 `dec-strategy-link ${activeView === 'clusters-profile' ? 'is-active' : ''}`
               }
             >
-              Biểu đồ cụm
+              Hồ sơ trung bình
             </NavLink>
             <NavLink
               to="/admin/analytics/strategy/clusters/strategy"
@@ -478,7 +545,7 @@ function AnalyticsStrategy({ view = 'table' }) {
                 `dec-strategy-link ${activeView === 'clusters-strategy' ? 'is-active' : ''}`
               }
             >
-              Chiến lược cụm
+              Chiến lược C0-C6
             </NavLink>
           </div>
         </div>
@@ -514,83 +581,168 @@ function AnalyticsStrategy({ view = 'table' }) {
 
           {activeView === 'table' && (
             <section className="dec-table-card dec-page-card">
-              <div className="dec-section-head">
+              <div className="dec-section-head dec-trending-head">
                 <div>
-                  <h2>Bảng chiến lược</h2>
-                  <span>
-                    {periodLabel} · {filteredStrategyRows.length}
-                    {clusterFilter !== 'all' ? `/${strategyRows.length}` : ''} dòng
-                  </span>
+                  <h2>Khuyến nghị chiến lược thịnh hành</h2>
+                  <span>Xếp theo số khách cần ưu tiên trong từng cụm</span>
                 </div>
-                <label className="dec-cluster-filter" htmlFor="dec-cluster-filter">
-                  <span>Cụm</span>
-                  <select
-                    id="dec-cluster-filter"
-                    value={clusterFilter}
-                    onChange={(event) => setClusterFilter(event.target.value)}
-                  >
-                    <option value="all">Tất cả cụm</option>
-                    {clusterOptions.map((cluster) => (
-                      <option key={cluster.key} value={cluster.key}>
-                        {cluster.label} ({cluster.count})
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="dec-trending-filters">
+                  <label>
+                    <span>Thời gian</span>
+                    <strong className="dec-period-badge">{periodLabel}</strong>
+                  </label>
+                  <label htmlFor="dec-strategy-filter">
+                    <span>Chiến lược</span>
+                    <select
+                      id="dec-strategy-filter"
+                      value={strategyFilter}
+                      onChange={(event) => setStrategyFilter(event.target.value)}
+                    >
+                      <option value="all">Tất cả chiến lược</option>
+                      {clusterProfiles.map((cluster) => (
+                        <option key={cluster.key} value={cluster.key}>
+                          {cluster.code} - {cluster.actionMeta.action}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
 
               <div className="dec-table-wrap">
-                <table className="dec-table">
+                <table className="dec-table dec-trending-table">
                   <thead>
                     <tr>
-                      <th>Tên người dùng</th>
-                      <th>Ngày</th>
-                      <th>Chiến lược</th>
+                      <th>Khuyến nghị thịnh hành</th>
+                      <th>Hành động chính</th>
+                      <th>Quy mô</th>
                       <th>Cụm</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStrategyRows.length === 0 ? (
+                    {filteredTrendingStrategyRows.length === 0 ? (
                       <tr>
-                        <td colSpan="4" className="dec-empty">
-                          {clusterFilter === 'all'
-                            ? 'Chưa có khách hàng nào trong tháng này để tạo khuyến nghị.'
-                            : 'Cụm này chưa có khách hàng trong tháng đang chọn.'}
-                        </td>
+                        <td colSpan="4" className="dec-empty">Chưa có dữ liệu để tạo khuyến nghị.</td>
                       </tr>
                     ) : (
-                      filteredStrategyRows.map((customer) => {
-                        const cluster = clusterLookup.get(customer.cluster_key);
-                        return (
-                          <tr key={`${customer.cluster_key}-${customer.id}`}>
+                      filteredTrendingStrategyRows.map((cluster) => (
+                          <tr key={cluster.key}>
                             <td>
-                              <div className="dec-user-cell">
-                                <strong>{customer.name}</strong>
-                                <span>{customer.email || '-'}</span>
-                              </div>
+                              {cluster.strategy}
+                              <small className="dec-table-note">{cluster.label}</small>
                             </td>
-                            <td>{formatDate(customer.last_booking_date)}</td>
-                            <td>{customer.strategy}</td>
+                            <td className="dec-action-cell">{cluster.actionMeta.action}</td>
                             <td>
-                              <span className="dec-cluster-pill">
-                                {cluster?.cluster_display || customer.cluster_display} ·{' '}
-                                {customer.cluster_short_label || cluster?.short_label || customer.cluster_label}
-                              </span>
+                              <strong>{cluster.count.toLocaleString('vi-VN')} khách</strong>
+                              <small className="dec-table-note">{formatDecimal(cluster.percent, 1)}% số khách đã phân cụm</small>
+                            </td>
+                            <td className="dec-trending-cluster-cell">
+                              <span className="dec-cluster-pill">{cluster.code}</span>
+                              <small className="dec-table-note">{cluster.short_label}</small>
                             </td>
                           </tr>
-                        );
-                      })
+                      ))
                     )}
                   </tbody>
                 </table>
               </div>
 
               <div className="dec-export-row">
-                <span>
-                  Xuất dữ liệu chiến lược theo {periodLabel}
-                  {activeClusterOption ? ` · ${activeClusterOption.label}` : ''}
-                </span>
+                <span>Xuất {filteredTrendingStrategyRows.length} chiến lược theo bộ lọc hiện tại</span>
                 <button type="button" className="btn-export-excel" onClick={handleExportStrategies}>
+                  Xuất file
+                </button>
+              </div>
+            </section>
+          )}
+
+          {activeView === 'customers' && (
+            <section className="dec-table-card dec-page-card dec-customer-list-card">
+              <div className="dec-section-head dec-customer-list-head">
+                <div>
+                  <h2>Danh sách khách hàng</h2>
+                  <span>
+                    {periodLabel} · {filteredStrategyRows.length}
+                    {clusterFilter !== 'all' || customerSearch ? `/${strategyRows.length}` : ''} khách
+                  </span>
+                </div>
+                <div className="dec-customer-filters">
+                  <label>
+                    <span>Tìm khách hàng</span>
+                    <input
+                      type="search"
+                      value={customerSearch}
+                      onChange={(event) => setCustomerSearch(event.target.value)}
+                      placeholder="Tên hoặc email"
+                    />
+                  </label>
+                  <label className="dec-cluster-filter" htmlFor="dec-customer-cluster-filter">
+                    <span>Cụm</span>
+                    <select
+                      id="dec-customer-cluster-filter"
+                      value={clusterFilter}
+                      onChange={(event) => setClusterFilter(event.target.value)}
+                    >
+                      <option value="all">Tất cả cụm</option>
+                      {clusterOptions.map((cluster) => (
+                        <option key={cluster.key} value={cluster.key}>
+                          {cluster.label} ({cluster.count})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="dec-table-wrap">
+                <table className="dec-table dec-customer-table">
+                  <thead>
+                    <tr>
+                      <th>Khách hàng</th>
+                      <th>Cụm</th>
+                      <th>Tổng lịch</th>
+                      <th>Hoàn thành</th>
+                      <th>Hủy</th>
+                      <th>Chi tiêu</th>
+                      <th>Gần nhất</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStrategyRows.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="dec-empty">Không tìm thấy khách hàng phù hợp.</td>
+                      </tr>
+                    ) : (
+                      filteredStrategyRows.map((customer) => (
+                        <tr key={`${customer.cluster_key}-${customer.id}`}>
+                          <td>
+                            <div className="dec-user-cell">
+                              <strong>{customer.name}</strong>
+                              <span>{customer.email || '-'}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="dec-cluster-pill">
+                              {customer.cluster_display} · {customer.cluster_short_label}
+                            </span>
+                          </td>
+                          <td>{Number(customer.total_bookings || 0).toLocaleString('vi-VN')}</td>
+                          <td>{formatDecimal(customer.completion_rate, 1)}%</td>
+                          <td>
+                            {formatDecimal(customer.cancellation_rate, 1)}%
+                          </td>
+                          <td>{formatCurrencyCompact(customer.completed_revenue)}</td>
+                          <td>{formatDate(customer.last_booking_date)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="dec-export-row">
+                <span>Xuất danh sách khách hàng đang hiển thị</span>
+                <button type="button" className="btn-export-excel" onClick={handleExportCustomers}>
                   Xuất file
                 </button>
               </div>
@@ -601,7 +753,7 @@ function AnalyticsStrategy({ view = 'table' }) {
             <section className="dec-cluster-screen dec-cluster-detail-screen">
               <div className="dec-cluster-screen-head">
                 <div>
-                  <h2>Table 7 · Đặc trưng chi tiết từng cụm</h2>
+                  <h2>Đặc trưng chi tiết của 7 cụm hành vi</h2>
                   <span>{periodLabel} · {clusterProfiles.length} cụm hành vi</span>
                 </div>
                 <span className="dec-paper-chip">DEC / XAI</span>
@@ -647,10 +799,10 @@ function AnalyticsStrategy({ view = 'table' }) {
             <section className="dec-cluster-screen dec-cluster-profile-screen">
               <div className="dec-cluster-screen-head">
                 <div>
-                  <h2>Figure 4 · Average profile of clusters</h2>
+                  <h2>Hồ sơ trung bình của các cụm</h2>
                   <span>So sánh các chỉ số trung bình chính theo từng cụm.</span>
                 </div>
-                <span className="dec-paper-chip">Chart</span>
+                <span className="dec-paper-chip">Biểu đồ</span>
               </div>
 
               <div className="dec-profile-chart-wrap">
@@ -667,10 +819,9 @@ function AnalyticsStrategy({ view = 'table' }) {
             <section className="dec-cluster-screen dec-cluster-strategy-screen">
               <div className="dec-cluster-screen-head">
                 <div>
-                  <h2>Table 8 · Chiến lược khuyến nghị theo cụm</h2>
-                  <span>Liên kết đặc trưng hành vi với hành động quản trị cụ thể.</span>
+                  <h2>Chiến lược khuyến nghị theo cụm C0-C6</h2>
                 </div>
-                <span className="dec-paper-chip">Action plan</span>
+                <span className="dec-paper-chip">Kế hoạch</span>
               </div>
 
               <div className="dec-cluster-strategy-wrap">

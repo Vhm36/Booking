@@ -1,4 +1,13 @@
 import api from './api';
+import {
+  clearAuthSession,
+  getAuthToken,
+  getAuthUser,
+  isAuthRemembered,
+  setAuthToken,
+  setAuthUser,
+  startFreshAuthSession
+} from '../utils/authStorage';
 
 const authService = {
   // Đăng ký
@@ -73,56 +82,36 @@ const authService = {
 
   // Lưu token
   setToken: (token, rememberMe = true) => {
-    if (token) {
-      if (rememberMe) {
-        localStorage.setItem('token', token);
-        sessionStorage.removeItem('token');
-      } else {
-        sessionStorage.setItem('token', token);
-        localStorage.removeItem('token');
-      }
-      return;
-    }
-
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
+    setAuthToken(token, rememberMe);
   },
 
   // Lấy token
   getToken: () => {
-    return localStorage.getItem('token') || sessionStorage.getItem('token');
+    return getAuthToken();
   },
 
   // Xóa token
   removeToken: () => {
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
+    setAuthToken(null);
   },
 
   // Lấy user từ localStorage hoặc sessionStorage
   getUser: () => {
-    const user = localStorage.getItem('user') || sessionStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    return getAuthUser();
   },
 
   // Lưu user
   setUser: (user, rememberMe = true) => {
-    const userStr = JSON.stringify(user);
-    if (rememberMe) {
-      localStorage.setItem('user', userStr);
-      sessionStorage.removeItem('user');
-    } else {
-      sessionStorage.setItem('user', userStr);
-      localStorage.removeItem('user');
-    }
+    setAuthUser(user, rememberMe);
   },
+
+  isRemembered: () => isAuthRemembered(),
+
+  startFreshSession: () => startFreshAuthSession(),
 
   // Logout
   logout: () => {
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('user');
+    clearAuthSession();
   }
 };
 

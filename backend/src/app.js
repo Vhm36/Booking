@@ -19,6 +19,18 @@ db.ready.then(() => {
     }
   });
 
+  db.query('ALTER TABLE users ADD COLUMN zalo_id VARCHAR(64) NULL UNIQUE AFTER email', (err) => {
+    if (err) {
+      if (err.errno === 1060 || err.code === 'ER_DUP_FIELDNAME') {
+        console.log('Column zalo_id already exists');
+      } else {
+        console.error('Migration zalo_id error:', err.message);
+      }
+    } else {
+      console.log('Migration zalo_id completed successfully');
+    }
+  });
+
   const ensureDateOfBirthIndex = () => {
     db.query('ALTER TABLE users ADD INDEX idx_users_date_of_birth (date_of_birth)', (indexErr) => {
       if (indexErr) {

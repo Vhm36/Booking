@@ -125,7 +125,7 @@ function Profile({ user, setUser }) {
 
         if (profileUser && isMounted) {
           const refreshedUser = { ...user, ...profileUser };
-          const rememberMe = Boolean(localStorage.getItem('token'));
+          const rememberMe = authService.isRemembered();
           authService.setUser(refreshedUser, rememberMe);
           setUser(refreshedUser);
         }

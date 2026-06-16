@@ -55,11 +55,32 @@ const attachMonthlyLoyaltyStats = (user, callback) => {
   });
 };
 
-const getGoogleClientIds = () =>
-  (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
-    .split(',')
+const splitEnvValues = (...values) =>
+  values
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(','))
     .map((item) => item.trim())
     .filter(Boolean);
+
+const getGoogleClientIds = () =>
+  splitEnvValues(
+    process.env.GOOGLE_CLIENT_IDS,
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_WEB_CLIENT_ID,
+    process.env.REACT_APP_GOOGLE_CLIENT_ID
+  );
+
+const getZaloAppConfig = () => ({
+  appId: String(process.env.ZALO_APP_ID || process.env.REACT_APP_ZALO_APP_ID || '').trim(),
+  appSecret: String(
+    process.env.ZALO_APP_SECRET ||
+      process.env.ZALO_APP_SECRET_KEY ||
+      process.env.ZALO_SECRET_KEY ||
+      process.env.ZALO_SECRET ||
+      ''
+  ).trim(),
+});
 
 const buildResetPasswordLink = (token) => {
   const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').trim();
@@ -220,7 +241,7 @@ exports.googleLogin = async (req, res) => {
   const clientIds = getGoogleClientIds();
 
   if (!clientIds.length) {
-    return res.status(500).json({ success: false, message: 'Thiếu cấu hình GOOGLE_CLIENT_ID trên server.' });
+    return res.status(500).json({ success: false, message: 'Thiếu cấu hình GOOGLE_CLIENT_ID hoặc REACT_APP_GOOGLE_CLIENT_ID trên server.' });
   }
 
   try {
@@ -266,6 +287,7 @@ exports.googleLogin = async (req, res) => {
       );
     });
   } catch (error) {
+    console.error('[GOOGLE_LOGIN_VERIFY_ERROR]', error.message);
     return res.status(401).json({ success: false, message: 'Google token không hợp lệ hoặc đã hết hạn.' });
   }
 };
@@ -274,19 +296,23 @@ exports.googleLogin = async (req, res) => {
 exports.zaloLogin = async (req, res) => {
   const code = String(req.body?.code || '').trim();
   const codeVerifier = String(req.body?.codeVerifier || '').trim();
-  const ZALO_APP_ID = (process.env.ZALO_APP_ID || '').trim();
-  const ZALO_APP_SECRET = (process.env.ZALO_APP_SECRET || '').trim();
+  const { appId, appSecret } = getZaloAppConfig();
 
-  if (!ZALO_APP_ID || !ZALO_APP_SECRET) {
-    return res.status(500).json({ success: false, message: 'Thiếu cấu hình ZALO_APP_ID hoặc ZALO_APP_SECRET trên server.' });
+  if (!appId || !appSecret) {
+    return res.status(500).json({ success: false, message: 'Thiếu cấu hình ZALO_APP_ID/REACT_APP_ZALO_APP_ID hoặc ZALO_APP_SECRET trên server.' });
   }
 
   try {
     // Bước 1: Đổi authorization code → access_token
-    const tokenParams = new URLSearchParams({ code, app_id: ZALO_APP_ID, grant_type: 'authorization_code', code_verifier: codeVerifier });
+    const tokenParams = new URLSearchParams({
+      code,
+      app_id: appId,
+      grant_type: 'authorization_code',
+      code_verifier: codeVerifier
+    });
     const tokenResponse = await fetch('https://oauth.zaloapp.com/v4/access_token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'secret_key': ZALO_APP_SECRET },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'secret_key': appSecret },
       body: tokenParams.toString()
     });
     const tokenData = await tokenResponse.json();

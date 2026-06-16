@@ -34,6 +34,15 @@ Frontend mặc định:
 http://localhost:3000
 ```
 
+File `frontend/.env` mẫu:
+
+```env
+REACT_APP_API_URL=http://127.0.0.1:5000/api
+REACT_APP_GOOGLE_CLIENT_ID=...
+REACT_APP_ZALO_APP_ID=...
+REACT_APP_ZALO_CALLBACK_URL=http://localhost:3000/auth/zalo-callback
+```
+
 ## 2. Lỗi hay gặp
 
 ### Port backend bị trùng
@@ -116,9 +125,16 @@ FRONTEND_URL=http://localhost:3000
 Biến tùy chọn:
 
 ```env
+GOOGLE_CLIENT_ID=...
+
+ZALO_APP_ID=...
+ZALO_APP_SECRET=...
+ZALO_REDIRECT_URI=http://localhost:3000/auth/zalo-callback
+
 OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-4.1-mini
 
+SMTP_SERVICE=gmail
 SMTP_HOST=...
 SMTP_PORT=587
 SMTP_USER=...

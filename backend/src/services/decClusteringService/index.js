@@ -4,66 +4,73 @@ const MIN_RECOMMENDED_CUSTOMERS = 100;
 
 const CLUSTER_DEFINITIONS = [
   {
+    code: 'C0',
     key: 'frequent_single_service',
-    label: 'Thường xuyên đặt 1 dịch vụ',
-    short_label: '1 dịch vụ',
-    description: 'Khách quay lại nhiều lần nhưng gần như chỉ dùng một dịch vụ cố định.',
-    criteria: 'Từ 3 lịch trở lên và chỉ phát sinh 1 nhóm dịch vụ chính.',
-    strategy: 'Gợi ý combo bảo dưỡng định kỳ, nhắc lịch theo chu kỳ và bán thêm dịch vụ bổ trợ.',
+    label: 'Khách hàng Đơn dịch vụ',
+    short_label: 'Đơn dịch vụ',
+    description: 'Khách quay lại salon nhiều lần nhưng chỉ trung thành với một dịch vụ duy nhất.',
+    criteria: 'Có từ 3 lịch, ít nhất 2 lịch hoàn thành và chỉ sử dụng 1 dịch vụ.',
+    strategy: 'Duy trì lịch nhắc theo chu kỳ, tạo gói thành viên theo dịch vụ chính và gợi ý một dịch vụ bổ trợ phù hợp.',
     tone: 'teal'
   },
   {
-    key: 'many_bookings_low_arrival',
-    label: 'Đặt nhiều nhưng ít đến',
-    short_label: 'Ít đến',
-    description: 'Khách tạo nhiều lịch nhưng tỷ lệ hoàn thành thấp.',
-    criteria: 'Từ 4 lịch trở lên, lịch hoàn thành thấp so với tổng lịch.',
-    strategy: 'Yêu cầu xác nhận trước giờ hẹn, đặt cọc nhẹ hoặc nhắc lịch tự động sớm hơn.',
-    tone: 'amber'
-  },
-  {
+    code: 'C1',
     key: 'frequent_cancel_no_show',
-    label: 'Hay hủy lịch hoặc không đến',
-    short_label: 'Hay hủy',
-    description: 'Khách có hành vi hủy lịch nhiều hoặc được ghi nhận không đến.',
-    criteria: 'Từ 2 lịch hủy/không đến và tỷ lệ rủi ro từ 35% trở lên.',
-    strategy: 'Ưu tiên khung giờ dễ thay thế, gửi nhắc lịch 24h và xác nhận lại trước ca.',
+    label: 'Khách hàng Đơn dịch vụ',
+    short_label: 'Đơn dịch vụ',
+    description: 'Khách có tỷ lệ hủy, không đến hoặc điểm rủi ro lịch hẹn vượt ngưỡng an toàn.',
+    criteria: 'Có từ 2 lịch hủy hoặc không đến và tỷ lệ rủi ro từ 30%, hoặc điểm Cancellation Score trung bình từ 70.',
+    strategy: 'Nhắc lịch nhiều bước, xác nhận lại trước ca và bắt buộc đặt cọc khi Cancellation Score vượt ngưỡng.',
     tone: 'rose'
   },
   {
+    code: 'C2',
+    key: 'many_bookings_low_arrival',
+    label: 'Khách đặt lịch ảo',
+    short_label: 'Đặt lịch ảo',
+    description: 'Khách tạo lịch liên tục nhưng tỷ lệ đến salon thực tế cực thấp, có dấu hiệu giữ chỗ ảo.',
+    criteria: 'Có từ 6 lịch, tỷ lệ hoàn thành không quá 35% và ít nhất 2 lần không đến hoặc 4 lịch rủi ro.',
+    strategy: 'Giới hạn số lịch mở đồng thời, yêu cầu cọc bắt buộc và chỉ giữ khung giờ sau khi xác nhận thanh toán.',
+    tone: 'amber'
+  },
+  {
+    code: 'C3',
     key: 'low_usage_premium',
-    label: 'Dùng ít nhưng chọn dịch vụ cao cấp',
-    short_label: 'Premium ít dùng',
-    description: 'Khách ít đặt lịch nhưng giá trị mỗi lần dùng dịch vụ cao.',
-    criteria: 'Tối đa 2 lịch hoàn thành và giá trị trung bình thuộc nhóm cao.',
-    strategy: 'Chăm sóc cá nhân hóa, ưu đãi dịch vụ cao cấp và mời quay lại theo dịp đặc biệt.',
+    label: 'Khách hàng Cao cấp',
+    short_label: 'Cao cấp',
+    description: 'Khách đặt không quá thường xuyên nhưng giá trị trung bình mỗi lần sử dụng dịch vụ rất cao.',
+    criteria: 'Có lịch hoàn thành, tối đa 3 lần hoàn thành và mức chi trung bình thuộc nhóm 25% cao nhất.',
+    strategy: 'Chăm sóc cá nhân hóa, ưu tiên chuyên viên phù hợp và giới thiệu liệu trình cao cấp theo nhu cầu.',
     tone: 'violet'
   },
   {
+    code: 'C4',
     key: 'high_usage_budget',
-    label: 'Dùng nhiều dịch vụ bình dân',
-    short_label: 'Bình dân nhiều',
-    description: 'Khách dùng thường xuyên nhưng chủ yếu chọn dịch vụ giá thấp.',
-    criteria: 'Từ 3 lịch hoàn thành và giá trị trung bình thuộc nhóm bình dân.',
-    strategy: 'Tạo gói tiết kiệm theo tháng, tích điểm và gợi ý nâng cấp từng bước.',
+    label: 'Khách hàng Bình dân',
+    short_label: 'Bình dân',
+    description: 'Khách tương tác thường xuyên nhưng nhạy cảm về giá và chủ yếu chọn dịch vụ cơ bản.',
+    criteria: 'Có từ 3 lịch hoàn thành và mức chi trung bình thuộc nhóm 40% thấp nhất.',
+    strategy: 'Tạo gói tiết kiệm, ưu đãi khung giờ thấp điểm, tích điểm và đề xuất nâng cấp từng bước.',
     tone: 'blue'
   },
   {
+    code: 'C5',
     key: 'one_time_then_left',
-    label: 'Đặt 1 lần rồi bỏ',
-    short_label: 'Một lần rồi bỏ',
-    description: 'Khách chỉ đặt một lịch rồi không quay lại trong một khoảng thời gian.',
-    criteria: 'Chỉ có 1 lịch, đặc biệt khi lịch gần nhất đã qua hơn 21 ngày.',
-    strategy: 'Gửi voucher quay lại, hỏi trải nghiệm sau dịch vụ và đề xuất lịch hẹn mới.',
+    label: 'Khách vãng lai rời bỏ',
+    short_label: 'Vãng lai',
+    description: 'Khách chỉ đặt đúng một lịch rồi không phát sinh tương tác quay lại trong ít nhất 21 ngày.',
+    criteria: 'Tổng số lịch bằng 1 và lịch gần nhất đã qua từ 21 ngày.',
+    strategy: 'Khảo sát trải nghiệm lần đầu, gửi voucher quay lại có thời hạn và đề xuất lịch thứ hai.',
     tone: 'slate'
   },
   {
+    code: 'C6',
     key: 'low_monthly_usage',
-    label: 'Đặt theo tháng ít',
-    short_label: 'Ít theo tháng',
-    description: 'Khách có phát sinh qua nhiều tháng nhưng tần suất mỗi tháng thấp.',
-    criteria: 'Có lịch ở từ 2 tháng trở lên và trung bình không quá 1.25 lịch/tháng.',
-    strategy: 'Nhắc lịch định kỳ theo tháng, đề xuất lịch trống gần nhất và gói duy trì.',
+    label: 'Khách tương tác thưa theo tháng',
+    short_label: 'Tương tác thưa theo tháng',
+    description: 'Khách duy trì giao dịch qua nhiều tháng nhưng tần suất mỗi tháng thấp và thiếu ổn định.',
+    criteria: 'Có giao dịch trong từ 2 tháng và trung bình không quá 1,25 lịch mỗi tháng.',
+    strategy: 'Nhắc lịch định kỳ theo tháng, đề xuất lịch trống phù hợp và xây gói duy trì dài hạn.',
     tone: 'emerald'
   }
 ];
@@ -72,20 +79,20 @@ const CUSTOMER_POTENTIAL_META = {
   frequent_single_service: {
     status: 'potential',
     label: 'Khách tiềm năng',
-    reason: 'Quay lại nhiều lần với một dịch vụ chính.',
-    staff_hint: 'Ưu tiên nhắc lịch định kỳ và gợi ý dịch vụ bổ trợ.'
-  },
-  many_bookings_low_arrival: {
-    status: 'not_potential',
-    label: 'Khách không tiềm năng',
-    reason: 'Đặt nhiều nhưng tỷ lệ đến thấp.',
-    staff_hint: 'Cần xác nhận kỹ trước giờ hẹn hoặc yêu cầu cọc nhẹ.'
+    reason: 'Trung thành với một dịch vụ chính và có khả năng quay lại theo chu kỳ.',
+    staff_hint: 'Nhắc lịch định kỳ, giữ chất lượng dịch vụ quen thuộc và gợi ý bổ trợ phù hợp.'
   },
   frequent_cancel_no_show: {
     status: 'not_potential',
-    label: 'Khách không tiềm năng',
-    reason: 'Có lịch sử hủy hoặc không đến cao.',
-    staff_hint: 'Nên nhắc lịch sớm và ưu tiên khung giờ dễ thay thế.'
+    label: 'Khách rủi ro',
+    reason: 'Có tỷ lệ hủy hoặc không đến, hoặc điểm Cancellation Score vượt ngưỡng an toàn.',
+    staff_hint: 'Nhắc lịch nhiều bước và áp dụng đặt cọc theo điểm rủi ro.'
+  },
+  many_bookings_low_arrival: {
+    status: 'not_potential',
+    label: 'Khách rủi ro cao',
+    reason: 'Tạo nhiều lịch nhưng tỷ lệ đến thực tế rất thấp.',
+    staff_hint: 'Giới hạn lịch mở đồng thời và yêu cầu cọc trước khi giữ chỗ.'
   },
   low_usage_premium: {
     status: 'potential',
@@ -289,8 +296,26 @@ const buildAppointmentPeriodClause = (alias, period) => {
   };
 };
 
+const buildCustomerActivityClause = (customerAlias, period) => {
+  if (period.type === 'all') {
+    return { sql: '', params: [] };
+  }
+
+  const activityPeriod = buildAppointmentPeriodClause('activity', period);
+  return {
+    sql: `
+      AND EXISTS (
+        SELECT 1
+        FROM appointments activity
+        WHERE activity.user_id = ${customerAlias}.id${activityPeriod.sql}
+      )
+    `,
+    params: activityPeriod.params
+  };
+};
+
 const getCustomerRows = async (period) => {
-  const appointmentPeriod = buildAppointmentPeriodClause('a', period);
+  const customerActivity = buildCustomerActivityClause('u', period);
   const sql = `
     SELECT
       u.id AS customer_id,
@@ -303,21 +328,23 @@ const getCustomerRows = async (period) => {
       SUM(CASE WHEN a.status IN ('pending', 'confirmed') THEN 1 ELSE 0 END) AS open_bookings,
       COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.total_amount ELSE 0 END), 0) AS completed_revenue,
       COALESCE(AVG(CASE WHEN a.status = 'completed' THEN a.total_amount ELSE NULL END), 0) AS avg_completed_amount,
+      COALESCE(AVG(CASE WHEN a.cancellation_score IS NOT NULL THEN a.cancellation_score ELSE NULL END), 0) AS avg_cancellation_score,
       COUNT(DISTINCT CASE WHEN a.id IS NOT NULL THEN DATE_FORMAT(a.appointment_date, '%Y-%m') ELSE NULL END) AS active_months,
       MIN(a.appointment_date) AS first_booking_date,
       MAX(a.appointment_date) AS last_booking_date
     FROM users u
-    LEFT JOIN appointments a ON a.user_id = u.id${appointmentPeriod.sql}
+    LEFT JOIN appointments a ON a.user_id = u.id AND a.appointment_date <= CURDATE()
     WHERE u.role = 'customer' AND u.is_active = 1
+      ${customerActivity.sql}
     GROUP BY u.id, u.name, u.email
     ORDER BY total_bookings DESC, completed_revenue DESC, u.name ASC
   `;
 
-  return query(sql, appointmentPeriod.params);
+  return query(sql, customerActivity.params);
 };
 
 const getServiceUsageRows = async (period) => {
-  const appointmentPeriod = buildAppointmentPeriodClause('a', period);
+  const customerActivity = buildCustomerActivityClause('u', period);
   const sql = `
     SELECT
       a.user_id AS customer_id,
@@ -326,18 +353,20 @@ const getServiceUsageRows = async (period) => {
       COUNT(DISTINCT a.id) AS booking_count,
       COALESCE(AVG(COALESCE(aps.price_snapshot, s.price, a.total_amount)), 0) AS avg_price
     FROM appointments a
+    JOIN users u ON u.id = a.user_id
     LEFT JOIN appointment_services aps ON aps.appointment_id = a.id
     LEFT JOIN services s ON s.id = COALESCE(aps.service_id, a.service_id)
     WHERE a.user_id IS NOT NULL
       AND a.status != 'cancelled'
-      ${appointmentPeriod.sql}
+      AND a.appointment_date <= CURDATE()
+      ${customerActivity.sql}
     GROUP BY
       a.user_id,
       COALESCE(aps.service_id, a.service_id),
       COALESCE(aps.service_name_snapshot, s.name, 'Không rõ')
   `;
 
-  return query(sql, appointmentPeriod.params);
+  return query(sql, customerActivity.params);
 };
 
 const getServicePrices = async () => {
@@ -387,6 +416,7 @@ const normalizeCustomer = (row, serviceUsageMap) => {
   const riskBookings = cancelledBookings + noShowBookings;
   const completedRevenue = toNumber(row.completed_revenue);
   const avgCompletedAmount = toNumber(row.avg_completed_amount);
+  const avgCancellationScore = toNumber(row.avg_cancellation_score);
   const activeMonths = Math.max(0, toNumber(row.active_months));
   const monthlyBookingRate = activeMonths > 0 ? totalBookings / activeMonths : totalBookings;
   const serviceUsage = serviceUsageMap.get(Number(row.customer_id)) || [];
@@ -403,6 +433,7 @@ const normalizeCustomer = (row, serviceUsageMap) => {
     open_bookings: toNumber(row.open_bookings),
     completed_revenue: completedRevenue,
     avg_completed_amount: avgCompletedAmount,
+    avg_cancellation_score: round(avgCancellationScore, 1),
     active_months: activeMonths,
     monthly_booking_rate: round(monthlyBookingRate, 2),
     distinct_services: serviceUsage.length,
@@ -421,12 +452,19 @@ const getClusterKey = (customer, thresholds) => {
 
   const riskCount = customer.cancelled_bookings + customer.no_show_bookings;
 
-  if (riskCount >= 2 && customer.cancellation_rate >= 35) {
-    return 'frequent_cancel_no_show';
+  if (
+    customer.total_bookings >= 6 &&
+    customer.completion_rate <= 35 &&
+    (customer.no_show_bookings >= 2 || riskCount >= 4)
+  ) {
+    return 'many_bookings_low_arrival';
   }
 
-  if (customer.total_bookings >= 4 && customer.completion_rate <= 45) {
-    return 'many_bookings_low_arrival';
+  if (
+    (riskCount >= 2 && customer.cancellation_rate >= 30) ||
+    customer.avg_cancellation_score >= 70
+  ) {
+    return 'frequent_cancel_no_show';
   }
 
   if (customer.total_bookings === 1 && customer.recency_days >= 21) {
@@ -434,8 +472,16 @@ const getClusterKey = (customer, thresholds) => {
   }
 
   if (
+    customer.total_bookings >= 3 &&
+    customer.completed_bookings >= 2 &&
+    customer.distinct_services === 1
+  ) {
+    return 'frequent_single_service';
+  }
+
+  if (
     customer.completed_bookings > 0 &&
-    customer.completed_bookings <= 2 &&
+    customer.completed_bookings <= 3 &&
     customer.avg_completed_amount >= thresholds.premium
   ) {
     return 'low_usage_premium';
@@ -449,19 +495,11 @@ const getClusterKey = (customer, thresholds) => {
     return 'high_usage_budget';
   }
 
-  if (customer.total_bookings >= 3 && customer.distinct_services <= 1) {
-    return 'frequent_single_service';
-  }
-
   if (customer.active_months >= 2 && customer.monthly_booking_rate <= 1.25) {
     return 'low_monthly_usage';
   }
 
-  if (customer.total_bookings === 1) {
-    return 'one_time_then_left';
-  }
-
-  return 'low_monthly_usage';
+  return null;
 };
 
 const calculateAverages = (customers = []) => {
@@ -470,6 +508,7 @@ const calculateAverages = (customers = []) => {
       total_bookings: 0,
       completion_rate: 0,
       cancellation_rate: 0,
+      avg_cancellation_score: 0,
       avg_completed_amount: 0,
       monthly_booking_rate: 0
     };
@@ -480,6 +519,7 @@ const calculateAverages = (customers = []) => {
       total_bookings: acc.total_bookings + customer.total_bookings,
       completion_rate: acc.completion_rate + customer.completion_rate,
       cancellation_rate: acc.cancellation_rate + customer.cancellation_rate,
+      avg_cancellation_score: acc.avg_cancellation_score + customer.avg_cancellation_score,
       avg_completed_amount: acc.avg_completed_amount + customer.avg_completed_amount,
       monthly_booking_rate: acc.monthly_booking_rate + customer.monthly_booking_rate
     }),
@@ -487,6 +527,7 @@ const calculateAverages = (customers = []) => {
       total_bookings: 0,
       completion_rate: 0,
       cancellation_rate: 0,
+      avg_cancellation_score: 0,
       avg_completed_amount: 0,
       monthly_booking_rate: 0
     }
@@ -496,6 +537,7 @@ const calculateAverages = (customers = []) => {
     total_bookings: round(sum.total_bookings / customers.length, 1),
     completion_rate: round(sum.completion_rate / customers.length, 1),
     cancellation_rate: round(sum.cancellation_rate / customers.length, 1),
+    avg_cancellation_score: round(sum.avg_cancellation_score / customers.length, 1),
     avg_completed_amount: round(sum.avg_completed_amount / customers.length, 0),
     monthly_booking_rate: round(sum.monthly_booking_rate / customers.length, 2)
   };
@@ -544,16 +586,16 @@ const buildDynamicStrategy = (definition, customers = [], averages = {}, period 
       year: `Có ${count} khách chỉ gắn với 1 dịch vụ ${phrase}. Xây gói thành viên theo dịch vụ chủ lực, chia nhóm chăm sóc theo mùa và mở rộng dần sang dịch vụ liên quan.`
     },
     many_bookings_low_arrival: {
-      day: `${count} khách đặt nhiều nhưng dễ không đến ${phrase}. Chỉ giữ slot khi khách xác nhận lại, ưu tiên gọi trước giờ hẹn và chuẩn bị phương án thay slot nhanh.`,
-      week: `${count} khách có tỷ lệ đến thấp ${phrase}. Đặt nhắc lịch 24h, xác nhận lại trong ngày hẹn và cân nhắc cọc nhẹ với nhóm hủy cao (${cancellationRate}%).`,
-      month: `${count} khách đặt nhiều nhưng hoàn thành thấp ${phrase}. Tách danh sách cần xác nhận sớm, giới hạn đặt trùng giờ đẹp và theo dõi chuyển đổi hoàn thành ${completionRate}%.`,
-      year: `${count} khách có thói quen đặt nhưng ít đến ${phrase}. Thiết lập chính sách giữ chỗ riêng, cọc theo rủi ro và đánh giá lại quyền ưu tiên lịch theo quý.`
+      day: `${count} khách có dấu hiệu đặt lịch ảo ${phrase}. Chỉ giữ slot sau khi xác nhận hoặc thanh toán cọc, đồng thời giới hạn số lịch đang mở trên mỗi tài khoản.`,
+      week: `${count} khách tạo nhiều lịch nhưng tỷ lệ đến rất thấp ${phrase}. Kiểm tra lịch trùng, khóa giữ chỗ cao điểm khi chưa cọc và rà lại tỷ lệ hoàn thành ${completionRate}%.`,
+      month: `${count} khách thuộc nhóm đặt lịch ảo ${phrase}. Áp dụng cọc bắt buộc, giới hạn số lịch mở đồng thời và theo dõi tài khoản tái phạm theo tuần.`,
+      year: `${count} khách có hành vi giữ chỗ gây lãng phí công suất ${phrase}. Thiết lập chế tài theo mức tái phạm và chỉ khôi phục quyền đặt linh hoạt sau các lịch hoàn thành.`
     },
     frequent_cancel_no_show: {
-      day: `${count} khách rủi ro hủy/không đến ${phrase}. Nhắc lịch trực tiếp trước ca, chọn khung giờ dễ thay thế và không để lịch này chiếm slot cao điểm quá lâu.`,
-      week: `${count} khách hủy hoặc không đến nhiều ${phrase}. Lên danh sách gọi xác nhận đầu tuần, ưu tiên slot linh hoạt và theo dõi tỷ lệ hủy ${cancellationRate}%.`,
-      month: `${count} khách rủi ro cao ${phrase}. Áp dụng nhắc lịch nhiều bước, yêu cầu xác nhận rõ trước ngày hẹn và dùng ưu đãi chỉ sau khi khách hoàn thành lịch.`,
-      year: `${count} khách có lịch sử rủi ro ${phrase}. Xây quy tắc chống boom lịch theo phân tầng, hạn chế giữ slot cao điểm và dùng cọc cho nhóm tái phạm.`
+      day: `${count} khách có rủi ro hủy, trễ hoặc không đến ${phrase}. Nhắc trực tiếp trước ca và yêu cầu cọc ngay khi Cancellation Score vượt ngưỡng.`,
+      week: `${count} khách hủy hoặc không đến nhiều ${phrase}. Gọi xác nhận, ưu tiên khung giờ linh hoạt và theo dõi tỷ lệ rủi ro ${cancellationRate}%.`,
+      month: `${count} khách vượt ngưỡng an toàn ${phrase}. Áp dụng nhắc lịch nhiều bước, cọc theo điểm rủi ro và chỉ cấp ưu đãi sau lịch hoàn thành.`,
+      year: `${count} khách có lịch sử rủi ro kéo dài ${phrase}. Phân tầng mức đặt cọc, hạn chế slot cao điểm và đánh giá lại sau mỗi chuỗi lịch hoàn thành.`
     },
     low_usage_premium: {
       day: `${count} khách ít dùng nhưng chọn dịch vụ cao cấp ${phrase}. Chuẩn bị tư vấn kỹ cho ${topCustomer}, chăm sóc sau ca và mời đặt lịch cao cấp tiếp theo.`,
@@ -733,7 +775,8 @@ const getDecCustomerInsights = async ({ customerIds = [], year = null, month = n
       insights.push({
         customer_id: customer.id,
         customer_dec_cluster_key: definition.key,
-        customer_dec_cluster_number: index + 1,
+        customer_dec_cluster_number: index,
+        customer_dec_cluster_code: definition.code,
         customer_dec_cluster_label: definition.label,
         customer_dec_cluster_short_label: definition.short_label,
         customer_dec_cluster_strategy: definition.strategy,

@@ -99,15 +99,11 @@ const markReminderSent = async (appointmentId) => {
 };
 
 const sendReminderEmail = async (appointment, template) => {
-  const hasMailConfig = Boolean(
-    (process.env.SMTP_HOST || process.env.EMAIL_HOST) &&
-      (process.env.SMTP_USER || process.env.EMAIL_USER) &&
-      (process.env.SMTP_PASS || process.env.EMAIL_PASSWORD)
-  );
+  const hasMailConfig = Boolean(mailService?.getMailConfigStatus?.().configured);
 
   if (!mailService || !template || !hasMailConfig) {
     console.log(`[Reminder] Would send to ${appointment.customer_email} for appointment #${appointment.id}`);
-    return true;
+    return false;
   }
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
