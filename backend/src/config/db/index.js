@@ -22,7 +22,15 @@ const parseDatabaseUrl = (value) => {
 };
 
 const isLocalHost = (value) => ["localhost", "127.0.0.1", "::1"].includes(String(value || "").trim());
-const urlConfig = parseDatabaseUrl(process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.MYSQL_PUBLIC_URL);
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  process.env.MYSQL_URL ||
+  process.env.MYSQL_PRIVATE_URL ||
+  process.env.MYSQL_PUBLIC_URL ||
+  process.env.DATABASE_PRIVATE_URL ||
+  process.env.DATABASE_PUBLIC_URL ||
+  process.env.RAILWAY_DATABASE_URL;
+const urlConfig = parseDatabaseUrl(databaseUrl);
 const railwayHost = process.env.MYSQLHOST || process.env.MYSQL_HOST;
 const shouldPreferRailwayVars = railwayHost && (!process.env.DB_HOST || isLocalHost(process.env.DB_HOST));
 
@@ -65,6 +73,12 @@ const dbPassword = (
 );
 const dbConnectTimeout = Number.parseInt(process.env.DB_CONNECT_TIMEOUT_MS || "10000", 10);
 const dbSslMode = String(process.env.DB_SSL || urlConfig.ssl || "").trim().toLowerCase();
+const isRailwayRuntime = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+    process.env.RAILWAY_PROJECT_ID ||
+    process.env.RAILWAY_SERVICE_ID ||
+    process.env.RAILWAY_DEPLOYMENT_ID
+);
 
 const normalizedDbPort = Number.isInteger(dbPort) && dbPort > 0 ? dbPort : 3306;
 const normalizedConnectTimeout =
@@ -90,7 +104,12 @@ const getConnectionContext = () => ({
   port: connectionOptions.port,
   user: connectionOptions.user,
   database: dbName,
-  connectTimeoutMs: connectionOptions.connectTimeout
+  connectTimeoutMs: connectionOptions.connectTimeout,
+  runtime: isRailwayRuntime ? "railway" : (process.env.NODE_ENV || "development"),
+  configSource: urlConfig.host ? "database_url" : (shouldPreferRailwayVars ? "railway_mysql_vars" : "db_vars_or_defaults"),
+  hasDatabaseUrl: Boolean(databaseUrl),
+  hasMysqlHost: Boolean(railwayHost),
+  hasDbHost: Boolean(process.env.DB_HOST)
 });
 
 const logConnectionDiagnostics = (err, phase) => {
@@ -107,7 +126,16 @@ const logConnectionDiagnostics = (err, phase) => {
 
 const ready = new Promise((resolve, reject) => {
   if (!dbName) {
-    reject(new Error("Missing required environment variable: DB_NAME"));
+    reject(new Error("Missing database name. Set DB_NAME, MYSQLDATABASE, or include a database name in DATABASE_URL/MYSQL_URL."));
+    return;
+  }
+
+  if ((isRailwayRuntime || process.env.NODE_ENV === "production") && isLocalHost(connectionOptions.host)) {
+    reject(new Error(
+      "Database host is localhost in production/Railway. Add Railway MySQL variables to this backend service " +
+      "(MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE) or set DATABASE_URL/MYSQL_URL. " +
+      "Do not use DB_HOST=localhost on Railway."
+    ));
     return;
   }
 
