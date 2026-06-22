@@ -355,7 +355,7 @@ http://localhost:3000
 
 ## Ghi Chú
 
-- Backend sử dụng JWT để xác thực và phân quyền theo `admin`, `staff`, `customer`.
+- Backend sử dụng JWT để xác thực và phân quyền theo `admin`, `staff`, `user`.
 - Frontend lưu token trong auth storage và tự động đăng xuất khi token hết hạn.
 - Socket.io được dùng cho dashboard realtime và trạng thái online.
 - Cron job chạy nhắc lịch, phân cụm khách hàng và tự động voucher sinh nhật/marketing.
