@@ -481,30 +481,30 @@ function MyAppointments() {
         </div>
       )}
 
-      <div className="filter-buttons">
-        <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => changeFilter('all')}>
+      <div className="my-appointments-filter-buttons">
+        <button className={`my-appointments-filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => changeFilter('all')}>
           Tất cả ({stats.total})
         </button>
-        <button className={`filter-btn ${filter === 'pending' ? 'active' : ''}`} onClick={() => changeFilter('pending')}>
+        <button className={`my-appointments-filter-btn ${filter === 'pending' ? 'active' : ''}`} onClick={() => changeFilter('pending')}>
           Chờ xác nhận ({stats.pending})
         </button>
-        <button className={`filter-btn ${filter === 'confirmed' ? 'active' : ''}`} onClick={() => changeFilter('confirmed')}>
+        <button className={`my-appointments-filter-btn ${filter === 'confirmed' ? 'active' : ''}`} onClick={() => changeFilter('confirmed')}>
           Đã xác nhận ({stats.confirmed})
         </button>
         <button
-          className={`filter-btn ${filter === 'unpaid' ? 'active' : ''}`}
+          className={`my-appointments-filter-btn ${filter === 'unpaid' ? 'active' : ''}`}
           onClick={() => changeFilter('unpaid')}
         >
           Chờ thanh toán ({stats.unpaid})
         </button>
         <button
-          className={`filter-btn ${filter === 'cancellation_requested' ? 'active' : ''}`}
+          className={`my-appointments-filter-btn ${filter === 'cancellation_requested' ? 'active' : ''}`}
           onClick={() => changeFilter('cancellation_requested')}
         >
           Chờ hủy ({stats.cancellationRequested})
         </button>
         <button
-          className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
+          className={`my-appointments-filter-btn ${filter === 'completed' ? 'active' : ''}`}
           onClick={() => changeFilter('completed')}
         >
           Hoàn thành ({stats.completed})
