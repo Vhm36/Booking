@@ -1,51 +1,27 @@
-const DISABLED_MESSAGE = 'Ket noi toi API dich vu da bi tat.';
-
-const createResponse = (data) => Promise.resolve({
-  data: {
-    success: true,
-    data
-  }
-});
-
-const createDisabledError = () => {
-  const error = new Error(DISABLED_MESSAGE);
-  error.response = {
-    status: 410,
-    data: {
-      success: false,
-      message: DISABLED_MESSAGE
-    }
-  };
-  return Promise.reject(error);
-};
+import api from './api';
 
 const serviceService = {
-  getAllServices: () => createResponse([]),
+  getAllServices: () => api.get('/services'),
 
-  getTrendingServices: () => createResponse({
-    all_services: [],
-    categories: []
-  }),
+  getTrendingServices: () => api.get('/services/trending'),
 
-  getAdminServices: () => createResponse([]),
+  getAdminServices: () => api.get('/services/admin/all'),
 
-  getServiceById: () => createResponse(null),
+  getServiceById: (id) => api.get(`/services/${id}`),
 
-  getRecommendations: () => createResponse({
-    recommendations: []
-  }),
+  getRecommendations: (params) => api.get('/services/recommendations', { params }),
 
-  createService: () => createDisabledError(),
+  createService: (data) => api.post('/services', data),
 
-  updateService: () => createDisabledError(),
+  updateService: (id, data) => api.put(`/services/${id}`, data),
 
-  updateServicePrice: () => createDisabledError(),
+  updateServicePrice: (id, price) => api.put(`/services/${id}/price`, { price }),
 
-  deleteService: () => createDisabledError(),
+  deleteService: (id) => api.delete(`/services/${id}`),
 
-  createCategory: () => createDisabledError(),
+  createCategory: (data) => api.post('/services/categories', data),
 
-  getAllCategories: () => createResponse([])
+  getAllCategories: () => api.get('/services/categories')
 };
 
 export default serviceService;

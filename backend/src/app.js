@@ -88,6 +88,7 @@ const customerRoutes = require('./routes/customerRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
 
 // Cron Jobs
 const { startReminderJob } = require('./jobs/appointmentReminderJob');
@@ -157,6 +158,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/admin-users', adminUserRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
+app.use('/api/services', serviceRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API đang hoạt động', status: 'ok' });
