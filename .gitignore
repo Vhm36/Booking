@@ -21,7 +21,7 @@ __tmpcmd__.cmd
 backend/.npmrc
 frontend/.npmrc
 scripts/use-local-node.ps1
-
+backend/uploads/
 .vercel/
 
 codex-frontend-build-check/
