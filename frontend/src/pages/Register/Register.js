@@ -261,20 +261,6 @@ function Register() {
                 <PasswordToggleIcon visible={showPassword} />
               </button>
             </div>
-            <div className="password-requirements">
-              <p className="password-requirements-title">Yêu cầu:</p>
-              <div className="password-check-list">
-                <div className={`password-check-item ${passwordRequirements.minLength ? 'is-valid' : ''}`}>
-                  ✓ Ít nhất 6 ký tự
-                </div>
-                <div className={`password-check-item ${passwordRequirements.hasLetter ? 'is-valid' : ''}`}>
-                  ✓ Chứa ít nhất 1 chữ cái
-                </div>
-                <div className={`password-check-item ${passwordRequirements.hasNumber ? 'is-valid' : ''}`}>
-                  ✓ Chứa ít nhất 1 số
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="form-group">

@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { normalizeDepositPercent } = require('../../utils/appointmentDeposit');
 
 /**
  * Cancellation Score Service — Chống "Boom" lịch
@@ -21,6 +22,7 @@ const getCustomerHistory = async (customerId) => {
     query(
       `SELECT
         cancellation_count,
+        cancellation_rate,
         noshow_count,
         customer_segment,
         rfm_score
@@ -39,11 +41,20 @@ const getCustomerHistory = async (customerId) => {
 
   const customer = customerRows[0] || {};
   const stats = appointmentRows[0] || {};
+  const totalBookings = Number(stats.total_bookings || 0);
+  const cancelledCount = Number(customer.cancellation_count ?? stats.cancelled_count ?? 0);
+  const storedCancellationRate =
+    customer.cancellation_rate !== null && typeof customer.cancellation_rate !== 'undefined'
+      ? Number(customer.cancellation_rate)
+      : null;
+  const computedCancellationRate =
+    totalBookings > 0 ? Math.min((Number(stats.cancelled_count || 0) / totalBookings) * 100, 100) : 0;
 
   return {
-    cancellation_count: Number(customer.cancellation_count || stats.cancelled_count || 0),
+    cancellation_count: cancelledCount,
+    cancellation_rate: Math.min(Math.max(storedCancellationRate ?? computedCancellationRate, 0), 100),
     noshow_count: Number(customer.noshow_count || 0),
-    total_bookings: Number(stats.total_bookings || 0),
+    total_bookings: totalBookings,
     completed_count: Number(stats.completed_count || 0),
     segment: customer.customer_segment || 'New',
     rfm_score: customer.rfm_score || '111'
@@ -63,12 +74,8 @@ const getCustomerHistory = async (customerId) => {
 const calculateScore = async (customerId, appointmentDate, appointmentTime) => {
   const history = await getCustomerHistory(customerId);
 
-  // 1. Cancellation Rate Score (40%)
-  let cancellationScore = 0;
-  if (history.total_bookings > 0) {
-    const rate = history.cancellation_count / history.total_bookings;
-    cancellationScore = Math.min(rate * 100, 100);
-  }
+  // 1. Cancellation Rate Score (40%) — đã lưu trên users dưới dạng 0-100%
+  const cancellationScore = history.cancellation_rate;
 
   // 2. Lead Time Score (20%) — Đặt sát giờ = rủi ro cao
   let leadTimeScore = 0;
@@ -122,11 +129,12 @@ const calculateScore = async (customerId, appointmentDate, appointmentTime) => {
   );
 
   const finalScore = Math.min(Math.max(totalScore, 0), 100);
+  const depositPercent = normalizeDepositPercent(finalScore > 85 ? 50 : finalScore > 70 ? 35 : 20);
 
   return {
     score: finalScore,
-    requireDeposit: finalScore > 70,
-    depositPercent: finalScore > 85 ? 30 : 20,
+    requireDeposit: true,
+    depositPercent,
     breakdown: {
       cancellation_rate: Math.round(cancellationScore),
       lead_time: Math.round(leadTimeScore),
@@ -136,6 +144,7 @@ const calculateScore = async (customerId, appointmentDate, appointmentTime) => {
     },
     history: {
       total_bookings: history.total_bookings,
+      cancellation_rate: Math.round(history.cancellation_rate),
       cancellation_count: history.cancellation_count,
       noshow_count: history.noshow_count,
       segment: history.segment
@@ -144,14 +153,35 @@ const calculateScore = async (customerId, appointmentDate, appointmentTime) => {
 };
 
 /**
- * Cập nhật cancellation count cho user khi lịch hẹn bị hủy
+ * Refresh tỷ lệ hủy cấp user theo phần trăm 0-100.
  */
-const incrementCancellationCount = async (customerId) => {
+const refreshCancellationRate = async (customerId) => {
   await query(
-    'UPDATE users SET cancellation_count = cancellation_count + 1 WHERE id = ?',
-    [customerId]
+    `
+      UPDATE users u
+      LEFT JOIN (
+        SELECT
+          user_id,
+          COUNT(*) AS total_bookings,
+          SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_bookings
+        FROM appointments
+        WHERE user_id = ?
+        GROUP BY user_id
+      ) stats ON stats.user_id = u.id
+      SET
+        u.cancellation_count = COALESCE(stats.cancelled_bookings, 0),
+        u.cancellation_rate = CASE
+          WHEN COALESCE(stats.total_bookings, 0) = 0 THEN 0
+          ELSE LEAST(100, GREATEST(0, ROUND(COALESCE(stats.cancelled_bookings, 0) * 100.0 / stats.total_bookings, 2)))
+        END
+      WHERE u.id = ?
+        AND u.role = 'customer'
+    `,
+    [customerId, customerId]
   );
 };
+
+const incrementCancellationCount = refreshCancellationRate;
 
 /**
  * Cập nhật noshow count
@@ -166,6 +196,7 @@ const incrementNoshowCount = async (customerId) => {
 module.exports = {
   calculateScore,
   getCustomerHistory,
+  refreshCancellationRate,
   incrementCancellationCount,
   incrementNoshowCount
 };

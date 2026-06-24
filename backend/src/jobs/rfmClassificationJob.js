@@ -66,7 +66,7 @@ const assignSystemVoucher = async (voucherId, customerId, reason) => {
   await query(
     `INSERT IGNORE INTO voucher_assignments (
        voucher_id,
-       customer_id,
+       user_id,
        max_usage_customer,
        source,
        reason

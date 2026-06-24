@@ -227,6 +227,7 @@
 }
 
 .sc-stat-pending strong { color: #fbbf24; }
+.sc-stat-deposit strong { color: #fde68a; }
 .sc-stat-confirmed strong { color: #34d399; }
 .sc-stat-completed strong { color: #60a5fa; }
 
@@ -516,10 +517,25 @@
   font-weight: 600;
 }
 
+.sc-appt-deposit {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 /* Status visual */
 .sc-status-pending,
 .sc-status-confirmed,
-.sc-status-completed {
+.sc-status-completed,
+.sc-status-deposit {
   opacity: 1;
 }
 
@@ -826,6 +842,7 @@
 }
 
 .sc-pill-pending { background: #fef3c7; color: #92400e; }
+.sc-pill-deposit { background: #fef9c3; color: #854d0e; }
 .sc-pill-confirmed { background: #d1fae5; color: #065f46; }
 .sc-pill-completed { background: #dbeafe; color: #1e40af; }
 .sc-pill-cancelled { background: #fee2e2; color: #991b1b; }

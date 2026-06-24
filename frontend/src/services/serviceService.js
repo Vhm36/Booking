@@ -9,19 +9,18 @@ const serviceService = {
 
   getServiceById: (id) => api.get(`/services/${id}`),
 
-  getRecommendations: (serviceId, limit = 4) =>
-    api.get('/services/recommendations', { params: { serviceId, limit } }),
+  getRecommendations: (params) => api.get('/services/recommendations', { params }),
 
-  createService: (payload) => api.post('/services', payload),
+  createService: (data) => api.post('/services', data),
 
-  updateService: (id, payload) => api.put(`/services/${id}`, payload),
+  updateService: (id, data) => api.put(`/services/${id}`, data),
 
   updateServicePrice: (id, price) => api.put(`/services/${id}/price`, { price }),
 
   deleteService: (id) => api.delete(`/services/${id}`),
 
-  createCategory: (categoryData) => api.post('/services/categories', categoryData),
-  
+  createCategory: (data) => api.post('/services/categories', data),
+
   getAllCategories: () => api.get('/services/categories')
 };
 

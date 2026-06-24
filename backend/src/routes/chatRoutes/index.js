@@ -1,7 +1,20 @@
 const express = require('express');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const chatController = require('../../controllers/chatController');
 const { verifyToken } = require('../../middleware/authMiddleware');
+
+const chatBotLimiter = rateLimit({
+  windowMs: Number(process.env.CHATBOT_RATE_LIMIT_WINDOW_MS || 60 * 1000),
+  max: Number(process.env.CHATBOT_RATE_LIMIT_MAX || 8),
+  keyGenerator: (req) => (req.user?.id ? `user:${req.user.id}` : ipKeyGenerator(req.ip)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Bạn gửi tin nhắn hơi nhanh, vui lòng thử lại sau ít phút.'
+  }
+});
 
 // ============================================================================
 // Chat Conversations
@@ -34,7 +47,7 @@ router.get('/conversations/:conversationId/messages', verifyToken, chatControlle
 // ============================================================================
 
 // Chat with bot (auto-response)
-router.post('/conversations/:conversationId/chat-bot', verifyToken, chatController.chatWithBot);
+router.post('/conversations/:conversationId/chat-bot', verifyToken, chatBotLimiter, chatController.chatWithBot);
 
 // ============================================================================
 // Chat Suggestions

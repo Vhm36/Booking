@@ -4,6 +4,70 @@ jest.mock('../src/config/db', () => ({
   ready: Promise.resolve()
 }));
 
+const segmentFromScores = (r, f, m) => {
+  if (r >= 4 && f >= 4 && m >= 4) return 'Champions';
+  if (f >= 4 && m >= 4) return 'Loyal Customers';
+  if ((f >= 3 || m >= 3) && r >= 2) return 'Potential Loyalists';
+  if (m >= 3 && r <= 2) return 'At Risk';
+  if (r <= 2 && f <= 2) return 'Lost Customers';
+  if (f <= 2) return 'New Customers';
+  return 'Need Attention';
+};
+
+const scoreRFMFixture = (customers) => {
+  const sortedByR = [...customers].sort((a, b) => a.recency - b.recency);
+  const sortedByF = [...customers].sort((a, b) => b.frequency - a.frequency);
+  const sortedByM = [...customers].sort((a, b) => b.monetary - a.monetary);
+
+  const assignScore = (sortedArr) => {
+    const scores = new Map();
+    const n = sortedArr.length;
+    sortedArr.forEach((item, idx) => {
+      const percentile = idx / n;
+      const score = percentile < 0.25 ? 4 : percentile < 0.5 ? 3 : percentile < 0.75 ? 2 : 1;
+      scores.set(item.customer_id, score);
+    });
+    return scores;
+  };
+
+  const rScores = assignScore(sortedByR);
+  const fScores = assignScore(sortedByF);
+  const mScores = assignScore(sortedByM);
+
+  return customers.map((customer) => {
+    const r_score = rScores.get(customer.customer_id) || 1;
+    const f_score = fScores.get(customer.customer_id) || 1;
+    const m_score = mScores.get(customer.customer_id) || 1;
+    return {
+      ...customer,
+      r_score,
+      f_score,
+      m_score,
+      rfm_score: `${r_score}${f_score}${m_score}`,
+      segment: segmentFromScores(r_score, f_score, m_score)
+    };
+  });
+};
+
+jest.mock('../src/utils/pythonRunner', () => ({
+  runPythonJson: jest.fn(),
+  runPythonJsonSync: jest.fn((scriptPath, mode, payload) => {
+    if (mode === 'rfm_segment') {
+      return {
+        segment: segmentFromScores(payload.r_score, payload.f_score, payload.m_score)
+      };
+    }
+
+    if (mode === 'rfm') {
+      return {
+        details: scoreRFMFixture(payload.customers || [])
+      };
+    }
+
+    return {};
+  })
+}));
+
 const rfmService = require('../src/services/rfmService');
 
 describe('RFM Service - Phân Khúc Khách Hàng Tự Động', () => {

@@ -121,7 +121,9 @@ exports.deleteVoucher = async (req, res) => {
 };
 
 exports.assignVoucher = async (req, res) => {
-  const customerIds = parseCustomerIds(req.body.customer_ids || req.body.customer_id);
+  const customerIds = parseCustomerIds(
+    req.body.user_ids || req.body.user_id || req.body.customer_ids || req.body.customer_id
+  );
   const shouldSendEmail = Boolean(req.body.send_email);
   const maxUsageCustomer = Number(req.body.max_usage_customer || 1);
 
@@ -164,12 +166,14 @@ exports.assignVoucher = async (req, res) => {
             reason: req.body.reason || 'Voucher được gửi trực tiếp từ đội ngũ BeautyBook.'
           });
           emailResults.push({
+            user_id: assignment.customerId,
             customer_id: assignment.customerId,
             email: assignment.customer.email,
             messageId: result.messageId
           });
         } catch (mailErr) {
           emailResults.push({
+            user_id: assignment.customerId,
             customer_id: assignment.customerId,
             email: assignment.customer.email,
             error: mailErr.message

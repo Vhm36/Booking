@@ -166,22 +166,25 @@ body.my-appointments-scroll-lock .footer {
 }
 
 /* ── Filter Tabs ── */
-.filter-buttons {
+.my-appointments-filter-buttons {
   display: flex;
   gap: 6px;
   flex-wrap: nowrap;
   overflow-x: auto;
-  padding: 4px;
+  overflow-y: hidden;
+  padding: 6px;
   background: #f1f5f9;
   border-radius: 14px;
+  -ms-overflow-style: none;
   scrollbar-width: none;
+  align-items: center;
 }
 
-.filter-buttons::-webkit-scrollbar {
+.my-appointments-filter-buttons::-webkit-scrollbar {
   display: none;
 }
 
-.filter-btn {
+.my-appointments-filter-btn {
   min-height: 36px;
   padding: 8px 16px;
   border: none;
@@ -195,12 +198,12 @@ body.my-appointments-scroll-lock .footer {
   color: #64748b;
 }
 
-.filter-btn:hover {
+.my-appointments-filter-btn:hover {
   background: rgba(15, 118, 110, 0.06);
   color: #0f766e;
 }
 
-.filter-btn.active {
+.my-appointments-filter-btn.active {
   background: #ffffff;
   color: #0f766e;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -571,6 +574,12 @@ body.my-appointments-scroll-lock .footer {
   font-weight: 500;
 }
 
+.booking-total .booking-deposit-line {
+  color: #0f766e;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .booking-card-actions {
   display: flex;
   justify-content: flex-end;
@@ -862,7 +871,7 @@ body.my-appointments-scroll-lock .footer {
     padding: 14px 16px 16px;
   }
 
-  .filter-buttons {
+  .my-appointments-filter-buttons {
     border-radius: 12px;
   }
 

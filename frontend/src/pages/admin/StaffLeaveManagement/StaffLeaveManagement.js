@@ -86,9 +86,6 @@ function StaffLeaveManagement() {
   const [activeTab, setActiveTab] = useState('weekly');
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
-  const [confirmLeaveAction, setConfirmLeaveAction] = useState(null);
-  const [leaveActionLoadingId, setLeaveActionLoadingId] = useState(null);
-  const [leaveActionSuccess, setLeaveActionSuccess] = useState('');
 
   const loadLeaveRequests = async () => {
     try {
@@ -96,7 +93,7 @@ function StaffLeaveManagement() {
       const response = await staffService.getAllLeaveRequests();
       setLeaveRequests(response.data?.data || []);
     } catch (err) {
-      console.error('Lỗi khi tải danh sách yêu cầu nghỉ phép:', err);
+      console.error('Lỗi khi tải danh sách lịch nghỉ:', err);
     } finally {
       setLoadingRequests(false);
     }
@@ -143,13 +140,6 @@ function StaffLeaveManagement() {
     };
     loadSchedule();
   }, [selectedStaffId]);
-
-  useEffect(() => {
-    if (!leaveActionSuccess) return undefined;
-
-    const timer = window.setTimeout(() => setLeaveActionSuccess(''), 1800);
-    return () => window.clearTimeout(timer);
-  }, [leaveActionSuccess]);
 
   const selectedStaff = useMemo(
     () => staffList.find((staff) => String(staff.id) === String(selectedStaffId)) || null,
@@ -236,34 +226,6 @@ function StaffLeaveManagement() {
     }
   };
 
-  const openLeaveActionConfirm = (request, status) => {
-    setError('');
-    setLeaveActionSuccess('');
-    setConfirmLeaveAction({ request, status });
-  };
-
-  const closeLeaveActionConfirm = () => {
-    if (leaveActionLoadingId) return;
-    setConfirmLeaveAction(null);
-  };
-
-  const handleUpdateStatus = async () => {
-    if (!confirmLeaveAction?.request) return;
-
-    const { request, status } = confirmLeaveAction;
-    try {
-      setLeaveActionLoadingId(request.id);
-      await staffService.updateLeaveRequestStatus(request.id, status);
-      setConfirmLeaveAction(null);
-      setLeaveActionSuccess(status === 'approved' ? 'Đã duyệt đơn nghỉ phép' : 'Đã từ chối đơn nghỉ phép');
-      await loadLeaveRequests();
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Không thể cập nhật trạng thái yêu cầu nghỉ phép.');
-    } finally {
-      setLeaveActionLoadingId(null);
-    }
-  };
-
   if (loading) {
     return <div className="loading">Đang tải dữ liệu nhân viên...</div>;
   }
@@ -299,7 +261,7 @@ function StaffLeaveManagement() {
           className={`btn-tab ${activeTab === 'requests' ? 'active' : ''}`}
           onClick={() => setActiveTab('requests')}
         >
-          Yêu cầu xin nghỉ phép
+          Lịch nghỉ đã ghi nhận
         </button>
       </div>
 
@@ -451,11 +413,11 @@ function StaffLeaveManagement() {
 
         {activeTab === 'requests' && (
           <div className="staff-leave-requests-section">
-            <h2>Danh sách đơn xin nghỉ phép</h2>
+            <h2>Danh sách lịch nghỉ đã ghi nhận</h2>
             {loadingRequests ? (
               <div className="loading">Đang tải danh sách...</div>
             ) : leaveRequests.length === 0 ? (
-              <p>Chưa có yêu cầu nghỉ phép nào.</p>
+              <p>Chưa có lịch nghỉ nào.</p>
             ) : (
               <table className="staff-leave-table">
                 <thead>
@@ -465,8 +427,7 @@ function StaffLeaveManagement() {
                     <th>Đến ngày</th>
                     <th>Lý do</th>
                     <th>Ngày gửi</th>
-                    <th>Trạng thái</th>
-                    <th>Hành động</th>
+                    <th>Hiệu lực</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -478,31 +439,9 @@ function StaffLeaveManagement() {
                       <td>{req.reason}</td>
                       <td>{new Date(req.created_at).toLocaleDateString('vi-VN')}</td>
                       <td>
-                        <span className={`status-badge ${req.status}`}>
-                          {req.status === 'pending' ? 'Chờ duyệt' : req.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}
+                        <span className={`status-badge ${req.status === 'rejected' ? 'rejected' : 'approved'}`}>
+                          {req.status === 'rejected' ? 'Đã hủy' : 'Đã ghi nhận'}
                         </span>
-                      </td>
-                      <td>
-                        {req.status === 'pending' && (
-                          <div className="action-buttons">
-                            <button
-                              type="button"
-                              className="btn-success btn-small"
-                              disabled={leaveActionLoadingId === req.id}
-                              onClick={() => openLeaveActionConfirm(req, 'approved')}
-                            >
-                              Duyệt
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-danger btn-small"
-                              disabled={leaveActionLoadingId === req.id}
-                              onClick={() => openLeaveActionConfirm(req, 'rejected')}
-                            >
-                              Từ chối
-                            </button>
-                          </div>
-                        )}
                       </td>
                     </tr>
                   ))}
@@ -513,70 +452,6 @@ function StaffLeaveManagement() {
         )}
       </div>
 
-      {confirmLeaveAction && (
-        <div className="leave-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="leave-confirm-title">
-          <div className="leave-confirm-modal">
-            <div className="leave-confirm-head">
-              <span className={`leave-confirm-mark ${confirmLeaveAction.status}`} aria-hidden="true" />
-              <div>
-                <p>{confirmLeaveAction.status === 'approved' ? 'Xác nhận duyệt' : 'Xác nhận từ chối'}</p>
-                <h2 id="leave-confirm-title">
-                  {confirmLeaveAction.status === 'approved'
-                    ? 'Bạn muốn duyệt đơn nghỉ phép này?'
-                    : 'Bạn muốn từ chối đơn nghỉ phép này?'}
-                </h2>
-              </div>
-            </div>
-
-            <div className="leave-confirm-details">
-              <div>
-                <span>Nhân viên</span>
-                <strong>{confirmLeaveAction.request.staff_name || '-'}</strong>
-              </div>
-              <div>
-                <span>Khoảng nghỉ</span>
-                <strong>
-                  {new Date(confirmLeaveAction.request.start_date).toLocaleDateString('vi-VN')} - {new Date(confirmLeaveAction.request.end_date).toLocaleDateString('vi-VN')}
-                </strong>
-              </div>
-              <div className="leave-confirm-reason">
-                <span>Lý do</span>
-                <strong>{confirmLeaveAction.request.reason || '-'}</strong>
-              </div>
-            </div>
-
-            <div className="leave-confirm-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={Boolean(leaveActionLoadingId)}
-                onClick={closeLeaveActionConfirm}
-              >
-                Không
-              </button>
-              <button
-                type="button"
-                className={`leave-confirm-primary ${confirmLeaveAction.status}`}
-                disabled={Boolean(leaveActionLoadingId)}
-                onClick={handleUpdateStatus}
-              >
-                {leaveActionLoadingId
-                  ? 'Đang xử lý...'
-                  : confirmLeaveAction.status === 'approved'
-                    ? 'Có, duyệt'
-                    : 'Có, từ chối'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {leaveActionSuccess && (
-        <div className="leave-success-toast" role="status" aria-live="polite">
-          <span className="leave-success-check" aria-hidden="true" />
-          <strong>{leaveActionSuccess}</strong>
-        </div>
-      )}
     </div>
   );
 }

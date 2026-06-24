@@ -10,9 +10,7 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   phone VARCHAR(20),
   date_of_birth DATE NULL,
-  role ENUM('customer', 'admin', 'staff') DEFAULT 'customer',
-  staff_role_id INT NULL,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  role ENUM('user', 'admin', 'staff') DEFAULT 'user',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

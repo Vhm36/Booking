@@ -37,6 +37,7 @@ Cột quan trọng:
 - `rfm_updated_at`
 - `date_of_birth`
 - `cancellation_count`
+- `cancellation_rate` (`0` - `100`, phần trăm lịch hủy của user)
 - `noshow_count`
 - `created_at`
 
@@ -171,7 +172,7 @@ Cột quan trọng:
 Gan voucher cho tung khach, dong thoi luu trang thai su dung va metadata goi y.
 
 - `voucher_id`
-- `customer_id`
+- `user_id`
 - `max_usage_customer`
 - `usage_count`
 - `last_used_date`
@@ -248,5 +249,5 @@ chat_conversations 1-n chat_messages
 - `idx_appointments_reminder`
 - `idx_appointments_cancellation_risk`
 - `idx_vouchers_code`
-- `idx_voucher_assignments_customer`
+- `idx_voucher_assignments_user`
 - `idx_chat_messages_conversation`

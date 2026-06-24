@@ -100,6 +100,8 @@ function PaymentInvoice() {
     );
   }
 
+  const isDepositPayment = Number(payment.deposit_required) === 1 && Number(payment.deposit_amount || 0) > 0;
+
   return (
     <div className="payment-invoice-page">
       <section className="invoice-toolbar no-print">
@@ -184,20 +186,32 @@ function PaymentInvoice() {
             </div>
             <div className="invoice-row">
               <span>Giá dịch vụ</span>
-              <strong>{formatMoney(payment.service_price || payment.amount)}</strong>
+              <strong>{formatMoney(payment.total_amount || payment.service_price || payment.amount)}</strong>
             </div>
             <div className="invoice-row">
-              <span>Thành tiền</span>
+              <span>{isDepositPayment ? 'Tiền cọc đã thu' : 'Thành tiền'}</span>
               <strong>{formatMoney(payment.amount)}</strong>
             </div>
+            {isDepositPayment && (
+              <div className="invoice-row">
+                <span>Còn lại sau cọc</span>
+                <strong>{formatMoney(payment.remaining_amount)}</strong>
+              </div>
+            )}
           </div>
         </article>
 
         <section className="invoice-total-card">
           <div className="invoice-total-line">
-            <span>Tổng thanh toán</span>
+            <span>{isDepositPayment ? 'Tổng cọc đã thanh toán' : 'Tổng thanh toán'}</span>
             <strong>{formatMoney(payment.amount)}</strong>
           </div>
+          {isDepositPayment && (
+            <div className="invoice-total-line compact">
+              <span>Còn lại khi dùng dịch vụ</span>
+              <strong>{formatMoney(payment.remaining_amount)}</strong>
+            </div>
+          )}
           <div className="invoice-total-line compact">
             <span>Trạng thái</span>
             <strong>{statusLabel}</strong>

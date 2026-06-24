@@ -234,6 +234,8 @@ function PaymentTransfer() {
     );
   }
 
+  const isDepositPayment = Number(payment.deposit_required) === 1 && Number(payment.deposit_amount || 0) > 0;
+
   return (
     <div className="payment-transfer-page">
       <section className="payment-transfer-card">
@@ -274,7 +276,7 @@ function PaymentTransfer() {
             )}
 
             <div className="transfer-amount-box">
-              <span>Số tiền cần chuyển</span>
+              <span>{isDepositPayment ? 'Số tiền cọc cần chuyển' : 'Số tiền cần chuyển'}</span>
               <strong>{formatMoney(payment.amount)}</strong>
             </div>
 
@@ -347,6 +349,18 @@ function PaymentTransfer() {
                 <span>Trạng thái</span>
                 <strong>{formatTransferStatus(payment.payment_status, isExpiredTransfer)}</strong>
               </div>
+              {isDepositPayment && (
+                <>
+                  <div className="payment-line">
+                    <span>Tổng dịch vụ</span>
+                    <strong>{formatMoney(payment.total_amount || payment.service_price)}</strong>
+                  </div>
+                  <div className="payment-line">
+                    <span>Còn lại sau cọc</span>
+                    <strong>{formatMoney(payment.remaining_amount)}</strong>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="transfer-support-note">

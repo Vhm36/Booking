@@ -1,6 +1,9 @@
 const db = require('../../config/db');
+const path = require('path');
+const { runPythonJson } = require('../../utils/pythonRunner');
 
 const MIN_RECOMMENDED_CUSTOMERS = 100;
+const PYTHON_ANALYTICS_SCRIPT = path.join(__dirname, '../../../ml/customer_analytics.py');
 
 const CLUSTER_DEFINITIONS = [
   {
@@ -634,43 +637,31 @@ const buildDecAssignmentData = async ({ period_type = null, periodType = null, y
     getServicePrices()
   ]);
 
-  const serviceUsageMap = buildServiceUsageMap(serviceUsageRows);
-  const allCustomers = customerRows.map((row) => normalizeCustomer(row, serviceUsageMap));
-  const hasPeriodFilter = period.type !== 'all';
-  const customers = hasPeriodFilter
-    ? allCustomers.filter((customer) => customer.total_bookings > 0)
-    : allCustomers;
-  const amountValues = customers
-    .map((customer) => customer.avg_completed_amount)
-    .filter((value) => value > 0);
-  const priceBasis = servicePrices.length > 0 ? servicePrices : amountValues;
-  const premiumThreshold = quantile(priceBasis, 0.75) || quantile(amountValues, 0.75) || 0;
-  const budgetThreshold = quantile(priceBasis, 0.4) || quantile(amountValues, 0.4) || 0;
-  const thresholds = {
-    premium: Math.round(premiumThreshold),
-    budget: Math.round(budgetThreshold)
-  };
-
-  const clustersByKey = new Map(CLUSTER_DEFINITIONS.map((definition) => [definition.key, []]));
-  const unassigned = [];
-
-  customers.forEach((customer) => {
-    const clusterKey = getClusterKey(customer, thresholds);
-    if (!clusterKey || !clustersByKey.has(clusterKey)) {
-      unassigned.push(customer);
-      return;
-    }
-
-    clustersByKey.get(clusterKey).push({ ...customer, cluster_key: clusterKey });
+  const analysis = await runPythonJson(PYTHON_ANALYTICS_SCRIPT, 'dec', {
+    customer_rows: customerRows,
+    service_usage_rows: serviceUsageRows,
+    service_prices: servicePrices,
+    has_period_filter: period.type !== 'all',
+    today: new Date().toISOString().slice(0, 10)
   });
+
+  const clustersByKey = new Map(
+    CLUSTER_DEFINITIONS.map((definition) => [
+      definition.key,
+      analysis.clusters_by_key?.[definition.key] || []
+    ])
+  );
+  const customers = analysis.customers || [];
+  const unassigned = analysis.unassigned || [];
 
   return {
     period,
     customers,
-    thresholds,
+    thresholds: analysis.thresholds || { premium: 0, budget: 0 },
     clustersByKey,
     unassigned,
-    clusteredCount: customers.length - unassigned.length
+    clusteredCount: analysis.clustered_count || 0,
+    method: analysis.method || 'python_dec'
   };
 };
 
@@ -690,7 +681,8 @@ const getDecClusteringReport = async ({
     thresholds,
     clustersByKey,
     unassigned,
-    clusteredCount
+    clusteredCount,
+    method
   } = await buildDecAssignmentData({ period_type, periodType, year, month, date, day, week });
 
   const clusters = CLUSTER_DEFINITIONS.map((definition) => {
@@ -730,6 +722,7 @@ const getDecClusteringReport = async ({
       name: 'Dynamic Engagement Clustering',
       description:
         'Phân cụm hành vi động dựa trên tần suất đặt lịch, tỷ lệ hoàn thành, hủy/không đến, giá trị dịch vụ và nhịp đặt theo tháng.',
+      runtime: method,
       min_recommended_customers: MIN_RECOMMENDED_CUSTOMERS,
       cluster_count: CLUSTER_DEFINITIONS.length,
       thresholds

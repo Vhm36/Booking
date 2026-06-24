@@ -396,7 +396,11 @@ exports.chatWithBot = async (req, res) => {
           sentiment = aiResult.sentiment || 'neutral';
         }
       } catch (aiErr) {
-        console.error('[GEMINI_CHAT_ERROR]', aiErr);
+        if (aiErr.isQuotaExceeded || aiErr.status === 429) {
+          console.error('[GEMINI_QUOTA_EXCEEDED] Gemini quota/rate limit reached. Falling back to local chat rules.');
+        } else {
+          console.error('[GEMINI_CHAT_ERROR]', aiErr);
+        }
       }
     }
 

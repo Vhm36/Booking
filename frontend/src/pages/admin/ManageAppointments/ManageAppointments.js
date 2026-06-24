@@ -17,12 +17,47 @@ const formatRating = (rating) => {
 const hasCancellationRequest = (appointment) =>
   Number(appointment?.cancellation_requested) === 1 && appointment?.status !== 'cancelled';
 
+const getDepositRequiredAmount = (appointment) => Number(appointment?.deposit_amount || 0);
+
+const getDepositPaidAmount = (appointment) => {
+  const required = getDepositRequiredAmount(appointment);
+  const explicitPaid = Number(appointment?.deposit_paid_amount || 0);
+
+  if (explicitPaid > 0) {
+    return Math.min(required, explicitPaid);
+  }
+
+  if (appointment?.payment_status === 'paid') {
+    return Math.min(required, Number(appointment?.payment_amount || 0));
+  }
+
+  return 0;
+};
+
+const getRemainingAmount = (appointment) => {
+  if (typeof appointment?.remaining_amount !== 'undefined' && appointment?.remaining_amount !== null) {
+    return Number(appointment.remaining_amount || 0);
+  }
+
+  return Math.max(Number(appointment?.total_amount || 0) - getDepositPaidAmount(appointment), 0);
+};
+
+const isAwaitingDeposit = (appointment) =>
+  appointment?.status !== 'cancelled' &&
+  Number(appointment?.deposit_required) === 1 &&
+  getDepositRequiredAmount(appointment) > 0 &&
+  getDepositPaidAmount(appointment) < getDepositRequiredAmount(appointment);
+
 const isAwaitingStaffConfirmation = (appointment) =>
-  appointment?.status === 'pending' && !hasCancellationRequest(appointment);
+  appointment?.status === 'pending' && !hasCancellationRequest(appointment) && !isAwaitingDeposit(appointment);
 
 const getDisplayStatus = (appointment) => {
   if (hasCancellationRequest(appointment)) {
     return 'Chờ xác nhận hủy';
+  }
+
+  if (isAwaitingDeposit(appointment)) {
+    return 'Chờ đặt cọc VietQR';
   }
 
   const statusMap = {
@@ -51,6 +86,10 @@ const getStatusToneClass = (appointment) => {
     return 'status-pill-warning';
   }
 
+  if (isAwaitingDeposit(appointment)) {
+    return 'status-pill-warning';
+  }
+
   if (appointment?.status === 'completed') {
     return 'status-pill-success';
   }
@@ -67,6 +106,19 @@ const getStatusToneClass = (appointment) => {
 };
 
 const getPaymentLabel = (appointment) => {
+  if (isAwaitingDeposit(appointment)) {
+    return appointment?.payment_status === 'pending' ? 'Chờ cọc VietQR' : 'Chưa đặt cọc';
+  }
+
+  if (
+    Number(appointment?.deposit_required) === 1 &&
+    getDepositRequiredAmount(appointment) > 0 &&
+    getDepositPaidAmount(appointment) >= getDepositRequiredAmount(appointment) &&
+    getRemainingAmount(appointment) > 0
+  ) {
+    return 'Đã cọc VietQR';
+  }
+
   if (appointment?.payment_status === 'paid') {
     return 'Đã thanh toán';
   }
@@ -194,17 +246,23 @@ function ManageAppointments() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  const stats = useMemo(
-    () => serverStats || ({
+  const stats = useMemo(() => {
+    const fallbackStats = {
       total: appointments.length,
+      depositPending: appointments.filter((item) => isAwaitingDeposit(item)).length,
       pending: appointments.filter((item) => isAwaitingStaffConfirmation(item)).length,
       confirmed: appointments.filter((item) => item.status === 'confirmed' && !hasCancellationRequest(item)).length,
       cancellationRequested: appointments.filter((item) => hasCancellationRequest(item)).length,
       completed: appointments.filter((item) => item.status === 'completed').length,
       cancelled: appointments.filter((item) => item.status === 'cancelled').length
-    }),
-    [appointments, serverStats]
-  );
+    };
+    const sourceStats = serverStats || fallbackStats;
+
+    return {
+      ...sourceStats,
+      depositPending: Number(sourceStats.depositPending ?? sourceStats.deposit_pending ?? fallbackStats.depositPending)
+    };
+  }, [appointments, serverStats]);
 
   const pageTitle = isStaffView
     ? isCashierView
@@ -221,6 +279,7 @@ function ManageAppointments() {
   const statCards = useMemo(
     () => [
       { key: 'total', label: 'Tổng lịch', value: stats.total, tone: 'total' },
+      { key: 'depositPending', label: 'Chờ cọc', value: stats.depositPending, tone: 'warning' },
       { key: 'pending', label: 'Chờ xác nhận', value: stats.pending, tone: 'pending' },
       { key: 'confirmed', label: 'Đã nhận làm', value: stats.confirmed, tone: 'confirmed' },
       { key: 'cancellationRequested', label: 'Yêu cầu hủy', value: stats.cancellationRequested, tone: 'warning' },
@@ -233,6 +292,7 @@ function ManageAppointments() {
   const filterOptions = useMemo(
     () => [
       { key: 'all', label: 'Tất cả', count: stats.total },
+      { key: 'deposit_pending', label: 'Chờ cọc', count: stats.depositPending },
       { key: 'pending', label: 'Chờ xác nhận', count: stats.pending },
       { key: 'confirmed', label: 'Đã nhận làm', count: stats.confirmed },
       { key: 'cancellation_requested', label: 'Yêu cầu hủy', count: stats.cancellationRequested },
@@ -388,6 +448,7 @@ function ManageAppointments() {
     () =>
       appointments.filter((appointment) => {
         if (filter === 'all') return true;
+        if (filter === 'deposit_pending') return isAwaitingDeposit(appointment);
         if (filter === 'cancellation_requested') return hasCancellationRequest(appointment);
         if (filter === 'pending') return isAwaitingStaffConfirmation(appointment);
         if (filter === 'confirmed') {
@@ -474,6 +535,9 @@ function ManageAppointments() {
                     { key: 'appointment_time', header: 'Giờ hẹn', width: 10 },
                     { key: 'status', header: 'Trạng thái', width: 16, transform: (v, row) => getDisplayStatus(row) },
                     { key: 'total_amount', header: 'Tổng tiền (VNĐ)', width: 18, transform: (v) => Number(v || 0) },
+                    { key: 'deposit_amount', header: 'Cọc yêu cầu (VNĐ)', width: 18, transform: (v) => Number(v || 0) },
+                    { key: 'deposit_paid_amount', header: 'Đã cọc (VNĐ)', width: 16, transform: (v, row) => getDepositPaidAmount(row) },
+                    { key: 'remaining_amount', header: 'Còn thu (VNĐ)', width: 16, transform: (v, row) => getRemainingAmount(row) },
                     { key: 'payment_method', header: 'Phương thức TT', width: 16, transform: (v) => formatPaymentMethodLabel(v) },
                     { key: 'payment_status', header: 'TT thanh toán', width: 16, transform: (v, row) => getPaymentLabel(row) },
                     { key: 'staff_rating', header: 'Đánh giá NV', width: 12, transform: (v) => { const n = Number(v); return n >= 1 && n <= 5 ? `${n}/5` : ''; } },
@@ -529,12 +593,15 @@ function ManageAppointments() {
 
               {filteredAppointments.map((appointment) => {
                 const requestPending = hasCancellationRequest(appointment);
+                const awaitingDeposit = isAwaitingDeposit(appointment);
                 const awaitingStaffConfirmation = isAwaitingStaffConfirmation(appointment);
                 const rowClass = requestPending
                   ? 'has-cancellation-request'
-                  : awaitingStaffConfirmation
-                    ? 'has-pending-confirmation'
-                    : '';
+                  : awaitingDeposit
+                    ? 'has-deposit-pending'
+                    : awaitingStaffConfirmation
+                      ? 'has-pending-confirmation'
+                      : '';
                 const serviceNames = parseServiceNames(appointment.service_name);
                 const serviceCount = Number(appointment.service_count) || serviceNames.length;
                 const serviceCountLabel =
@@ -595,6 +662,9 @@ function ManageAppointments() {
                         {requestPending && (
                           <small className="status-note">Khách đang chờ nhân viên xác nhận hủy.</small>
                         )}
+                        {awaitingDeposit && (
+                          <small className="status-note">Khung giờ chỉ khóa sau khi xác nhận cọc.</small>
+                        )}
                       </div>
                     </td>
                     <td>
@@ -602,6 +672,11 @@ function ManageAppointments() {
                         <strong>{formatPaymentMethodLabel(appointment.payment_method)}</strong>
                         <small>{getPaymentLabel(appointment)}</small>
                         <small>{appointment.payment_reference || 'Chưa có mã đối soát'}</small>
+                        {Number(appointment.deposit_required) === 1 && getDepositRequiredAmount(appointment) > 0 && (
+                          <small className="deposit-note">
+                            Đã cọc {formatVnd(getDepositPaidAmount(appointment))} / {formatVnd(getDepositRequiredAmount(appointment))}; còn thu {formatVnd(getRemainingAmount(appointment))}
+                          </small>
+                        )}
                       </div>
                     </td>
                     <td>

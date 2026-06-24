@@ -74,7 +74,7 @@
 
 .search-form {
   display: grid;
-  grid-template-columns: 1.4fr 0.75fr auto;
+  grid-template-columns: 1fr auto;
   gap: 8px;
 }
 

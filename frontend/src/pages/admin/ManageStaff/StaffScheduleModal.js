@@ -126,7 +126,7 @@ function StaffScheduleModal({
             <p className="staff-schedule-kicker">Lịch làm việc hằng tuần</p>
             <h3 id="staff-schedule-title">{staff?.name || 'Nhân viên'}</h3>
             <p className="staff-schedule-description">
-              Chọn ca sáng, ca tối hoặc full ca cho đủ 7 ngày. Nghỉ phép được xử lý bằng yêu cầu xin nghỉ đã duyệt.
+              Chọn ca sáng, ca tối hoặc full ca cho đủ 7 ngày. Nghỉ phép có hiệu lực ngay khi nhân viên đăng ký.
             </p>
           </div>
           <button

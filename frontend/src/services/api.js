@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { clearAuthSession, getAuthToken } from '../utils/authStorage';
 
-export const DEFAULT_API_ORIGIN = 'https://bookingsalon.up.railway.app';
-const configuredApiUrl = (process.env.REACT_APP_API_URL || DEFAULT_API_ORIGIN).replace(/\/+$/, '');
+const normalizeApiUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
+const configuredApiUrl = normalizeApiUrl(process.env.REACT_APP_API_URL);
 
 export const API_ORIGIN = configuredApiUrl.replace(/\/api\/?$/, '');
-export const API_BASE_URL = `${API_ORIGIN}/api`;
+export const API_BASE_URL = API_ORIGIN ? `${API_ORIGIN}/api` : '/api';
 export const AUTH_EXPIRED_EVENT = 'auth:expired';
 
 const PUBLIC_AUTH_PATHS = [

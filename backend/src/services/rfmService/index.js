@@ -1,8 +1,12 @@
 const db = require('../../config/db');
+const path = require('path');
+const { runPythonJson, runPythonJsonSync } = require('../../utils/pythonRunner');
+
+const PYTHON_ANALYTICS_SCRIPT = path.join(__dirname, '../../../ml/customer_analytics.py');
 
 /**
  * RFM Service — Phân hạng khách hàng tự động
- * Port từ Python (ml-analysis/rfm_analysis.py) sang Node.js
+ * Node lấy dữ liệu DB, thuật toán RFM chạy bằng Python.
  */
 
 const query = (sql, params = []) =>
@@ -48,66 +52,27 @@ const calculateRFM = async () => {
  * Gán điểm R, F, M dựa trên quartile phân bổ
  */
 const scoreRFM = (customers) => {
-  if (customers.length === 0) return [];
-
-  const sortedByR = [...customers].sort((a, b) => a.recency - b.recency);
-  const sortedByF = [...customers].sort((a, b) => b.frequency - a.frequency);
-  const sortedByM = [...customers].sort((a, b) => b.monetary - a.monetary);
-
-  const assignScore = (sortedArr, key) => {
-    const n = sortedArr.length;
-    sortedArr.forEach((item, idx) => {
-      const percentile = idx / n;
-      if (percentile < 0.25) item[key] = 4;
-      else if (percentile < 0.5) item[key] = 3;
-      else if (percentile < 0.75) item[key] = 2;
-      else item[key] = 1;
-    });
-  };
-
-  assignScore(sortedByR, 'r_score');
-  assignScore(sortedByF, 'f_score');
-  assignScore(sortedByM, 'm_score');
-
-  const scoreMap = new Map();
-  sortedByR.forEach((c) => scoreMap.set(c.customer_id, { r_score: c.r_score }));
-  sortedByF.forEach((c) => {
-    const existing = scoreMap.get(c.customer_id) || {};
-    scoreMap.set(c.customer_id, { ...existing, f_score: c.f_score });
-  });
-  sortedByM.forEach((c) => {
-    const existing = scoreMap.get(c.customer_id) || {};
-    scoreMap.set(c.customer_id, { ...existing, m_score: c.m_score });
-  });
-
-  return customers.map((c) => {
-    const scores = scoreMap.get(c.customer_id) || { r_score: 1, f_score: 1, m_score: 1 };
-    return {
-      ...c,
-      ...scores,
-      rfm_score: `${scores.r_score}${scores.f_score}${scores.m_score}`
-    };
-  });
+  const analysis = runPythonJsonSync(PYTHON_ANALYTICS_SCRIPT, 'rfm', { customers });
+  return analysis.details || [];
 };
 
 /**
  * Phân khúc khách hàng dựa trên điểm RFM
  */
 const segmentCustomer = (r, f, m) => {
-  if (r >= 4 && f >= 4 && m >= 4) return 'Champions';
-  if (f >= 4 && m >= 4) return 'Loyal Customers';
-  if ((f >= 3 || m >= 3) && r >= 2) return 'Potential Loyalists';
-  if (m >= 3 && r <= 2) return 'At Risk';
-  if (r <= 2 && f <= 2) return 'Lost Customers';
-  if (f <= 2) return 'New Customers';
-  return 'Need Attention';
+  const result = runPythonJsonSync(PYTHON_ANALYTICS_SCRIPT, 'rfm_segment', {
+    r_score: r,
+    f_score: f,
+    m_score: m
+  });
+  return result.segment;
 };
 
 /**
  * Chạy phân tích RFM đầy đủ và cập nhật DB
  */
 const runFullAnalysis = async () => {
-  console.log('[RFM] Starting full RFM analysis...');
+  console.log('[RFM] Starting full Python RFM analysis...');
 
   const customers = await calculateRFM();
   if (customers.length === 0) {
@@ -115,12 +80,8 @@ const runFullAnalysis = async () => {
     return { total: 0, segments: {} };
   }
 
-  const scored = scoreRFM(customers);
-
-  const results = scored.map((c) => ({
-    ...c,
-    segment: segmentCustomer(c.r_score, c.f_score, c.m_score)
-  }));
+  const analysis = await runPythonJson(PYTHON_ANALYTICS_SCRIPT, 'rfm', { customers });
+  const results = analysis.details || [];
 
   // Update DB in batch
   const updatePromises = results.map((c) =>
@@ -131,18 +92,19 @@ const runFullAnalysis = async () => {
   );
   await Promise.all(updatePromises);
 
-  // Summarize
-  const segments = {};
-  results.forEach((c) => {
-    segments[c.segment] = (segments[c.segment] || 0) + 1;
-  });
+  const segments = analysis.segments || {};
 
   console.log(`[RFM] ✅ Analyzed ${results.length} customers`);
   Object.entries(segments).forEach(([seg, count]) => {
     console.log(`[RFM]   ${seg}: ${count}`);
   });
 
-  return { total: results.length, segments, details: results };
+  return {
+    total: results.length,
+    segments,
+    details: results,
+    method: analysis.method || 'python_rfm'
+  };
 };
 
 /**

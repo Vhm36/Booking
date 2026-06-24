@@ -271,7 +271,7 @@ const normalizeWeeklyAvailabilitySlots = (slots) => {
   }
 
   if (slots.length !== 7) {
-    return { error: 'Lịch tuần cần đủ 7 ngày từ Thứ 2 đến Chủ nhật. Ngày nghỉ xử lý bằng yêu cầu xin nghỉ phép.' };
+    return { error: 'Lịch tuần cần đủ 7 ngày từ Thứ 2 đến Chủ nhật. Ngày nghỉ xử lý bằng đăng ký nghỉ riêng.' };
   }
 
   const daysSeen = new Set();
@@ -582,7 +582,11 @@ exports.requestLeave = (req, res) => {
     if (err) {
       return res.status(500).json({ message: 'Lỗi server', error: err });
     }
-    return res.status(201).json({ success: true, message: 'Gửi yêu cầu nghỉ phép thành công', data: { id: result.insertId } });
+    return res.status(201).json({
+      success: true,
+      message: 'Đã ghi nhận lịch nghỉ. Nhân viên sẽ không được xếp lịch trong khoảng ngày này.',
+      data: { id: result.insertId, status: 'approved' }
+    });
   });
 };
 
@@ -606,17 +610,8 @@ exports.getAllLeaveRequests = (req, res) => {
 };
 
 exports.updateLeaveRequestStatus = (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
-  if (!['approved', 'rejected'].includes(status)) {
-    return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
-  }
-
-  staffModel.updateLeaveRequestStatus(id, status, (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: 'Lỗi server', error: err });
-    }
-    return res.status(200).json({ success: true, message: 'Cập nhật trạng thái thành công' });
+  return res.status(410).json({
+    success: false,
+    message: 'Lịch nghỉ có hiệu lực ngay sau khi nhân viên đăng ký, không cần quản lý duyệt hoặc từ chối.'
   });
 };

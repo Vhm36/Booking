@@ -4,6 +4,7 @@ const path = require('path');
 const { rateLimit } = require('express-rate-limit');
 const bodyParser = require('body-parser');
 require('./config/loadEnv');
+const { expressCorsOptions } = require('./config/cors');
 
 const db = require('./config/db');
 db.ready.then(() => {
@@ -79,7 +80,6 @@ db.ready.then(() => {
 });
 
 const authRoutes = require('./routes/authRoutes');
-const serviceRoutes = require('./routes/serviceRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
@@ -88,6 +88,7 @@ const customerRoutes = require('./routes/customerRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
 
 // Cron Jobs
 const { startReminderJob } = require('./jobs/appointmentReminderJob');
@@ -101,41 +102,7 @@ const clusteringService = require('./services/clusteringService');
 const app = express();
 app.set('trust proxy', 1);
 
-const defaultAllowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost',
-  'http://127.0.0.1'
-];
-
-const envAllowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
-const isLocalDevelopmentOrigin = (origin) =>
-  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (
-      !origin ||
-      allowedOrigins.includes(origin) ||
-      (process.env.NODE_ENV !== 'production' && isLocalDevelopmentOrigin(origin))
-    ) {
-      return callback(null, true);
-    }
-
-    return callback(new Error(`CORS blocked origin: ${origin}`));
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-
-app.use(cors(corsOptions));
+app.use(cors(expressCorsOptions));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -183,7 +150,6 @@ app.use(generalLimiter);
 
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
-app.use('/api/services', serviceRoutes);
 app.use('/api/bookings', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/staff', staffRoutes);
@@ -192,6 +158,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/admin-users', adminUserRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
+app.use('/api/services', serviceRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'API đang hoạt động', status: 'ok' });
@@ -203,7 +170,8 @@ const { verifyToken, verifyAdmin } = require('./middleware/authMiddleware');
 // Cancellation Score — Check before booking
 app.post('/api/cancellation-score', verifyToken, async (req, res) => {
   try {
-    const { appointmentDate, appointmentTime } = req.body;
+    const appointmentDate = req.body.appointmentDate || req.body.appointment_date;
+    const appointmentTime = req.body.appointmentTime || req.body.appointment_time;
     const result = await cancellationScoreService.calculateScore(
       req.user.id,
       appointmentDate,

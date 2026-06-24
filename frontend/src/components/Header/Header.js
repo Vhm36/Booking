@@ -259,15 +259,6 @@ function Header({ user, onLogout, presenceStatus = 'offline' }) {
                       <small>{getRoleLabel()}</small>
                     </div>
                   </Link>
-                  <a
-                    href="/login?session=new"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-new-session"
-                    onClick={closeMenus}
-                  >
-                    Tài khoản khác
-                  </a>
                   <button type="button" onClick={() => setIsLogoutConfirmOpen(true)} className="btn-logout">
                     Đăng xuất
                   </button>

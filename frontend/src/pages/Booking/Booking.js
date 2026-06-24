@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import authService from '../../services/authService';
 import bookingService from '../../services/bookingService';
@@ -13,8 +13,10 @@ import './Booking.css';
 const WEEKDAY_QUICK_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
 const WEEKEND_QUICK_SLOTS = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'];
 const visiblePaymentMethodSet = new Set(['cash', 'banking', 'vietqr', 'vnpay']);
-const manualPaymentMethodSet = new Set(['cash', 'banking']);
 const onlinePaymentMethodSet = new Set(['vietqr', 'vnpay']);
+const BOOKING_SERVICE_PAGE_SIZE = 5;
+const MIN_DEPOSIT_PERCENT = 20;
+const MAX_DEPOSIT_PERCENT = 50;
 
 const toShortTimeString = (value) => {
   const raw = String(value || '').trim();
@@ -234,12 +236,23 @@ const formatPaymentMethodLabel = (paymentMethod) => {
 function Booking() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
+  const categoryTabsRef = useRef(null);
+  const subcategoryTabsRef = useRef(null);
+  const tabDragStateRef = useRef({
+    element: null,
+    pointerId: null,
+    startX: 0,
+    scrollLeft: 0,
+    didDrag: false,
+    justDragged: false
+  });
 
   const [allServices, setAllServices] = useState([]);
   const [serviceCategoriesFromDb, setServiceCategoriesFromDb] = useState([]);
   const [selectedServices, setSelectedServices] = useState([]);
   const [activeCategoryKey, setActiveCategoryKey] = useState('');
   const [activeSubcategoryByCategory, setActiveSubcategoryByCategory] = useState({});
+  const [servicePage, setServicePage] = useState(1);
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -255,7 +268,7 @@ function Booking() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState('vietqr');
   const [paymentOptions, setPaymentOptions] = useState([]);
   const [myVouchers, setMyVouchers] = useState([]);
   const [selectedVoucherCode, setSelectedVoucherCode] = useState('');
@@ -698,13 +711,15 @@ function Booking() {
 
   const voucherDiscount = Number(voucherPreview?.discountAmount || 0);
   const finalTotalPrice = Math.max(totalPrice - voucherDiscount, 0);
-  const depositRequired = Boolean(cancellationRisk?.requireDeposit) && finalTotalPrice > 0;
+  const depositPercent = Math.min(
+    MAX_DEPOSIT_PERCENT,
+    Math.max(MIN_DEPOSIT_PERCENT, Math.round(Number(cancellationRisk?.depositPercent || MIN_DEPOSIT_PERCENT)))
+  );
+  const depositRequired = finalTotalPrice > 0;
   const estimatedDepositAmount = depositRequired
-    ? Math.min(
-        finalTotalPrice,
-        Math.max(1000, Math.round((finalTotalPrice * Number(cancellationRisk?.depositPercent || 20)) / 100))
-      )
+    ? Math.min(finalTotalPrice, Math.round((finalTotalPrice * depositPercent) / 100))
     : 0;
+  const remainingAfterDeposit = Math.max(finalTotalPrice - estimatedDepositAmount, 0);
 
   const enabledPaymentOptions = useMemo(
     () =>
@@ -715,7 +730,7 @@ function Booking() {
               ...option,
               label: 'VietQR ngân hàng',
               description: option.enabled
-                ? 'Quét mã QR để chuyển khoản đúng số tiền và nội dung thanh toán.'
+                ? 'Quét mã QR để đặt cọc giữ khung giờ hẹn.'
                 : 'Tạm thời chưa khả dụng.'
             };
           }
@@ -723,6 +738,7 @@ function Booking() {
           if (option.method === 'vnpay') {
             return {
               ...option,
+              enabled: depositRequired ? false : option.enabled,
               label: 'VNPay online',
               description: option.enabled
                 ? 'Thanh toán online qua cổng VNPay rồi quay lại trang kết quả tự động.'
@@ -754,15 +770,15 @@ function Booking() {
   );
 
   useEffect(() => {
-    if (!depositRequired || !manualPaymentMethodSet.has(paymentMethod)) {
+    if (!depositRequired || paymentMethod === 'vietqr') {
       return;
     }
 
-    const nextOnlineMethod =
-      enabledPaymentOptions.find((option) => option.enabled && onlinePaymentMethodSet.has(option.method))?.method ||
+    const nextVietQrMethod =
+      enabledPaymentOptions.find((option) => option.enabled && option.method === 'vietqr')?.method ||
       paymentMethod;
 
-    setPaymentMethod(nextOnlineMethod);
+    setPaymentMethod(nextVietQrMethod);
   }, [depositRequired, enabledPaymentOptions, paymentMethod]);
 
   const selectedServiceSummary = useMemo(() => {
@@ -905,6 +921,32 @@ function Booking() {
     );
   }, [activeCategory, activeCategoryServices, activeSubcategoryKey]);
 
+  const servicePageCount = useMemo(
+    () => Math.max(1, Math.ceil(filteredCategoryServices.length / BOOKING_SERVICE_PAGE_SIZE)),
+    [filteredCategoryServices.length]
+  );
+  const safeServicePage = Math.min(servicePage, servicePageCount);
+  const servicePageStartIndex = (safeServicePage - 1) * BOOKING_SERVICE_PAGE_SIZE;
+  const paginatedCategoryServices = useMemo(
+    () => filteredCategoryServices.slice(servicePageStartIndex, servicePageStartIndex + BOOKING_SERVICE_PAGE_SIZE),
+    [filteredCategoryServices, servicePageStartIndex]
+  );
+  const servicePageStartDisplay = filteredCategoryServices.length === 0 ? 0 : servicePageStartIndex + 1;
+  const servicePageEndDisplay = Math.min(
+    filteredCategoryServices.length,
+    servicePageStartIndex + paginatedCategoryServices.length
+  );
+
+  useEffect(() => {
+    setServicePage(1);
+  }, [activeCategoryKey, activeSubcategoryKey]);
+
+  useEffect(() => {
+    if (servicePage > servicePageCount) {
+      setServicePage(servicePageCount);
+    }
+  }, [servicePage, servicePageCount]);
+
   useEffect(() => {
     if (!activeCategory) {
       return;
@@ -937,7 +979,7 @@ function Booking() {
     null;
 
   const isOnlinePayment = onlinePaymentMethodSet.has(paymentMethod);
-  const onlinePaymentLabel = paymentMethod === 'vnpay' ? 'cổng thanh toán online' : 'mã chuyển khoản';
+  const onlinePaymentLabel = paymentMethod === 'vnpay' ? 'cổng thanh toán online' : 'mã cọc VietQR';
   const paymentFallbackLabel = isOnlinePayment ? onlinePaymentLabel : 'phiếu thanh toán';
 
   const toggleServiceSelection = (service) => {
@@ -964,6 +1006,81 @@ function Booking() {
       ...current,
       [activeCategory.key]: subcategoryKey
     }));
+  };
+
+  const beginTabDrag = (event, tabsRef) => {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+
+    const element = tabsRef.current;
+    if (!element || element.scrollWidth <= element.clientWidth) {
+      return;
+    }
+
+    tabDragStateRef.current = {
+      element,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      scrollLeft: element.scrollLeft,
+      didDrag: false,
+      justDragged: false
+    };
+    element.classList.add('is-dragging');
+    element.setPointerCapture?.(event.pointerId);
+  };
+
+  const handleTabDragMove = (event) => {
+    const dragState = tabDragStateRef.current;
+    if (!dragState.element || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.startX;
+    if (Math.abs(deltaX) > 3) {
+      dragState.didDrag = true;
+      event.preventDefault();
+    }
+
+    dragState.element.scrollLeft = dragState.scrollLeft - deltaX;
+  };
+
+  const finishTabDrag = (event) => {
+    const dragState = tabDragStateRef.current;
+    if (!dragState.element || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    dragState.element.classList.remove('is-dragging');
+    if (dragState.element.hasPointerCapture?.(event.pointerId)) {
+      dragState.element.releasePointerCapture(event.pointerId);
+    }
+
+    const didDrag = dragState.didDrag;
+    tabDragStateRef.current = {
+      element: null,
+      pointerId: null,
+      startX: 0,
+      scrollLeft: 0,
+      didDrag: false,
+      justDragged: didDrag
+    };
+
+    if (didDrag) {
+      window.setTimeout(() => {
+        tabDragStateRef.current.justDragged = false;
+      }, 80);
+    }
+  };
+
+  const handleTabClickCapture = (event) => {
+    if (!tabDragStateRef.current.justDragged) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    tabDragStateRef.current.justDragged = false;
   };
 
   const handleQuickSlotClick = (slot) => {
@@ -1022,8 +1139,8 @@ function Booking() {
       return;
     }
 
-    if (depositRequired && !onlinePaymentMethodSet.has(paymentMethod)) {
-      setError('Lịch này cần thanh toán cọc online do AI đánh giá rủi ro hủy cao.');
+    if (depositRequired && paymentMethod !== 'vietqr') {
+      setError('Bạn cần đặt cọc qua VietQR trước khi khóa khung giờ hẹn.');
       return;
     }
 
@@ -1064,7 +1181,7 @@ function Booking() {
         setSuccess(
           paymentMethod === 'vnpay'
             ? `${baseSuccessMsg} Đang mở cổng thanh toán online...`
-            : `${baseSuccessMsg} Đang mở mã chuyển khoản...`
+            : `${baseSuccessMsg} Đang mở mã cọc VietQR...`
         );
         window.location.assign(paymentUrl);
         return;
@@ -1100,19 +1217,28 @@ function Booking() {
     <div className="booking-page">
       <form className="booking-layout" onSubmit={handleSubmit}>
         <section className="booking-panel">
-          <h1>Đặt lịch nhanh</h1>
-          <p className="subtitle">Chọn nhiều dịch vụ, tính tổng thời gian và đặt lịch trong một lần.</p>
+          <div className="booking-panel-heading">
+            <span className="booking-kicker">BeautyBook</span>
+            <h1>Đặt lịch nhanh</h1>
+            <p className="subtitle">Ghép nhiều dịch vụ, chọn giờ phù hợp và xác nhận trong một lượt.</p>
+          </div>
 
           {error && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 
-          <div className="form-group">
-            <label>Chọn dịch vụ</label>
+          <div className="form-group booking-service-group">
+            <div className="booking-section-heading">
+              <label>Chọn dịch vụ</label>
+              <span>{selectedServices.length} dịch vụ đã chọn</span>
+            </div>
             <div className="service-browser">
               <div className="service-browser-head">
                 <div>
                   <strong>{activeCategory?.label || 'Danh mục dịch vụ'}</strong>
-                  <span>Chạm vào từng thẻ để thêm nhanh vào lịch, không cần tích checkbox.</span>
+                  <span>
+                    {filteredCategoryServices.length} dịch vụ
+                    {servicePageCount > 1 ? ` • trang ${safeServicePage}/${servicePageCount}` : ' đang hiển thị'}
+                  </span>
                 </div>
                 <div className="service-browser-counter">
                   <strong>{selectedServices.length}</strong>
@@ -1120,7 +1246,17 @@ function Booking() {
                 </div>
               </div>
 
-              <div className="service-category-tabs" role="tablist" aria-label="Danh mục dịch vụ">
+              <div
+                ref={categoryTabsRef}
+                className="service-category-tabs"
+                role="tablist"
+                aria-label="Danh mục dịch vụ"
+                onPointerDown={(event) => beginTabDrag(event, categoryTabsRef)}
+                onPointerMove={handleTabDragMove}
+                onPointerUp={finishTabDrag}
+                onPointerCancel={finishTabDrag}
+                onClickCapture={handleTabClickCapture}
+              >
                 {serviceCategories.map((category) => (
                   <button
                     key={category.key}
@@ -1138,7 +1274,17 @@ function Booking() {
               {activeCategory ? (
                 <>
                   {availableSubcategories.length > 1 && (
-                    <div className="service-subcategory-tabs" role="tablist" aria-label="Bộ lọc dịch vụ">
+                    <div
+                      ref={subcategoryTabsRef}
+                      className="service-subcategory-tabs"
+                      role="tablist"
+                      aria-label="Bộ lọc dịch vụ"
+                      onPointerDown={(event) => beginTabDrag(event, subcategoryTabsRef)}
+                      onPointerMove={handleTabDragMove}
+                      onPointerUp={finishTabDrag}
+                      onPointerCancel={finishTabDrag}
+                      onClickCapture={handleTabClickCapture}
+                    >
                       {availableSubcategories.map((subcategory) => (
                         <button
                           key={subcategory.key}
@@ -1169,19 +1315,24 @@ function Booking() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredCategoryServices.map((service) => {
+                        {paginatedCategoryServices.map((service) => {
                           const isSelected = selectedServiceIdSet.has(String(service.id));
 
                           return (
                             <tr key={`${activeCategory.key}-${service.id}`} className={isSelected ? 'is-selected' : ''}>
-                              <td>{service.name}</td>
-                              <td>{formatDurationLabel(Number(service.duration) || 0)}</td>
-                              <td>{formatVnd(Number(service.price) || 0)}</td>
-                              <td>
+                              <td data-label="Dịch vụ">
+                                <span className="service-row-name">{service.name}</span>
+                              </td>
+                              <td data-label="Thời lượng">{formatDurationLabel(Number(service.duration) || 0)}</td>
+                              <td data-label="Giá">
+                                <span className="service-row-price">{formatVnd(Number(service.price) || 0)}</span>
+                              </td>
+                              <td className="service-row-action">
                                 <button
                                   type="button"
                                   className={isSelected ? 'service-select-btn selected' : 'service-select-btn'}
                                   onClick={() => toggleServiceSelection(service)}
+                                  aria-pressed={isSelected}
                                 >
                                   <span className="service-select-icon">{isSelected ? '✓' : '+'}</span>
                                   <span>{isSelected ? 'Đã chọn' : 'Thêm'}</span>
@@ -1196,9 +1347,30 @@ function Booking() {
 
                   <div className="service-carousel-footer">
                     <span>
-                      {activeCategory.label} • {filteredCategoryServices.length}/{activeCategoryServices.length} dịch vụ
+                      {activeCategory.label} • {servicePageStartDisplay}-{servicePageEndDisplay}/{filteredCategoryServices.length} dịch vụ
                     </span>
-                    {activeSubcategoryKey !== 'all' && <span>Đang lọc: {getSubcategoryLabel(activeSubcategoryKey)}</span>}
+                    <div className="service-footer-actions">
+                      {activeSubcategoryKey !== 'all' && <span>Đang lọc: {getSubcategoryLabel(activeSubcategoryKey)}</span>}
+                      {servicePageCount > 1 && (
+                        <div className="service-page-controls" role="group" aria-label="Chuyển trang dịch vụ">
+                          <button
+                            type="button"
+                            onClick={() => setServicePage((current) => Math.max(1, current - 1))}
+                            disabled={safeServicePage === 1}
+                          >
+                            Trước
+                          </button>
+                          <strong>{safeServicePage}/{servicePageCount}</strong>
+                          <button
+                            type="button"
+                            onClick={() => setServicePage((current) => Math.min(servicePageCount, current + 1))}
+                            disabled={safeServicePage === servicePageCount}
+                          >
+                            Sau
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               ) : (
@@ -1456,30 +1628,39 @@ function Booking() {
             <strong>{formatVnd(finalTotalPrice)}</strong>
           </div>
 
-          {(loadingCancellationRisk || cancellationRisk) && (
+          {depositRequired && (
+            <>
+              <div className="summary-row deposit">
+                <span>Cọc VietQR bắt buộc ({depositPercent}%)</span>
+                <strong>{formatVnd(estimatedDepositAmount)}</strong>
+              </div>
+              <div className="summary-row remaining">
+                <span>Còn lại khi dùng dịch vụ</span>
+                <strong>{formatVnd(remainingAfterDeposit)}</strong>
+              </div>
+            </>
+          )}
+
+          {depositRequired && (
             <div className={`cancellation-risk-panel risk-${cancellationRisk?.riskLevel || 'loading'}`}>
               <div className="cancellation-risk-head">
-                <strong>AI chong boom lich</strong>
+                <strong>Đặt cọc giữ lịch</strong>
                 <span>
                   {loadingCancellationRisk
                     ? 'Đang tính...'
-                    : `${Number(cancellationRisk?.score || 0)}% - ${cancellationRisk?.riskLevel || 'low'}`}
+                    : `${depositPercent}% dịch vụ`}
                 </span>
               </div>
-              {depositRequired ? (
-                <p>
-                  Lịch này cần cọc {formatVnd(estimatedDepositAmount)} qua thanh toán online để giữ chỗ.
-                </p>
-              ) : (
-                <p>Rủi ro hủy lịch thấp, có thể thanh toán linh hoạt tại salon.</p>
-              )}
+              <p>
+                Cọc {formatVnd(estimatedDepositAmount)} qua VietQR để khóa khung giờ. Khi dùng dịch vụ, hệ thống trừ cọc và còn thu {formatVnd(remainingAfterDeposit)}.
+              </p>
             </div>
           )}
 
           <div className="payment-method-panel">
             <div className="payment-method-head">
               <strong>Thanh toán</strong>
-              <span>Hệ thống sẽ tạo payment record ngay sau khi lịch hẹn được tạo.</span>
+              <span>Khung giờ chỉ được khóa sau khi khoản cọc VietQR được ghi nhận.</span>
             </div>
 
             {enabledPaymentOptions.map((option) => (
@@ -1515,7 +1696,9 @@ function Booking() {
               : isOnlinePayment
                 ? paymentMethod === 'vnpay'
                   ? 'Đặt lịch và thanh toán online'
-                  : `Đặt lịch và mở ${onlinePaymentLabel}`
+                  : depositRequired
+                    ? 'Đặt lịch và mở mã cọc VietQR'
+                    : `Đặt lịch và mở ${onlinePaymentLabel}`
                 : 'Xác nhận đặt lịch'}
           </button>
         </aside>

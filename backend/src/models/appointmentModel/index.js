@@ -1,6 +1,10 @@
 const db = require('../../config/db');
 const { getPaymentSchemaInfo } = require('../../utils/paymentSchema');
 const { getAppointmentServiceSchemaInfo } = require('../../utils/appointmentServiceSchema');
+const {
+  buildAppointmentLocksTimeCondition,
+  buildAwaitingDepositCondition
+} = require('../../utils/appointmentDeposit');
 
 const getAppointmentServiceSummaryJoin = (appointmentAlias = 'a', summaryAlias = 'service_summary') => `
   LEFT JOIN (
@@ -93,7 +97,11 @@ const buildAppointmentSelect = (schemaInfo, appointmentServiceSchemaInfo) => `
     u.phone AS customer_phone,
     ${getAppointmentServiceSelectFragment(appointmentServiceSchemaInfo.hasAppointmentServicesTable)},
     st.name AS staff_name,
-    ${getPaymentSelectFragment(schemaInfo)}
+    ${getPaymentSelectFragment(schemaInfo)},
+    COALESCE(payment_summary.paid_amount, 0) AS paid_amount,
+    LEAST(COALESCE(a.deposit_amount, 0), COALESCE(payment_summary.paid_amount, 0)) AS deposit_paid_amount,
+    GREATEST(COALESCE(a.total_amount, 0) - COALESCE(payment_summary.paid_amount, 0), 0) AS remaining_amount,
+    payment_summary.last_paid_at
   FROM appointments a
   JOIN users u ON a.user_id = u.id
   JOIN services s ON a.service_id = s.id
@@ -104,6 +112,14 @@ const buildAppointmentSelect = (schemaInfo, appointmentServiceSchemaInfo) => `
       FROM payments payment_item
       WHERE payment_item.appointment_id = a.id
     )
+  LEFT JOIN (
+    SELECT
+      appointment_id,
+      COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END), 0) AS paid_amount,
+      MAX(CASE WHEN payment_status = 'paid' THEN paid_at ELSE NULL END) AS last_paid_at
+    FROM payments
+    GROUP BY appointment_id
+  ) payment_summary ON payment_summary.appointment_id = a.id
 `;
 
 const runAppointmentQuery = (queryTail, params, callback, pickOne = false) => {
@@ -274,8 +290,10 @@ const getAppointmentsPage = (
     baseParams.push(pattern, pattern, pattern, pattern, pattern);
   }
 
+  const awaitingDepositCondition = buildAwaitingDepositCondition('a');
   const statusClauseMap = {
-    pending: "a.status = 'pending' AND COALESCE(a.cancellation_requested, 0) = 0",
+    deposit_pending: `a.status != 'cancelled' AND ${awaitingDepositCondition}`,
+    pending: `a.status = 'pending' AND COALESCE(a.cancellation_requested, 0) = 0 AND NOT ${awaitingDepositCondition}`,
     confirmed: "a.status = 'confirmed' AND COALESCE(a.cancellation_requested, 0) = 0",
     cancellation_requested: 'COALESCE(a.cancellation_requested, 0) = 1',
     completed: "a.status = 'completed'",
@@ -305,6 +323,7 @@ const getAppointmentsPage = (
     const stats = statsRows[0] || {};
     const normalizedStats = {
       total: Number(stats.total || 0),
+      depositPending: Number(stats.deposit_pending || 0),
       pending: Number(stats.pending || 0),
       confirmed: Number(stats.confirmed || 0),
       cancellationRequested: Number(stats.cancellation_requested || 0),
@@ -312,6 +331,7 @@ const getAppointmentsPage = (
       cancelled: Number(stats.cancelled || 0)
     };
     const totalByStatus = {
+      deposit_pending: normalizedStats.depositPending,
       pending: normalizedStats.pending,
       confirmed: normalizedStats.confirmed,
       cancellation_requested: normalizedStats.cancellationRequested,
@@ -340,7 +360,8 @@ const getAppointmentsPage = (
     `
       SELECT
         COUNT(*) AS total,
-        SUM(a.status = 'pending' AND COALESCE(a.cancellation_requested, 0) = 0) AS pending,
+        SUM(a.status != 'cancelled' AND ${awaitingDepositCondition}) AS deposit_pending,
+        SUM(a.status = 'pending' AND COALESCE(a.cancellation_requested, 0) = 0 AND NOT ${awaitingDepositCondition}) AS pending,
         SUM(a.status = 'confirmed' AND COALESCE(a.cancellation_requested, 0) = 0) AS confirmed,
         SUM(COALESCE(a.cancellation_requested, 0) = 1) AS cancellation_requested,
         SUM(a.status = 'completed') AS completed,
@@ -514,6 +535,7 @@ const checkTimeConflict = (staff_id, appointment_date, requested_start_time, req
       WHERE a.staff_id = ?
         AND a.appointment_date = ?
         AND a.status != 'cancelled'
+        AND ${buildAppointmentLocksTimeCondition('a')}
         AND TIME(a.appointment_time) < TIME(?)
         AND TIME(${busyEndExpression}) > TIME(?)
       ORDER BY a.appointment_time ASC
@@ -531,24 +553,35 @@ const checkTimeConflict = (staff_id, appointment_date, requested_start_time, req
   });
 };
 
-const refreshCustomerCancellationCount = (userId, callback) => {
+const refreshCustomerCancellationRate = (userId, callback) => {
   const query = `
     UPDATE users u
-    SET cancellation_count = (
-      SELECT COUNT(*)
-      FROM appointments a
-      WHERE a.user_id = u.id
-        AND a.status = 'cancelled'
-    )
+    LEFT JOIN (
+      SELECT
+        user_id,
+        COUNT(*) AS total_bookings,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_bookings
+      FROM appointments
+      WHERE user_id = ?
+      GROUP BY user_id
+    ) stats ON stats.user_id = u.id
+    SET
+      u.cancellation_count = COALESCE(stats.cancelled_bookings, 0),
+      u.cancellation_rate = CASE
+        WHEN COALESCE(stats.total_bookings, 0) = 0 THEN 0
+        ELSE LEAST(100, GREATEST(0, ROUND(COALESCE(stats.cancelled_bookings, 0) * 100.0 / stats.total_bookings, 2)))
+      END
     WHERE u.id = ?
       AND u.role = 'customer'
   `;
 
-  db.query(query, [userId], (err, result) => {
+  db.query(query, [userId, userId], (err, result) => {
     if (err) return callback(err);
     callback(null, result);
   });
 };
+
+const refreshCustomerCancellationCount = refreshCustomerCancellationRate;
 
 module.exports = {
   createAppointment,
@@ -561,6 +594,7 @@ module.exports = {
   requestAppointmentCancellation,
   clearAppointmentCancellationRequest,
   cancelAppointment,
+  refreshCustomerCancellationRate,
   refreshCustomerCancellationCount,
   addStaffReview,
   checkTimeConflict

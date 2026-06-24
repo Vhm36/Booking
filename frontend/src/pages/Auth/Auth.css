@@ -92,31 +92,6 @@
   height: 20px;
 }
 
-.auth-card .password-requirements {
-  margin-top: 8px;
-  color: #666;
-  font-size: 13px;
-}
-
-.auth-card .password-requirements-title {
-  margin: 4px 0;
-  font-weight: 500;
-}
-
-.auth-card .password-check-list {
-  display: grid;
-  gap: 4px;
-  margin-left: 12px;
-}
-
-.auth-card .password-check-item {
-  color: #999;
-}
-
-.auth-card .password-check-item.is-valid {
-  color: #4caf50;
-}
-
 .auth-card .field-hint {
   margin-top: 8px;
   font-size: 13px;

@@ -1,0 +1,63 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-bookingsalon_root}
+      MYSQL_DATABASE: booking_system
+      MYSQL_USER: ${MYSQL_USER:-bookingsalon}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookingsalon@}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      # 1. Chuyển sang bind mount (lưu vào thư mục mysql-data cụ thể) để giữ lại dữ liệu vĩnh viễn
+      - ./mysql-data:/var/lib/mysql
+      # 2. Đổi đường dẫn trỏ thẳng vào thư mục database-init sạch để Docker tự chạy chuẩn từ đầu
+      - ./database-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      # Đồng bộ hóa thông tin kết nối chuẩn xác với hosting Mắt Bão / Tinh Gọn
+      DATABASE_URL: mysql://${MYSQL_USER:-bookingsalon}:${MYSQL_PASSWORD:-bookingsalon@}@db:3306/booking_system
+      JWT_SECRET: ${JWT_SECRET:-local_dev_secret_change_me_min_32_chars}
+      JWT_EXPIRE: 7d
+      PASSWORD_RESET_EXPIRE: 15m
+      FRONTEND_URL: https://bookingsalon.tinhgon.xyz
+      BACKEND_PUBLIC_URL: https://bookingsalon.tinhgon.xyz/api
+      FRONTEND_PAYMENT_RETURN_URL: https://bookingsalon.tinhgon.xyz/payment-result
+      GENERAL_RATE_LIMIT_MAX: 10000
+      AUTOMATION_RUN_ON_STARTUP: "false"
+      GEMINI_ENABLED: "false"
+      VIETQR_BANK_BIN: ${VIETQR_BANK_BIN:-970405}
+      VIETQR_BANK_NAME: ${VIETQR_BANK_NAME:-Agribank}
+      VIETQR_TEMPLATE: ${VIETQR_TEMPLATE:-compact2}
+      VIETQR_EXPIRE_SECONDS: ${VIETQR_EXPIRE_SECONDS:-300}
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: https://bookingsalon.tinhgon.xyz/api
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"

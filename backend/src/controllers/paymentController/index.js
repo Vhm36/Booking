@@ -31,6 +31,11 @@ const normalizePaymentMethod = (paymentMethod) => {
   return normalizedMethod;
 };
 
+const toShortTimeString = (value) => {
+  const raw = String(value || '').trim();
+  return raw.length >= 5 ? raw.slice(0, 5) : raw;
+};
+
 const getPaymentMethodLabel = (paymentMethod) => {
   if (paymentMethod === 'cash') {
     return 'tiền mặt';
@@ -255,6 +260,19 @@ const buildInvoicePayload = (payment) => ({
 
 const buildPaymentClientPayload = (payment, options = {}) => {
   const payload = buildInvoicePayload(payment);
+  const totalAmount = Number(payment?.total_amount || payment?.service_price || 0);
+  const depositAmount = Number(payment?.deposit_amount || 0);
+  const requiresDeposit = Number(payment?.deposit_required) === 1 && depositAmount > 0;
+  const depositCreditAmount = requiresDeposit
+    ? Math.min(depositAmount, Number(payment?.amount || 0))
+    : payment?.payment_status === 'paid'
+      ? Number(payment?.amount || 0)
+      : 0;
+  const depositPaidAmount = payment?.payment_status === 'paid' ? depositCreditAmount : 0;
+
+  payload.deposit_paid_amount = depositPaidAmount;
+  payload.deposit_credit_amount = depositCreditAmount;
+  payload.remaining_amount = Math.max(totalAmount - depositCreditAmount, 0);
 
   if (payment?.payment_method === 'vietqr') {
     const vietQrConfig = getVietQrConfig();
@@ -302,6 +320,31 @@ const ensurePaymentOwner = (payment, user) => {
 
 const canConfirmTransferPayment = (user) =>
   user && (user.role === 'admin' || user.role === 'staff');
+
+const ensureAppointmentCanBeLocked = (payment, callback) => {
+  const requiresDeposit = Number(payment?.deposit_required) === 1 && Number(payment?.deposit_amount || 0) > 0;
+  if (!requiresDeposit || !payment?.staff_id || !payment?.appointment_date || !payment?.appointment_time) {
+    return callback(null);
+  }
+
+  return appointmentModel.checkTimeConflict(
+    payment.staff_id,
+    payment.appointment_date,
+    payment.appointment_time,
+    payment.end_time || payment.appointment_time,
+    (conflictErr, conflictInfo) => {
+      if (conflictErr) {
+        return callback(conflictErr);
+      }
+
+      if (conflictInfo && Number(conflictInfo.id) !== Number(payment.appointment_id)) {
+        return callback(null, conflictInfo);
+      }
+
+      return callback(null);
+    }
+  );
+};
 
 const finalizePaymentResult = (payment, params, callback) => {
   if (!payment) {
@@ -396,8 +439,8 @@ const buildPaymentOptions = (req, schemaInfo) => {
   ];
 
   const recommendedMethod =
-    options.find((option) => option.enabled && option.method === 'vnpay')?.method ||
     options.find((option) => option.enabled && option.method === 'vietqr')?.method ||
+    options.find((option) => option.enabled && option.method === 'vnpay')?.method ||
     options.find((option) => option.enabled && option.method === 'banking')?.method ||
     options.find((option) => option.enabled && option.method === 'cash')?.method ||
     options.find((option) => option.enabled)?.method ||
@@ -483,13 +526,13 @@ exports.createPayment = (req, res) => {
       }
 
       if (
-        OFFLINE_PAYMENT_METHODS.has(normalizedMethod) &&
         Number(appointment.deposit_required) === 1 &&
-        Number(appointment.deposit_amount || 0) > 0
+        Number(appointment.deposit_amount || 0) > 0 &&
+        normalizedMethod !== 'vietqr'
       ) {
         return res.status(400).json({
           success: false,
-          message: 'Lịch có rủi ro hủy cao cần thanh toán cọc online để giữ chỗ.'
+          message: 'Bắt buộc đặt cọc qua VietQR trước khi khóa khung giờ hẹn.'
         });
       }
 
@@ -730,7 +773,23 @@ exports.confirmTransferPayment = (req, res) => {
       })
     };
 
-    return paymentModel.updatePaymentIfStatus(payment.id, 'pending', updateData, (updateErr, updateResult) => {
+    return ensureAppointmentCanBeLocked(payment, (lockErr, conflictInfo) => {
+      if (lockErr) {
+        console.error('[CONFIRM_TRANSFER_LOCK_CHECK_ERROR]', lockErr);
+        return res.status(500).json({
+          success: false,
+          message: 'Không thể kiểm tra khung giờ trước khi xác nhận cọc'
+        });
+      }
+
+      if (conflictInfo) {
+        return res.status(409).json({
+          success: false,
+          message: `Khung giờ này vừa được khóa bởi lịch khác từ ${toShortTimeString(conflictInfo.busy_start_time)} đến ${toShortTimeString(conflictInfo.busy_end_time)}. Không thể xác nhận khoản cọc này.`
+        });
+      }
+
+      return paymentModel.updatePaymentIfStatus(payment.id, 'pending', updateData, (updateErr, updateResult) => {
       if (updateErr) {
         console.error('[CONFIRM_TRANSFER_PAYMENT_ERROR]', updateErr);
         return res.status(500).json({
@@ -767,6 +826,7 @@ exports.confirmTransferPayment = (req, res) => {
           message: `Đã xác nhận thanh toán ${getPaymentMethodLabel(finalPaymentMethod)} thành công`,
           data: buildPaymentClientPayload(refreshedPayment)
         });
+      });
       });
     });
   });

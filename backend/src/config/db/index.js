@@ -56,65 +56,24 @@ const isLocalHost = (value) => {
   return ["localhost", "127.0.0.1", "::1"].includes(host);
 };
 
-const databaseUrl = firstEnvValue(
-  "DATABASE_URL",
-  "MYSQL_URL",
-  "MYSQL_PRIVATE_URL",
-  "MYSQL_PUBLIC_URL",
-  "DATABASE_PRIVATE_URL",
-  "DATABASE_PUBLIC_URL",
-  "RAILWAY_DATABASE_URL"
-);
+const databaseUrl = firstEnvValue("DATABASE_URL", "MYSQL_URL");
 
 const urlConfig = parseDatabaseUrl(databaseUrl);
-const railwayHost = firstEnvValue("MYSQLHOST", "MYSQL_HOST");
 const dbHostEnv = envValue("DB_HOST");
 const dbPortEnv = envValue("DB_PORT");
-const mysqlPortEnv = firstEnvValue("MYSQLPORT", "MYSQL_PORT");
 const dbUserEnv = envValue("DB_USER");
-const mysqlUserEnv = firstEnvValue("MYSQLUSER", "MYSQL_USER");
 const dbPasswordEnv = envValue("DB_PASSWORD");
-const mysqlPasswordEnv = firstEnvValue("MYSQLPASSWORD", "MYSQL_PASSWORD");
-const shouldPreferRailwayVars = Boolean(railwayHost);
 
-const configuredDbName =
-  urlConfig.database ||
-  firstEnvValue("MYSQLDATABASE", "MYSQL_DATABASE", "DB_NAME");
+const configuredDbName = urlConfig.database || envValue("DB_NAME");
 const dbName = configuredDbName || DEFAULT_LOCAL_DATABASE;
-const dbHost =
-  urlConfig.host ||
-  railwayHost ||
-  (dbHostEnv && !isLocalHost(dbHostEnv) ? dbHostEnv : undefined) ||
-  "127.0.0.1";
-const dbPort = parsePositiveInt(
-  urlConfig.port ||
-    (shouldPreferRailwayVars ? mysqlPortEnv : dbPortEnv) ||
-    dbPortEnv ||
-    mysqlPortEnv,
-  3306
-);
-const dbUser =
-  urlConfig.user ||
-  (shouldPreferRailwayVars ? mysqlUserEnv : dbUserEnv) ||
-  dbUserEnv ||
-  mysqlUserEnv ||
-  "root";
-const dbPassword =
-  urlConfig.password ||
-  (shouldPreferRailwayVars ? mysqlPasswordEnv : dbPasswordEnv) ||
-  dbPasswordEnv ||
-  mysqlPasswordEnv ||
-  "";
+const dbHost = urlConfig.host || dbHostEnv || "127.0.0.1";
+const dbPort = parsePositiveInt(urlConfig.port || dbPortEnv, 3306);
+const dbUser = urlConfig.user || dbUserEnv || "root";
+const dbPassword = urlConfig.password || dbPasswordEnv || "";
 const dbConnectTimeout = parsePositiveInt(envValue("DB_CONNECT_TIMEOUT_MS"), 10000);
 const dbConnectionLimit = parsePositiveInt(envValue("DB_CONNECTION_LIMIT"), 15);
 const dbSslMode = String(envValue("DB_SSL") || urlConfig.ssl || "").trim().toLowerCase();
-const isRailwayRuntime = Boolean(
-  process.env.RAILWAY_ENVIRONMENT ||
-    process.env.RAILWAY_PROJECT_ID ||
-    process.env.RAILWAY_SERVICE_ID ||
-    process.env.RAILWAY_DEPLOYMENT_ID
-);
-const isProductionRuntime = isRailwayRuntime || process.env.NODE_ENV === "production";
+const isProductionRuntime = process.env.NODE_ENV === "production";
 
 const connectionOptions = {
   host: dbHost,
@@ -143,10 +102,9 @@ const getConnectionContext = () => ({
   database: dbName,
   connectTimeoutMs: connectionOptions.connectTimeout,
   connectionLimit: connectionOptions.connectionLimit,
-  runtime: isRailwayRuntime ? "railway" : (process.env.NODE_ENV || "development"),
-  configSource: urlConfig.host ? "database_url" : (shouldPreferRailwayVars ? "railway_mysql_vars" : "db_vars_or_defaults"),
+  runtime: process.env.NODE_ENV || "development",
+  configSource: urlConfig.host ? "database_url" : "db_env_vars",
   hasDatabaseUrl: Boolean(databaseUrl),
-  hasMysqlHost: Boolean(railwayHost),
   hasDbHost: Boolean(dbHostEnv),
   hasConfiguredDatabase: Boolean(configuredDbName)
 });
@@ -157,9 +115,16 @@ const logConnectionDiagnostics = (err, phase) => {
   console.error("Database connection context:", context);
 
   if (err?.code === "ECONNREFUSED" && isLocalHost(connectionOptions.host)) {
-    console.error(
-      "MySQL is still configured as localhost. On Railway, add MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, and MYSQLDATABASE to the backend service."
-    );
+    if (isProductionRuntime) {
+      console.error(
+        "MySQL is still configured as localhost in production. Set DATABASE_URL or DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME to your hosting database."
+      );
+    } else {
+      console.error(
+        `Local MySQL is not reachable at ${connectionOptions.host}:${connectionOptions.port}. ` +
+          "Start MySQL/MariaDB locally, or set DATABASE_URL/DB_HOST to a reachable database."
+      );
+    }
   }
 
   if (err?.code === "ETIMEDOUT") {
@@ -181,15 +146,14 @@ const getStandaloneConnectionOptions = () => {
 const assertProductionConfig = () => {
   if (isProductionRuntime && !configuredDbName) {
     throw new Error(
-      "Missing database name. Set MYSQLDATABASE, DB_NAME, or include a database name in DATABASE_URL/MYSQL_URL."
+      "Missing database name. Set DB_NAME or include a database name in DATABASE_URL."
     );
   }
 
   if (isProductionRuntime && isLocalHost(connectionOptions.host)) {
     throw new Error(
-      "Database host is localhost in production/Railway. Add Railway MySQL variables to this backend service " +
-        "(MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE) or set DATABASE_URL/MYSQL_URL. " +
-        "Do not use DB_HOST=localhost on Railway."
+      "Database host is localhost in production. Set DATABASE_URL or DB_HOST to your hosting database. " +
+        "Do not use DB_HOST=localhost in production."
     );
   }
 };

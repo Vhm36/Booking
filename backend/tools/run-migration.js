@@ -15,13 +15,17 @@ async function main() {
     throw new Error('Migration path không hợp lệ');
   }
 
-  const sql = fs.readFileSync(migrationPath, 'utf8');
+  const sql = fs
+    .readFileSync(migrationPath, 'utf8')
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n');
 
   // Tách các câu lệnh SQL bằng dấu chấm phẩy
   const queries = sql
     .split(';')
     .map(q => q.trim())
-    .filter(q => q.length > 0 && !q.startsWith('--'));
+    .filter(q => q.length > 0);
 
   for (const query of queries) {
     console.log(`Đang thực thi truy vấn:\n${query}\n`);

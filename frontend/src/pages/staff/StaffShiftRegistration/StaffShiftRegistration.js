@@ -54,9 +54,8 @@ const buildWeekFromRows = (rows = []) =>
   });
 
 const getLeaveStatusLabel = (status) => {
-  if (status === 'approved') return 'Đã duyệt';
-  if (status === 'rejected') return 'Từ chối';
-  return 'Chờ duyệt';
+  if (status === 'rejected') return 'Đã hủy';
+  return 'Đã ghi nhận';
 };
 
 const getScheduleApiErrorMessage = (err, fallback) => {
@@ -170,13 +169,13 @@ function StaffShiftRegistration() {
     try {
       setLeaveRequestSubmitting(true);
       await staffService.requestLeave(leaveRequest);
-      setWeeklyScheduleMessage('Đã gửi yêu cầu nghỉ phép thành công. Chờ quản lý xác nhận.');
+      setWeeklyScheduleMessage('Đã ghi nhận lịch nghỉ. Bạn sẽ không được xếp lịch trong khoảng ngày này.');
       setShowLeaveRequestConfirm(false);
       setShowLeaveRequestModal(false);
       setLeaveRequest({ start_date: '', end_date: '', reason: '' });
       fetchMyLeaveRequests();
     } catch (err) {
-      window.alert(getScheduleApiErrorMessage(err, 'Có lỗi xảy ra khi gửi yêu cầu.'));
+      window.alert(getScheduleApiErrorMessage(err, 'Có lỗi xảy ra khi đăng ký nghỉ.'));
     } finally {
       setLeaveRequestSubmitting(false);
     }
@@ -259,7 +258,7 @@ function StaffShiftRegistration() {
               className="btn-leave-request"
               onClick={() => setShowLeaveRequestModal(true)}
             >
-              Yêu cầu nghỉ phép
+              Đăng ký nghỉ
             </button>
             <button
               type="button"
@@ -292,12 +291,12 @@ function StaffShiftRegistration() {
           <section className="staff-shifts-leave-history">
             <div className="staff-shifts-section-head">
               <p>Lịch sử</p>
-              <h2>Yêu cầu nghỉ phép</h2>
+              <h2>Lịch nghỉ đã đăng ký</h2>
             </div>
 
             {myLeaveRequests.length === 0 ? (
               <div className="staff-shifts-empty-state">
-                <p>Bạn chưa gửi yêu cầu nghỉ phép nào.</p>
+                <p>Bạn chưa đăng ký lịch nghỉ nào.</p>
               </div>
             ) : (
               <div className="staff-shifts-leave-list">
@@ -324,7 +323,7 @@ function StaffShiftRegistration() {
         <div className="staff-shifts-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="leave-request-title">
           <div className="staff-shifts-modal">
             <div className="staff-shifts-modal-header">
-              <h2 id="leave-request-title">Yêu cầu nghỉ phép</h2>
+              <h2 id="leave-request-title">Đăng ký nghỉ</h2>
               <button
                 type="button"
                 className="staff-shifts-modal-close"
@@ -332,7 +331,7 @@ function StaffShiftRegistration() {
                   setShowLeaveRequestConfirm(false);
                   setShowLeaveRequestModal(false);
                 }}
-                aria-label="Đóng cửa sổ yêu cầu nghỉ phép"
+                aria-label="Đóng cửa sổ đăng ký nghỉ"
               >
                 ×
               </button>
@@ -367,7 +366,7 @@ function StaffShiftRegistration() {
               </div>
               <div className="staff-shifts-modal-actions">
                 <button type="submit" className="btn-submit-leave">
-                  Gửi yêu cầu
+                  Đăng ký nghỉ
                 </button>
                 <button
                   type="button"
@@ -389,8 +388,8 @@ function StaffShiftRegistration() {
         <div className="staff-shifts-modal-overlay staff-shifts-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="leave-confirm-title">
           <div className="staff-shifts-confirm-modal">
             <div className="staff-shifts-confirm-head">
-              <h2 id="leave-confirm-title">Xác nhận gửi yêu cầu?</h2>
-              <p>Yêu cầu nghỉ phép sẽ được gửi cho quản lý xét duyệt.</p>
+              <h2 id="leave-confirm-title">Xác nhận đăng ký nghỉ?</h2>
+              <p>Lịch nghỉ sẽ có hiệu lực ngay sau khi xác nhận.</p>
             </div>
             <div className="staff-shifts-confirm-details">
               <div>
@@ -421,7 +420,7 @@ function StaffShiftRegistration() {
                 onClick={confirmSubmitLeaveRequest}
                 disabled={leaveRequestSubmitting}
               >
-                {leaveRequestSubmitting ? 'Đang gửi...' : 'Xác nhận gửi'}
+                {leaveRequestSubmitting ? 'Đang ghi nhận...' : 'Xác nhận nghỉ'}
               </button>
             </div>
           </div>

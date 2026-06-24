@@ -7,6 +7,10 @@
  */
 
 const db = require('../../config/db');
+const {
+  buildAppointmentLocksTimeCondition,
+  calculateDepositAmount
+} = require('../appointmentDeposit');
 
 const queryAsync = (sql, params = []) =>
   new Promise((resolve, reject) => {
@@ -56,12 +60,15 @@ const TOOL_REGISTRY = {
             SELECT 1
             FROM staff_leave_requests slr
             WHERE slr.staff_id = u.id
-              AND slr.status = 'approved'
+              AND slr.status <> 'rejected'
               AND ? BETWEEN slr.start_date AND slr.end_date
           )
           AND u.id NOT IN (
-            SELECT staff_id FROM appointments
-            WHERE appointment_date = ? AND appointment_time = ? AND status IN ('pending','confirmed')
+            SELECT a.staff_id FROM appointments a
+            WHERE a.appointment_date = ?
+              AND a.appointment_time = ?
+              AND a.status IN ('pending','confirmed')
+              AND ${buildAppointmentLocksTimeCondition('a')}
           )
         ORDER BY u.name
       `;
@@ -171,8 +178,11 @@ const TOOL_REGISTRY = {
          WHERE u.role = 'staff' AND u.is_active = 1
            AND (sr.role_name IS NULL OR LOWER(sr.role_name) NOT LIKE '%thu ng%')
            AND u.id NOT IN (
-             SELECT staff_id FROM appointments
-             WHERE appointment_date = ? AND appointment_time = ? AND status IN ('pending','confirmed')
+             SELECT a.staff_id FROM appointments a
+             WHERE a.appointment_date = ?
+               AND a.appointment_time = ?
+               AND a.status IN ('pending','confirmed')
+               AND ${buildAppointmentLocksTimeCondition('a')}
            )
          ORDER BY RAND() LIMIT 1`,
         [date, time]
@@ -190,12 +200,13 @@ const TOOL_REGISTRY = {
       const endH = Math.floor((h * 60 + m + endTimeMinutes) / 60);
       const endM = (h * 60 + m + endTimeMinutes) % 60;
       const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:00`;
+      const depositAmount = calculateDepositAmount(service.price, 20);
 
       // Create appointment
       const result = await queryAsync(
-        `INSERT INTO appointments (user_id, service_id, staff_id, appointment_date, appointment_time, end_time, total_amount, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
-        [userId, service_id, staff.id, date, time, endTime, service.price]
+        `INSERT INTO appointments (user_id, service_id, staff_id, appointment_date, appointment_time, end_time, total_amount, status, deposit_required, deposit_amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 1, ?)`,
+        [userId, service_id, staff.id, date, time, endTime, service.price, depositAmount]
       );
 
       // Insert appointment_services
@@ -214,7 +225,8 @@ const TOOL_REGISTRY = {
         time,
         end_time: endTime,
         price: `${Number(service.price).toLocaleString('vi-VN')} VNĐ`,
-        message: `✅ Đã đặt lịch thành công! Mã lịch hẹn: #${result.insertId}`
+        deposit_amount: `${Number(depositAmount).toLocaleString('vi-VN')} VNĐ`,
+        message: `Đã tạo lịch chờ đặt cọc. Khách cần cọc ${Number(depositAmount).toLocaleString('vi-VN')} VNĐ qua VietQR để khóa khung giờ. Mã lịch hẹn: #${result.insertId}`
       };
     }
   },
@@ -349,7 +361,7 @@ const TOOL_REGISTRY = {
           `SELECT v.code, v.voucher_type, v.discount_amount, v.discount_percent, v.max_discount_amount, v.min_order_value, v.expiry_date, v.description
            FROM voucher_assignments va
            JOIN vouchers v ON va.voucher_id = v.id
-           WHERE va.customer_id = ?
+           WHERE va.user_id = ?
              AND va.status = 'active'
              AND va.usage_count < va.max_usage_customer
              AND v.status = 'active'
@@ -438,7 +450,7 @@ const TOOL_REGISTRY = {
           'Thứ 2 - Thứ 6': '08:00 - 21:00',
           'Thứ 7 - Chủ nhật': '07:00 - 23:00'
         },
-        note: 'Ca sáng và ca tối được quản lý theo lịch nhân viên. Ngày nghỉ xử lý bằng yêu cầu xin nghỉ đã duyệt.',
+        note: 'Ca sáng và ca tối được quản lý theo lịch nhân viên. Ngày nghỉ có hiệu lực ngay khi nhân viên đăng ký.',
         contact: 'Liên hệ qua hotline hoặc đặt lịch trực tiếp trên website.'
       };
     }

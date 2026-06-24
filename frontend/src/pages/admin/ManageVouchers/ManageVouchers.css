@@ -871,3 +871,200 @@
     overflow: hidden;
   }
 }
+
+/* Stable dense list layout for admin voucher rows */
+.voucher-admin-list {
+  gap: 10px;
+  padding: 2px 6px 10px 2px;
+}
+
+.voucher-ticket-card {
+  overflow: visible;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.voucher-ticket-card:hover {
+  transform: none;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.voucher-ticket-main {
+  display: grid;
+  grid-template-columns: 136px 1px minmax(0, 1fr);
+  min-height: 106px;
+  align-items: stretch;
+}
+
+.voucher-ticket-left {
+  width: auto;
+  min-height: 106px;
+  padding: 12px 10px;
+  border-radius: 14px 0 0 14px;
+  overflow: hidden;
+}
+
+.voucher-ticket-left::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.16), transparent 32%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent 45%);
+  pointer-events: none;
+}
+
+.ticket-discount-wrap {
+  position: relative;
+  z-index: 1;
+  gap: 6px;
+}
+
+.ticket-discount-val {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.05;
+}
+
+.ticket-discount-val.long-val {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.ticket-discount-lbl {
+  line-height: 1.2;
+}
+
+.ticket-notch {
+  width: 14px;
+  height: 14px;
+  right: -7px;
+}
+
+.voucher-ticket-divider {
+  width: 1px;
+  border-left-width: 1px;
+  border-left-color: #cbd5e1;
+}
+
+.voucher-ticket-right {
+  min-width: 0;
+  min-height: 106px;
+  padding: 12px 14px;
+  gap: 7px;
+}
+
+.ticket-header-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.ticket-header-actions {
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.ticket-code {
+  max-width: min(34ch, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+.ticket-actions-group {
+  flex: 0 0 auto;
+}
+
+.ticket-action-mini {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
+.ticket-desc {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-usage-progress {
+  margin: 0;
+}
+
+.progress-bar-container {
+  height: 7px;
+  margin-bottom: 5px;
+}
+
+.voucher-ticket-info-row {
+  margin-top: 0;
+  padding-top: 7px;
+}
+
+.voucher-assign-drawer {
+  border-radius: 0 0 14px 14px;
+}
+
+@media (max-width: 900px) {
+  .voucher-ticket-main {
+    grid-template-columns: 112px 1px minmax(0, 1fr);
+  }
+
+  .ticket-header-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .ticket-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .ticket-code {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 680px) {
+  .voucher-ticket-main {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .voucher-ticket-left {
+    width: 100%;
+    min-height: 78px;
+    height: auto;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .ticket-discount-wrap {
+    flex-direction: row;
+  }
+
+  .ticket-notch {
+    display: none;
+  }
+
+  .voucher-ticket-divider {
+    width: 100%;
+    height: 1px;
+    border-left: 0;
+    border-top: 1px dashed #cbd5e1;
+  }
+
+  .voucher-ticket-right {
+    min-height: 0;
+  }
+}

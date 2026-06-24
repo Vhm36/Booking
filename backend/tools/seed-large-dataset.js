@@ -769,7 +769,7 @@ const seedHistoricalVoucherAutomation = async (customers) => {
         await query(
           `
             INSERT INTO voucher_assignments (
-              voucher_id, customer_id, assigned_date, max_usage_customer,
+              voucher_id, user_id, assigned_date, max_usage_customer,
               status, source, reason, created_at
             ) VALUES ?
           `,

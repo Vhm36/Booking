@@ -208,16 +208,6 @@ function RoleSidebar({ user, onLogout, presenceStatus = 'offline' }) {
           </span>
         </NavLink>
 
-        <a
-          href="/login?session=new"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="role-sidebar__new-session"
-        >
-          <Icon name="profile" />
-          <span>Tài khoản khác</span>
-        </a>
-
         <button type="button" className="role-sidebar__logout" onClick={handleLogout}>
           <Icon name="logout" />
           <span>Đăng xuất</span>

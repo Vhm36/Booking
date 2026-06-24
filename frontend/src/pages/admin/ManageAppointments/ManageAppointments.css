@@ -53,7 +53,7 @@
 
 .appointments-stats {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -304,6 +304,10 @@
   background: linear-gradient(180deg, #fffaf2 0%, #fff5e8 100%);
 }
 
+.appointments-table tbody tr.has-deposit-pending {
+  background: linear-gradient(180deg, #fffdf4 0%, #fef7df 100%);
+}
+
 .appointments-table tbody tr.has-pending-confirmation {
   background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 100%);
 }
@@ -507,6 +511,12 @@
 
 .payment-stack strong {
   word-break: break-word;
+}
+
+.deposit-note {
+  color: #0f766e !important;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .action-buttons {

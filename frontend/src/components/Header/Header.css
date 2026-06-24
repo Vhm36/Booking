@@ -71,7 +71,6 @@
 .user-menu,
 .btn-login,
 .btn-register,
-.btn-new-session,
 .btn-logout {
   transition:
     transform 0.24s ease,
@@ -707,26 +706,6 @@
   font-size: 13px;
 }
 
-.btn-new-session {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 9px 14px;
-  border: 1px solid #99d8d2;
-  border-radius: 10px;
-  background: #f0fdfa;
-  color: #0f766e;
-  font-size: 13px;
-  font-weight: 800;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.btn-new-session:hover {
-  border-color: #0f766e;
-  background: #dff7f3;
-}
-
 .btn-logout:hover {
   border-color: #fda4af;
   background: #ffe8eb;
@@ -882,7 +861,6 @@
   .user-menu,
   .btn-login,
   .btn-register,
-  .btn-new-session,
   .btn-logout {
     width: 100%;
   }

@@ -83,6 +83,106 @@ const ensureIndex = async (databaseName, tableName, indexName, definition) => {
   console.log(`Added ${indexName}`);
 };
 
+const getForeignKeyConstraint = async (databaseName, tableName, columnName, referencedTableName = null) => {
+  const referencedFilter = referencedTableName ? 'AND REFERENCED_TABLE_NAME = ?' : '';
+  const params = [databaseName, tableName, columnName];
+  if (referencedTableName) {
+    params.push(referencedTableName);
+  }
+
+  const rows = await query(
+    `
+      SELECT CONSTRAINT_NAME
+      FROM information_schema.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = ?
+        AND TABLE_NAME = ?
+        AND COLUMN_NAME = ?
+        AND REFERENCED_TABLE_NAME IS NOT NULL
+        ${referencedFilter}
+      LIMIT 1
+    `,
+    params
+  );
+
+  return rows[0]?.CONSTRAINT_NAME || null;
+};
+
+const replaceIndexIfNeeded = async (
+  databaseName,
+  tableName,
+  oldIndexName,
+  newIndexName,
+  definition,
+  { unique = false } = {}
+) => {
+  const hasOldIndex = await indexExists(databaseName, tableName, oldIndexName);
+  const hasNewIndex = await indexExists(databaseName, tableName, newIndexName);
+
+  if (hasOldIndex && !hasNewIndex) {
+    await query(`ALTER TABLE ${quoteId(tableName)} DROP INDEX ${quoteId(oldIndexName)}`);
+    console.log(`Dropped ${oldIndexName}`);
+  }
+
+  const hasNewIndexAfterDrop = await indexExists(databaseName, tableName, newIndexName);
+  if (!hasNewIndexAfterDrop) {
+    const indexType = unique ? 'UNIQUE KEY' : 'INDEX';
+    await query(`ALTER TABLE ${quoteId(tableName)} ADD ${indexType} ${quoteId(newIndexName)} ${definition}`);
+    console.log(`Added ${newIndexName}`);
+  }
+};
+
+const ensureVoucherAssignmentUserColumn = async (databaseName) => {
+  const hasUserId = await columnExists(databaseName, 'voucher_assignments', 'user_id');
+  const hasCustomerId = await columnExists(databaseName, 'voucher_assignments', 'customer_id');
+
+  if (!hasUserId && hasCustomerId) {
+    const oldForeignKey = await getForeignKeyConstraint(
+      databaseName,
+      'voucher_assignments',
+      'customer_id'
+    );
+
+    if (oldForeignKey) {
+      await query(`ALTER TABLE voucher_assignments DROP FOREIGN KEY ${quoteId(oldForeignKey)}`);
+      console.log(`Dropped ${oldForeignKey}`);
+    }
+
+    await query('ALTER TABLE voucher_assignments CHANGE COLUMN customer_id user_id INT NOT NULL');
+    console.log('Renamed voucher_assignments.customer_id to user_id');
+  } else if (!hasUserId) {
+    await query('ALTER TABLE voucher_assignments ADD COLUMN user_id INT NOT NULL AFTER voucher_id');
+    console.log('Added voucher_assignments.user_id');
+  } else {
+    console.log('voucher_assignments.user_id already exists');
+  }
+
+  await replaceIndexIfNeeded(
+    databaseName,
+    'voucher_assignments',
+    'uniq_voucher_customer',
+    'uniq_voucher_user',
+    '(voucher_id, user_id)',
+    { unique: true }
+  );
+  await replaceIndexIfNeeded(
+    databaseName,
+    'voucher_assignments',
+    'idx_voucher_assignments_customer',
+    'idx_voucher_assignments_user',
+    '(user_id)'
+  );
+
+  const userForeignKey = await getForeignKeyConstraint(databaseName, 'voucher_assignments', 'user_id', 'users');
+  if (!userForeignKey) {
+    await query(
+      'ALTER TABLE voucher_assignments ADD CONSTRAINT fk_voucher_assignments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE'
+    );
+    console.log('Added fk_voucher_assignments_user');
+  } else {
+    console.log(`${userForeignKey} already exists`);
+  }
+};
+
 const ensureVoucherTables = async (databaseName) => {
   if (!(await tableExists(databaseName, 'vouchers'))) {
     await query(
@@ -125,7 +225,7 @@ const ensureVoucherTables = async (databaseName) => {
         CREATE TABLE voucher_assignments (
           id INT AUTO_INCREMENT PRIMARY KEY,
           voucher_id INT NOT NULL,
-          customer_id INT NOT NULL,
+          user_id INT NOT NULL,
           assigned_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           max_usage_customer INT NOT NULL DEFAULT 1,
           usage_count INT NOT NULL DEFAULT 0,
@@ -143,16 +243,16 @@ const ensureVoucherTables = async (databaseName) => {
           total_discount_applied DECIMAL(10,2) NOT NULL DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          UNIQUE KEY uniq_voucher_customer (voucher_id, customer_id),
-          INDEX idx_voucher_assignments_customer (customer_id),
+          UNIQUE KEY uniq_voucher_user (voucher_id, user_id),
+          INDEX idx_voucher_assignments_user (user_id),
           INDEX idx_voucher_assignments_voucher (voucher_id),
           INDEX idx_voucher_assignments_status (status),
           INDEX idx_voucher_assignments_source (source),
           INDEX idx_voucher_assignments_shown_date (shown_date),
           CONSTRAINT fk_voucher_assignments_voucher
             FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE CASCADE,
-          CONSTRAINT fk_voucher_assignments_customer
-            FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_voucher_assignments_user
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
           CONSTRAINT fk_voucher_assignments_last_appointment
             FOREIGN KEY (last_appointment_id) REFERENCES appointments(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -163,6 +263,7 @@ const ensureVoucherTables = async (databaseName) => {
   }
 
   console.log('voucher_assignments table already exists');
+  await ensureVoucherAssignmentUserColumn(databaseName);
   await ensureColumn(databaseName, 'voucher_assignments', 'source', "ENUM('admin', 'system', 'bot') NOT NULL DEFAULT 'admin' AFTER status");
   await ensureColumn(databaseName, 'voucher_assignments', 'reason', 'VARCHAR(255) NULL AFTER source');
   await ensureColumn(databaseName, 'voucher_assignments', 'confidence_score', 'FLOAT NULL AFTER reason');

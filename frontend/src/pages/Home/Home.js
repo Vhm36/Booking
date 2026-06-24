@@ -605,16 +605,6 @@ function Home({ userLocation = null }) {
     navigate(buildServiceUrl('', date, category));
   };
 
-  const todayFormatted = useMemo(() => {
-    const now = new Date();
-    return now.toLocaleDateString('vi-VN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  }, []);
-
   return (
     <div className="home-fresha">
       <section className="fresha-hero">
@@ -627,7 +617,6 @@ function Home({ userLocation = null }) {
 
           <form className="fresha-search" onSubmit={handleSearchSubmit}>
             <div className="search-field">
-              <label>Dịch vụ</label>
               <input
                 type="text"
                 value={keyword}
@@ -637,7 +626,6 @@ function Home({ userLocation = null }) {
             </div>
 
             <div className="search-field">
-              <label>Hôm nay, {todayFormatted}</label>
               <input
                 type="date"
                 lang="vi"
@@ -716,10 +704,6 @@ function Home({ userLocation = null }) {
             {/* ===== TRENDING SECTION - Category-based ===== */}
             {trendingCategories.length > 0 && (
               <div className="listing-group trending-section">
-                <div className="trending-header">
-                  <h3>Được đặt nhiều</h3>
-                </div>
-
                 <>
                   <div className="trending-category-tabs">
                     <button

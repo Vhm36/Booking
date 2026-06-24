@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "build": "npm --prefix frontend run build",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
     "vercel-build": "npm --prefix frontend run build && node scripts/prepare-vercel-output.js"
   },
   "engines": {

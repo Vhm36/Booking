@@ -8,12 +8,47 @@ const APPOINTMENTS_PER_PAGE = 2;
 const hasCancellationRequest = (appointment) =>
   Number(appointment?.cancellation_requested) === 1 && appointment?.status !== 'cancelled';
 
+const getDepositRequiredAmount = (appointment) => Number(appointment?.deposit_amount || 0);
+
+const getDepositPaidAmount = (appointment) => {
+  const required = getDepositRequiredAmount(appointment);
+  const explicitPaid = Number(appointment?.deposit_paid_amount || 0);
+
+  if (explicitPaid > 0) {
+    return Math.min(required, explicitPaid);
+  }
+
+  if (appointment?.payment_status === 'paid') {
+    return Math.min(required, Number(appointment?.payment_amount || 0));
+  }
+
+  return 0;
+};
+
+const getRemainingAmount = (appointment) => {
+  if (typeof appointment?.remaining_amount !== 'undefined' && appointment?.remaining_amount !== null) {
+    return Number(appointment.remaining_amount || 0);
+  }
+
+  return Math.max(Number(appointment?.booking_total_amount || appointment?.total_amount || 0) - getDepositPaidAmount(appointment), 0);
+};
+
+const isAwaitingDeposit = (appointment) =>
+  appointment?.status !== 'cancelled' &&
+  Number(appointment?.deposit_required) === 1 &&
+  getDepositRequiredAmount(appointment) > 0 &&
+  getDepositPaidAmount(appointment) < getDepositRequiredAmount(appointment);
+
 const isAwaitingStaffConfirmation = (appointment) =>
-  appointment?.status === 'pending' && !hasCancellationRequest(appointment);
+  appointment?.status === 'pending' && !hasCancellationRequest(appointment) && !isAwaitingDeposit(appointment);
 
 const getStatusBadge = (appointment) => {
   if (hasCancellationRequest(appointment)) {
     return { label: 'Chờ xác nhận hủy', class: 'badge-cancel-request' };
+  }
+
+  if (isAwaitingDeposit(appointment)) {
+    return { label: 'Chờ đặt cọc VietQR', class: 'badge-payment-pending' };
   }
 
   if (
@@ -361,11 +396,15 @@ function MyAppointments() {
 
   const handleOnlinePayment = async (appointment) => {
     const enabledMethods = new Set(paymentOptions.filter((option) => option.enabled).map((option) => option.method));
+    const requiresVietQrDeposit =
+      Number(appointment?.deposit_required) === 1 && getDepositRequiredAmount(appointment) > 0;
     const preferredMethod =
-      [
-        'vnpay',
-        'vietqr'
-      ].find((method) => method && enabledMethods.has(method)) || 'cash';
+      requiresVietQrDeposit
+        ? (enabledMethods.has('vietqr') ? 'vietqr' : 'cash')
+        : [
+            'vnpay',
+            'vietqr'
+          ].find((method) => method && enabledMethods.has(method)) || 'cash';
 
     if (preferredMethod === 'cash') {
       window.alert('Hiện tại chưa có phương thức thanh toán online khả dụng.');
@@ -442,30 +481,30 @@ function MyAppointments() {
         </div>
       )}
 
-      <div className="filter-buttons">
-        <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => changeFilter('all')}>
+      <div className="my-appointments-filter-buttons">
+        <button className={`my-appointments-filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => changeFilter('all')}>
           Tất cả ({stats.total})
         </button>
-        <button className={`filter-btn ${filter === 'pending' ? 'active' : ''}`} onClick={() => changeFilter('pending')}>
+        <button className={`my-appointments-filter-btn ${filter === 'pending' ? 'active' : ''}`} onClick={() => changeFilter('pending')}>
           Chờ xác nhận ({stats.pending})
         </button>
-        <button className={`filter-btn ${filter === 'confirmed' ? 'active' : ''}`} onClick={() => changeFilter('confirmed')}>
+        <button className={`my-appointments-filter-btn ${filter === 'confirmed' ? 'active' : ''}`} onClick={() => changeFilter('confirmed')}>
           Đã xác nhận ({stats.confirmed})
         </button>
         <button
-          className={`filter-btn ${filter === 'unpaid' ? 'active' : ''}`}
+          className={`my-appointments-filter-btn ${filter === 'unpaid' ? 'active' : ''}`}
           onClick={() => changeFilter('unpaid')}
         >
           Chờ thanh toán ({stats.unpaid})
         </button>
         <button
-          className={`filter-btn ${filter === 'cancellation_requested' ? 'active' : ''}`}
+          className={`my-appointments-filter-btn ${filter === 'cancellation_requested' ? 'active' : ''}`}
           onClick={() => changeFilter('cancellation_requested')}
         >
           Chờ hủy ({stats.cancellationRequested})
         </button>
         <button
-          className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
+          className={`my-appointments-filter-btn ${filter === 'completed' ? 'active' : ''}`}
           onClick={() => changeFilter('completed')}
         >
           Hoàn thành ({stats.completed})
@@ -483,8 +522,14 @@ function MyAppointments() {
           {paginatedAppointments.map((appointment) => {
             const statusInfo = getStatusBadge(appointment);
             const draft = reviewDrafts[appointment.id] || { rating: '5', review: '' };
-            const paymentMeta = formatPaymentStatus(appointment.payment_status);
             const totalAmount = appointment.booking_total_amount || appointment.payment_amount || appointment.service_price || 0;
+            const requiresDeposit = Number(appointment.deposit_required) === 1 && getDepositRequiredAmount(appointment) > 0;
+            const paymentMeta =
+              requiresDeposit &&
+              getDepositPaidAmount(appointment) >= getDepositRequiredAmount(appointment) &&
+              getRemainingAmount(appointment) > 0
+                ? { label: 'Đã cọc', className: 'payment-pill paid' }
+                : formatPaymentStatus(appointment.payment_status);
             const hasBillAction = appointment.payment_status === 'paid' && appointment.payment_id;
             const hasPaymentAction = canPayOnline(appointment);
             const hasCancelAction = canRequestCancellation(appointment);
@@ -504,6 +549,11 @@ function MyAppointments() {
                       <small>
                         {formatPaymentMethodLabel(appointment.payment_method)} · {paymentMeta.label}
                       </small>
+                      {requiresDeposit && (
+                        <small className="booking-deposit-line">
+                          Cọc {formatMoney(getDepositPaidAmount(appointment))}/{formatMoney(getDepositRequiredAmount(appointment))}; còn lại {formatMoney(getRemainingAmount(appointment))}
+                        </small>
+                      )}
                     </div>
                     <span className={`badge ${statusInfo.class}`}>{statusInfo.label}</span>
                   </div>

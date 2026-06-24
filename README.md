@@ -143,6 +143,18 @@ PORT=5000
 FRONTEND_URL=http://localhost:3000
 ```
 
+Railway backend service variables:
+
+```env
+MYSQLHOST=${{MySQL.MYSQLHOST}}
+MYSQLPORT=${{MySQL.MYSQLPORT}}
+MYSQLUSER=${{MySQL.MYSQLUSER}}
+MYSQLPASSWORD=${{MySQL.MYSQLPASSWORD}}
+MYSQLDATABASE=${{MySQL.MYSQLDATABASE}}
+```
+
+Do not set `DB_HOST=127.0.0.1` or `DB_HOST=localhost` on Railway. Add these variables to the backend service, not only to the MySQL service, then redeploy the backend.
+
 Biến tùy chọn:
 
 ```env
@@ -219,19 +231,6 @@ http://localhost:3000
 - `GET /api/auth/profile`
 - `PUT /api/auth/profile`
 - `POST /api/auth/avatar`
-
-### Services
-
-- `GET /api/services`
-- `GET /api/services/:id`
-- `GET /api/services/categories`
-- `GET /api/services/trending`
-- `GET /api/services/recommendations`
-- `GET /api/services/admin/all`
-- `POST /api/services`
-- `PUT /api/services/:id`
-- `PUT /api/services/:id/price`
-- `DELETE /api/services/:id`
 
 ### Bookings
 

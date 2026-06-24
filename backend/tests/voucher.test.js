@@ -63,7 +63,9 @@ describe('Voucher Service - Mã Giảm Giá', () => {
       };
 
       // Giả lập truy vấn SQL trả về voucher
-      db.query.mockResolvedValueOnce([[mockVoucherRow]]);
+      db.query
+        .mockResolvedValueOnce([{}])
+        .mockResolvedValueOnce([[mockVoucherRow]]);
       
       // Mock getCustomerSegment
       jest.spyOn(voucherService, 'getCustomerSegment').mockResolvedValue('regular');
@@ -92,7 +94,9 @@ describe('Voucher Service - Mã Giảm Giá', () => {
         max_usage_customer: 1
       };
 
-      db.query.mockResolvedValueOnce([[mockVoucherRow]]);
+      db.query
+        .mockResolvedValueOnce([{}])
+        .mockResolvedValueOnce([[mockVoucherRow]]);
       jest.spyOn(voucherService, 'getCustomerSegment').mockResolvedValue('regular');
 
       const result = await voucherService.validateVoucherForCustomer({

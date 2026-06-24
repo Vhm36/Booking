@@ -10,7 +10,12 @@ const { getToolsForOpenAI, executeTool } = require('../toolRegistry');
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-const isGeminiEnabled = () => Boolean(process.env.GEMINI_API_KEY);
+const GEMINI_DISABLED_VALUES = new Set(['0', 'false', 'off', 'no']);
+
+const isGeminiEnabled = () => {
+  const enabledValue = String(process.env.GEMINI_ENABLED ?? 'true').trim().toLowerCase();
+  return Boolean(process.env.GEMINI_API_KEY) && !GEMINI_DISABLED_VALUES.has(enabledValue);
+};
 
 // =============================================================================
 // Helpers
@@ -236,7 +241,11 @@ const generateSalonAIReply = async ({
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+        const error = new Error(`Gemini API error ${response.status}: ${errorText}`);
+        error.status = response.status;
+        error.responseBody = errorText;
+        error.isQuotaExceeded = response.status === 429;
+        throw error;
       }
 
       const data = await response.json();
@@ -326,7 +335,7 @@ const generateSalonAIReply = async ({
       toolsUsed: []
     };
   } catch (err) {
-    console.error('[Gemini Error]', err.message);
+    console.error(err.isQuotaExceeded ? '[Gemini Quota Exceeded]' : '[Gemini Error]', err.message);
     throw err;
   }
 };

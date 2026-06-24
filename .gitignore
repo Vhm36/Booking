@@ -5,6 +5,9 @@ frontend/build/
 artifacts/
 backend/.env
 frontend/.env
+.env.local
+backend/.env.local
+frontend/.env.local
 tmp_utf8_test.txt
 *.log
 .tools/
@@ -18,3 +21,9 @@ __tmpcmd__.cmd
 backend/.npmrc
 frontend/.npmrc
 scripts/use-local-node.ps1
+backend/uploads/
+.vercel/
+
+codex-frontend-build-check/
+
+backend.zip

@@ -13,9 +13,34 @@ const {
   normalizeSelectedServiceIds,
   summarizeSelectedServices
 } = require('../../utils/appointmentServices');
+const { calculateDepositAmount, normalizeDepositPercent } = require('../../utils/appointmentDeposit');
 
 const CUSTOMER_CANCELLABLE_STATUSES = new Set(['pending', 'confirmed']);
 const AUTOMATION_TRIGGER_STATUSES = new Set(['completed', 'cancelled']);
+
+const getDepositPaidAmount = (appointment) => {
+  const depositAmount = Number(appointment?.deposit_amount || 0);
+  const explicitPaid = Number(appointment?.deposit_paid_amount || 0);
+
+  if (Number.isFinite(explicitPaid) && explicitPaid > 0) {
+    return Math.min(depositAmount, explicitPaid);
+  }
+
+  if (appointment?.payment_status === 'paid') {
+    return Math.min(depositAmount, Number(appointment?.payment_amount || 0));
+  }
+
+  return 0;
+};
+
+const hasPaidRequiredDeposit = (appointment) => {
+  const required = Number(appointment?.deposit_required) === 1 && Number(appointment?.deposit_amount || 0) > 0;
+  if (!required) {
+    return true;
+  }
+
+  return getDepositPaidAmount(appointment) >= Number(appointment.deposit_amount || 0);
+};
 
 const enrichAppointmentsWithCustomerInsights = async (appointments = []) => {
   if (!Array.isArray(appointments) || appointments.length === 0) {
@@ -75,6 +100,22 @@ const canManageAppointment = (appointment, currentUser) => {
   }
 
   return false;
+};
+
+exports.getCancellationScore = async (req, res) => {
+  try {
+    const appointmentDate = req.body.appointment_date || req.body.appointmentDate;
+    const appointmentTime = req.body.appointment_time || req.body.appointmentTime;
+    const result = await calculateCancellationScore(req.user.id, appointmentDate, appointmentTime);
+
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    console.error('[BOOKING_CANCELLATION_SCORE_ERROR]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể tính điểm rủi ro hủy lịch'
+    });
+  }
 };
 
 const sendZaloStatusNotification = (appointment, status, cancelReason = '') => {
@@ -284,8 +325,8 @@ exports.createAppointment = (req, res) => {
                   let cancellationScore = {
                     score: 0,
                     riskLevel: 'low',
-                    requireDeposit: false,
-                    depositPercent: 0
+                    requireDeposit: true,
+                    depositPercent: 20
                   };
 
                   try {
@@ -298,11 +339,14 @@ exports.createAppointment = (req, res) => {
                     console.error('[CANCELLATION_SCORE_CREATE_ERROR]', scoreErr.message);
                   }
 
-                  const depositPercent = Number(cancellationScore.depositPercent || 0);
-                  const depositRequired = Boolean(cancellationScore.requireDeposit);
-                  const depositAmount = depositRequired && finalTotal > 0
-                    ? Math.min(finalTotal, Math.max(1000, Math.round((finalTotal * depositPercent) / 100)))
-                    : 0;
+                  const depositPercent = normalizeDepositPercent(cancellationScore.depositPercent || 20);
+                  const depositRequired = finalTotal > 0;
+                  const depositAmount = depositRequired ? calculateDepositAmount(finalTotal, depositPercent) : 0;
+                  cancellationScore = {
+                    ...cancellationScore,
+                    requireDeposit: depositRequired,
+                    depositPercent
+                  };
                   const appointmentData = {
                     user_id,
                     service_id: requestedServiceIds[0],
@@ -554,6 +598,13 @@ exports.updateAppointmentStatus = (req, res) => {
       });
     }
 
+    if (['confirmed', 'completed'].includes(String(status).toLowerCase()) && !hasPaidRequiredDeposit(appointment)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lịch này chưa đặt cọc VietQR nên chưa thể khóa/nhận lịch.'
+      });
+    }
+
     appointmentModel.updateAppointmentStatus(
       id,
       status,
@@ -566,13 +617,11 @@ exports.updateAppointmentStatus = (req, res) => {
           });
         }
 
-        if (status === 'cancelled') {
-          appointmentModel.refreshCustomerCancellationCount(appointment.user_id, (refreshErr) => {
-            if (refreshErr) {
-              console.error('[REFRESH_CANCELLATION_COUNT_ERROR]', refreshErr);
-            }
-          });
-        }
+        appointmentModel.refreshCustomerCancellationRate(appointment.user_id, (refreshErr) => {
+          if (refreshErr) {
+            console.error('[REFRESH_CANCELLATION_RATE_ERROR]', refreshErr);
+          }
+        });
 
       emitDashboardUpdate(req, 'appointment.status_updated', {
         appointmentId: Number(id),
@@ -613,9 +662,9 @@ exports.cancelAppointment = (req, res) => {
           return res.status(500).json({ success: false, message: 'Lỗi server', error: cancelErr });
         }
 
-        appointmentModel.refreshCustomerCancellationCount(appointment.user_id, (refreshErr) => {
+        appointmentModel.refreshCustomerCancellationRate(appointment.user_id, (refreshErr) => {
           if (refreshErr) {
-            console.error('[REFRESH_CANCELLATION_COUNT_ERROR]', refreshErr);
+            console.error('[REFRESH_CANCELLATION_RATE_ERROR]', refreshErr);
           }
         });
         emitDashboardUpdate(req, 'appointment.cancelled', {
@@ -668,9 +717,9 @@ exports.cancelAppointment = (req, res) => {
         return res.status(500).json({ success: false, message: 'Lỗi server', error: cancelErr });
       }
 
-      appointmentModel.refreshCustomerCancellationCount(appointment.user_id, (refreshErr) => {
+      appointmentModel.refreshCustomerCancellationRate(appointment.user_id, (refreshErr) => {
         if (refreshErr) {
-          console.error('[REFRESH_CANCELLATION_COUNT_ERROR]', refreshErr);
+          console.error('[REFRESH_CANCELLATION_RATE_ERROR]', refreshErr);
         }
       });
       emitDashboardUpdate(req, 'appointment.cancelled', {
@@ -793,9 +842,9 @@ exports.confirmCancellationRequest = (req, res) => {
         return res.status(500).json({ success: false, message: 'Lỗi server', error: cancelErr });
       }
 
-      appointmentModel.refreshCustomerCancellationCount(appointment.user_id, (refreshErr) => {
+      appointmentModel.refreshCustomerCancellationRate(appointment.user_id, (refreshErr) => {
         if (refreshErr) {
-          console.error('[REFRESH_CANCELLATION_COUNT_ERROR]', refreshErr);
+          console.error('[REFRESH_CANCELLATION_RATE_ERROR]', refreshErr);
         }
       });
       emitDashboardUpdate(req, 'appointment.cancelled', {

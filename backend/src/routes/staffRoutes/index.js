@@ -30,12 +30,13 @@ router.put(
   staffController.replaceWeeklyAvailability
 );
 
-// Leave requests (Staff)
+// Leave records (Staff): effective immediately after registration
 router.post('/leave-request', verifyToken, staffController.requestLeave);
 router.get('/my-leave-requests', verifyToken, staffController.getMyLeaveRequests);
 
-// Leave requests (Admin)
+// Leave records (Admin)
 router.get('/leave-requests', verifyToken, verifyAdmin, staffController.getAllLeaveRequests);
+// Deprecated: leave records are no longer approved/rejected by managers.
 router.put('/leave-requests/:id/status', verifyToken, verifyAdmin, staffController.updateLeaveRequestStatus);
 
 router.get('/', verifyToken, verifyAdmin, staffController.getAllStaff);

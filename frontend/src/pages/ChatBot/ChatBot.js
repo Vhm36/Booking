@@ -526,7 +526,7 @@ function ChatBot() {
           </div>
         </dl>
         {bookingData.deposit_required && (
-          <p>AI yêu cầu cọc {formatCurrency(bookingData.deposit_amount)} để giữ chỗ.</p>
+          <p>Cần cọc {formatCurrency(bookingData.deposit_amount)} qua VietQR để khóa khung giờ.</p>
         )}
       </div>
     );

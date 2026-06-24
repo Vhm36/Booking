@@ -246,7 +246,7 @@ class VoucherService {
       `
         INSERT INTO voucher_assignments (
           voucher_id,
-          customer_id,
+          user_id,
           max_usage_customer,
           status,
           source,
@@ -361,13 +361,14 @@ class VoucherService {
           va.usage_count,
           va.max_usage_customer,
           va.status AS assignment_status,
-          va.customer_id,
+          va.user_id,
+          va.user_id AS customer_id,
           ${getVoucherStatusExpression()} AS effective_status,
           DATEDIFF(v.expiry_date, NOW()) AS days_remaining
         FROM vouchers v
         JOIN voucher_assignments va ON va.voucher_id = v.id
         WHERE v.code = ?
-          AND va.customer_id = ?
+          AND va.user_id = ?
         LIMIT 1
       `,
       [normalizedCode, customerId]
@@ -462,7 +463,7 @@ class VoucherService {
           DATEDIFF(v.expiry_date, NOW()) AS days_remaining
         FROM voucher_assignments va
         JOIN vouchers v ON va.voucher_id = v.id
-        WHERE va.customer_id = ?
+        WHERE va.user_id = ?
         ORDER BY
           CASE WHEN va.status = 'active' AND v.status = 'active' AND v.expiry_date > NOW() THEN 0 ELSE 1 END,
           v.expiry_date ASC
@@ -498,7 +499,7 @@ class VoucherService {
             status = CASE WHEN usage_count + 1 >= max_usage_customer THEN 'used' ELSE status END
           WHERE id = ?
             AND voucher_id = ?
-            AND customer_id = ?
+            AND user_id = ?
         `,
         [appointmentId, discountApplied, discountApplied, assignmentId, voucherId, customerId]
       );

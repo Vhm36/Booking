@@ -73,7 +73,46 @@ const formatTime12h = (minutes) => {
   return `${h}:${String(m).padStart(2, '0')}`;
 };
 
-const getStatusInfo = (status) => {
+const formatMoney = (value) => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
+
+const getDepositRequiredAmount = (appointment) => Number(appointment?.deposit_amount || 0);
+
+const getDepositPaidAmount = (appointment) => {
+  const required = getDepositRequiredAmount(appointment);
+  const explicitPaid = Number(appointment?.deposit_paid_amount || 0);
+
+  if (explicitPaid > 0) {
+    return Math.min(required, explicitPaid);
+  }
+
+  if (appointment?.payment_status === 'paid') {
+    return Math.min(required, Number(appointment?.payment_amount || 0));
+  }
+
+  return 0;
+};
+
+const getRemainingAmount = (appointment) => {
+  if (typeof appointment?.remaining_amount !== 'undefined' && appointment?.remaining_amount !== null) {
+    return Number(appointment.remaining_amount || 0);
+  }
+
+  return Math.max(Number(appointment?.total_amount || 0) - getDepositPaidAmount(appointment), 0);
+};
+
+const isAwaitingDeposit = (appointment) =>
+  appointment?.status !== 'cancelled' &&
+  Number(appointment?.deposit_required) === 1 &&
+  getDepositRequiredAmount(appointment) > 0 &&
+  getDepositPaidAmount(appointment) < getDepositRequiredAmount(appointment);
+
+const getStatusInfo = (value) => {
+  const appointment = typeof value === 'object' && value !== null ? value : null;
+  if (appointment && isAwaitingDeposit(appointment)) {
+    return { label: 'Chờ cọc VietQR', cls: 'deposit' };
+  }
+
+  const status = appointment ? appointment.status : value;
   const map = {
     pending: { label: 'Chờ xác nhận', cls: 'pending' },
     confirmed: { label: 'Đã xác nhận', cls: 'confirmed' },
@@ -116,7 +155,8 @@ const AppointmentBlock = ({ appointment, color, onClick }) => {
   const duration = Number(appointment.total_duration || appointment.duration || 60);
   const topPx = ((startMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT;
   const heightPx = Math.max((duration / 60) * HOUR_HEIGHT - 3, 30);
-  const statusInfo = getStatusInfo(appointment.status);
+  const statusInfo = getStatusInfo(appointment);
+  const requiresDeposit = Number(appointment.deposit_required) === 1 && getDepositRequiredAmount(appointment) > 0;
 
   const endMinutes = startMinutes + duration;
   const timeLabel = `${formatTime12h(startMinutes)}`;
@@ -141,6 +181,11 @@ const AppointmentBlock = ({ appointment, color, onClick }) => {
       )}
       {heightPx > 64 && (
         <div className="sc-appt-duration">{duration} phút</div>
+      )}
+      {requiresDeposit && heightPx > 74 && (
+        <div className="sc-appt-deposit">
+          Cọc {formatMoney(getDepositPaidAmount(appointment))}/{formatMoney(getDepositRequiredAmount(appointment))}
+        </div>
       )}
     </div>
   );
@@ -185,7 +230,8 @@ const NowIndicator = () => {
 const AppointmentDetailModal = ({ appointment, onClose, onStatusChange, processing }) => {
   if (!appointment) return null;
 
-  const statusInfo = getStatusInfo(appointment.status);
+  const statusInfo = getStatusInfo(appointment);
+  const awaitingDeposit = isAwaitingDeposit(appointment);
 
   return (
     <div className="sc-modal-overlay" onClick={onClose}>
@@ -217,7 +263,23 @@ const AppointmentDetailModal = ({ appointment, onClose, onStatusChange, processi
           </div>
           <div className="sc-detail-row">
             <span className="sc-detail-label">Tổng tiền</span>
-            <strong>{Number(appointment.total_amount || 0).toLocaleString('vi-VN')} VNĐ</strong>
+            <strong>{formatMoney(appointment.total_amount)}</strong>
+          </div>
+          {Number(appointment.deposit_required) === 1 && getDepositRequiredAmount(appointment) > 0 && (
+            <>
+              <div className="sc-detail-row">
+                <span className="sc-detail-label">Đã đặt cọc</span>
+                <strong>{formatMoney(getDepositPaidAmount(appointment))} / {formatMoney(getDepositRequiredAmount(appointment))}</strong>
+              </div>
+              <div className="sc-detail-row">
+                <span className="sc-detail-label">Còn thu</span>
+                <strong>{formatMoney(getRemainingAmount(appointment))}</strong>
+              </div>
+            </>
+          )}
+          <div className="sc-detail-row">
+            <span className="sc-detail-label">Thanh toán</span>
+            <strong>{appointment.payment_reference || 'Chưa có mã đối soát'}</strong>
           </div>
           <div className="sc-detail-row">
             <span className="sc-detail-label">Trạng thái</span>
@@ -225,7 +287,7 @@ const AppointmentDetailModal = ({ appointment, onClose, onStatusChange, processi
           </div>
         </div>
         <div className="sc-modal-actions">
-          {appointment.status === 'pending' && (
+          {appointment.status === 'pending' && !awaitingDeposit && (
             <button
               className="sc-btn sc-btn-confirm"
               onClick={() => onStatusChange(appointment.id, 'confirmed')}
@@ -353,7 +415,8 @@ function StaffScheduleCalendar() {
   // ── Stats ──
   const stats = useMemo(() => ({
     totalPeriod: periodAppointments.length,
-    pending: periodAppointments.filter(a => a.status === 'pending').length,
+    depositPending: periodAppointments.filter(a => isAwaitingDeposit(a)).length,
+    pending: periodAppointments.filter(a => a.status === 'pending' && !isAwaitingDeposit(a)).length,
     confirmed: periodAppointments.filter(a => a.status === 'confirmed').length,
     completed: periodAppointments.filter(a => a.status === 'completed').length,
     staffCount: visibleStaff.length
@@ -429,8 +492,11 @@ function StaffScheduleCalendar() {
             { key: 'customer_name', header: 'Khách hàng', width: 22 },
             { key: 'customer_phone', header: 'SĐT', width: 14 },
             { key: 'service_name', header: 'Dịch vụ', width: 28 },
-            { key: 'status', header: 'Trạng thái', width: 16, transform: (v) => getStatusInfo(v).label },
-            { key: 'total_amount', header: 'Tổng tiền (VNĐ)', width: 18, transform: (v) => Number(v || 0) }
+            { key: 'status', header: 'Trạng thái', width: 16, transform: (v, row) => getStatusInfo(row).label },
+            { key: 'total_amount', header: 'Tổng tiền (VNĐ)', width: 18, transform: (v) => Number(v || 0) },
+            { key: 'deposit_amount', header: 'Cọc yêu cầu (VNĐ)', width: 18, transform: (v) => Number(v || 0) },
+            { key: 'deposit_paid_amount', header: 'Đã cọc (VNĐ)', width: 16, transform: (v, row) => getDepositPaidAmount(row) },
+            { key: 'remaining_amount', header: 'Còn thu (VNĐ)', width: 16, transform: (v, row) => getRemainingAmount(row) }
           ],
           rows: exportData
         }
@@ -489,6 +555,7 @@ function StaffScheduleCalendar() {
         <div className="sc-toolbar-right">
           <div className="sc-stats-mini">
             <span className="sc-stat-item">📅 <strong>{stats.totalPeriod}</strong> lịch</span>
+            <span className="sc-stat-item sc-stat-deposit">Cọc <strong>{stats.depositPending}</strong></span>
             <span className="sc-stat-item sc-stat-pending">⏳ <strong>{stats.pending}</strong></span>
             <span className="sc-stat-item sc-stat-confirmed">✓ <strong>{stats.confirmed}</strong></span>
             <span className="sc-stat-item sc-stat-completed">✅ <strong>{stats.completed}</strong></span>
@@ -575,6 +642,7 @@ function StaffScheduleCalendar() {
                   <th>Nhân viên</th>
                   <th>Khách hàng</th>
                   <th>Dịch vụ</th>
+                  <th>Cọc</th>
                   <th>Trạng thái</th>
                   <th>Thao tác</th>
                 </tr>
@@ -599,8 +667,13 @@ function StaffScheduleCalendar() {
                       <td>{appt.customer_name}</td>
                       <td>{appt.service_name}</td>
                       <td>
-                        <span className={`sc-status-pill sc-pill-${getStatusInfo(appt.status).cls}`}>
-                          {getStatusInfo(appt.status).label}
+                        {Number(appt.deposit_required) === 1 && getDepositRequiredAmount(appt) > 0
+                          ? `${formatMoney(getDepositPaidAmount(appt))} / ${formatMoney(getDepositRequiredAmount(appt))}`
+                          : '-'}
+                      </td>
+                      <td>
+                        <span className={`sc-status-pill sc-pill-${getStatusInfo(appt).cls}`}>
+                          {getStatusInfo(appt).label}
                         </span>
                       </td>
                       <td>

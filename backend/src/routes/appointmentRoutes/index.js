@@ -18,6 +18,7 @@ const createBookingLimiter = rateLimit({
 });
 
 router.post('/', verifyToken, createBookingLimiter, validateCreateAppointment, appointmentController.createAppointment);
+router.post('/cancellation-score', verifyToken, appointmentController.getCancellationScore);
 router.get('/my-bookings', verifyToken, appointmentController.getMyAppointments);
 router.put('/:id/cancel', verifyToken, validateAppointmentId, appointmentController.cancelAppointment);
 router.put('/:id/request-cancel', verifyToken, verifyAdminOrStaff, validateAppointmentId, appointmentController.requestCancellationByStaff);

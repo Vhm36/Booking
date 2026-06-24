@@ -70,13 +70,11 @@ function Services() {
     return categoryParam ? getCategoryKey(categoryParam) : 'all';
   });
   const [query, setQuery] = useState(searchParams.get('q') || '');
-  const [preferredDate, setPreferredDate] = useState(searchParams.get('date') || '');
 
   const user = authService.getUser();
 
   useEffect(() => {
     setQuery(searchParams.get('q') || '');
-    setPreferredDate(searchParams.get('date') || '');
     const categoryParam = searchParams.get('category');
     setActiveCategory(categoryParam ? getCategoryKey(categoryParam) : 'all');
   }, [searchParams]);
@@ -256,11 +254,7 @@ function Services() {
       params.delete('q');
     }
 
-    if (preferredDate) {
-      params.set('date', preferredDate);
-    } else {
-      params.delete('date');
-    }
+    params.delete('date');
 
     if (activeCategory !== 'all') {
       params.set('category', activeCategory);
@@ -287,18 +281,13 @@ function Services() {
       params.delete('q');
     }
 
-    if (preferredDate) {
-      params.set('date', preferredDate);
-    } else {
-      params.delete('date');
-    }
+    params.delete('date');
 
     setSearchParams(params);
   };
 
   const clearFilters = () => {
     setQuery('');
-    setPreferredDate('');
     setActiveCategory('all');
     setDurationFilter('all');
     setPriceRange('all');
@@ -348,11 +337,6 @@ function Services() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Tìm theo tên dịch vụ, mô tả hoặc danh mục..."
-          />
-          <input
-            type="date"
-            value={preferredDate}
-            onChange={(event) => setPreferredDate(event.target.value)}
           />
           <button type="submit" className="btn-primary">
             Tìm dịch vụ

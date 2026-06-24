@@ -124,9 +124,10 @@ const getVoucherAssignmentColumns = async () => {
 
 const assignBirthdayVoucher = async ({ voucherId, customerId, reason }) => {
   const columns = await getVoucherAssignmentColumns();
+  const userReferenceColumn = columns.has('user_id') ? 'user_id' : 'customer_id';
   const row = {
     voucher_id: voucherId,
-    customer_id: customerId,
+    [userReferenceColumn]: customerId,
     max_usage_customer: 1,
     source: 'system',
     reason,

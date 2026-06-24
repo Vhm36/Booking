@@ -1,5 +1,6 @@
 const db = require('../../config/db');
 const { getAppointmentServiceSchemaInfo } = require('../../utils/appointmentServiceSchema');
+const { buildAppointmentLocksTimeCondition } = require('../../utils/appointmentDeposit');
 
 const DEFAULT_MAX_DAILY_STAFF_MINUTES = 8 * 60;
 
@@ -110,7 +111,7 @@ const ensureStaffLeaveRequestsTable = (callback) => {
       start_date DATE NOT NULL,
       end_date DATE NOT NULL,
       reason TEXT NOT NULL,
-      status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+      status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT fk_slr_staff_auto FOREIGN KEY (staff_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -442,6 +443,8 @@ const getAvailableStaff = (
     );
     const maxDailyMinutes = getMaxDailyStaffMinutes();
     const requestedDuration = Number(requestedDurationMinutes || 0);
+    const appointmentLocksTimeCondition = buildAppointmentLocksTimeCondition('a');
+    const dailyAppointmentLocksTimeCondition = buildAppointmentLocksTimeCondition('daily_a');
 
     const availableQuery = `
       SELECT u.id, u.name, u.email, u.phone
@@ -454,7 +457,7 @@ const getAvailableStaff = (
           SELECT 1
           FROM staff_leave_requests slr
           WHERE slr.staff_id = u.id
-            AND slr.status = 'approved'
+            AND slr.status <> 'rejected'
             AND ? BETWEEN slr.start_date AND slr.end_date
         )
         AND NOT EXISTS (
@@ -466,6 +469,7 @@ const getAvailableStaff = (
           WHERE a.staff_id = u.id
             AND a.appointment_date = ?
             AND a.status != 'cancelled'
+            AND ${appointmentLocksTimeCondition}
             AND TIME(a.appointment_time) < TIME(?)
             AND TIME(${busyEndExpression}) > TIME(?)
         )
@@ -496,6 +500,7 @@ const getAvailableStaff = (
             WHERE daily_a.staff_id = u.id
               AND daily_a.appointment_date = ?
               AND daily_a.status != 'cancelled'
+              AND ${dailyAppointmentLocksTimeCondition}
           ) + ? <= COALESCE(
             (
               SELECT MAX(FLOOR(TIME_TO_SEC(TIMEDIFF(swa_cap.end_time, swa_cap.start_time)) / 60))
@@ -533,6 +538,7 @@ const getAvailableStaff = (
         ${customerBookableStaffRoleFilter}
         AND a.appointment_date = ?
         AND a.status != 'cancelled'
+        AND ${appointmentLocksTimeCondition}
         AND TIME(a.appointment_time) < TIME(?)
         AND TIME(${busyEndExpression}) > TIME(?)
       ORDER BY u.name ASC, a.appointment_time ASC
@@ -587,6 +593,7 @@ const getBusyTimeSlots = (staffId, appointmentDate, callback) => {
 
     const { summaryJoin, busyEndExpression, bookedServiceNameExpression } =
       getAppointmentConflictExpressions(appointmentServiceSchemaInfo.hasAppointmentServicesTable);
+    const appointmentLocksTimeCondition = buildAppointmentLocksTimeCondition('a');
     const query = `
       SELECT
         a.id AS appointment_id,
@@ -603,6 +610,7 @@ const getBusyTimeSlots = (staffId, appointmentDate, callback) => {
       WHERE a.staff_id = ?
         AND a.appointment_date = ?
         AND a.status != 'cancelled'
+        AND ${appointmentLocksTimeCondition}
       ORDER BY a.appointment_time ASC
     `;
 
@@ -619,6 +627,7 @@ const confirmPendingAppointmentsForStaff = (staffId, callback) => {
 
     const { summaryJoin, busyEndExpression, bookedServiceNameExpression } =
       getAppointmentConflictExpressions(appointmentServiceSchemaInfo.hasAppointmentServicesTable);
+    const appointmentLocksTimeCondition = buildAppointmentLocksTimeCondition('a');
     const selectQuery = `
       SELECT
         a.id,
@@ -641,6 +650,7 @@ const confirmPendingAppointmentsForStaff = (staffId, callback) => {
       ${summaryJoin}
       WHERE a.staff_id = ?
         AND a.status = 'pending'
+        AND ${appointmentLocksTimeCondition}
         AND a.appointment_date >= CURDATE()
       ORDER BY a.appointment_date ASC, a.appointment_time ASC, a.id ASC
     `;
@@ -686,6 +696,7 @@ const getStaffBookedMinutes = (staffId, appointmentDate, callback) => {
       'booked_service',
       'service_summary'
     );
+    const appointmentLocksTimeCondition = buildAppointmentLocksTimeCondition('a');
     const query = `
       SELECT COALESCE(
         SUM(
@@ -703,6 +714,7 @@ const getStaffBookedMinutes = (staffId, appointmentDate, callback) => {
       WHERE a.staff_id = ?
         AND a.appointment_date = ?
         AND a.status != 'cancelled'
+        AND ${appointmentLocksTimeCondition}
     `;
 
     db.query(query, [staffId, appointmentDate], (err, rows) => {
@@ -842,7 +854,7 @@ const isStaffAvailableForWeeklySchedule = (
       SELECT 1
       FROM staff_leave_requests
       WHERE staff_id = ?
-        AND status = 'approved'
+        AND status <> 'rejected'
         AND ? BETWEEN start_date AND end_date
       LIMIT 1
     `;
@@ -933,8 +945,8 @@ const createLeaveRequest = (staffId, startDate, endDate, reason, callback) => {
     if (schemaErr) return callback(schemaErr);
 
     const query = `
-      INSERT INTO staff_leave_requests (staff_id, start_date, end_date, reason)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO staff_leave_requests (staff_id, start_date, end_date, reason, status)
+      VALUES (?, ?, ?, ?, 'approved')
     `;
     db.query(query, [staffId, startDate, endDate, reason], (err, result) => {
       if (err) return callback(err);
@@ -977,22 +989,6 @@ const getAllLeaveRequests = (callback) => {
   });
 };
 
-const updateLeaveRequestStatus = (id, status, callback) => {
-  ensureStaffLeaveRequestsTable((schemaErr) => {
-    if (schemaErr) return callback(schemaErr);
-
-    const query = `
-      UPDATE staff_leave_requests
-      SET status = ?
-      WHERE id = ?
-    `;
-    db.query(query, [status, id], (err, result) => {
-      if (err) return callback(err);
-      callback(null, result);
-    });
-  });
-};
-
 module.exports = {
   getAllStaff,
   getBookableStaff,
@@ -1017,6 +1013,5 @@ module.exports = {
   getStaffRoleNameByUserId,
   createLeaveRequest,
   getLeaveRequestsByStaff,
-  getAllLeaveRequests,
-  updateLeaveRequestStatus
+  getAllLeaveRequests
 };
